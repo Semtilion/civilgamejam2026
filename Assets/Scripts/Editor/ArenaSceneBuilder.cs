@@ -151,6 +151,15 @@ public static class ArenaSceneBuilder
         };
         arena.boss = a.colossus;
         arena.forceBoss = a.force;
+        // Day-15 horde: the default ramp x1.5 (25 / 30+5 / 30+6+4 / 40+8+8 / 30+6+6 + Colossus)
+        arena.hordeWaves = new[]
+        {
+            Wave((a.crawler, 38)),
+            Wave((a.crawler, 45), (a.spitter, 8)),
+            Wave((a.crawler, 45), (a.spitter, 9), (a.brute, 6)),
+            Wave((a.crawler, 60), (a.spitter, 12), (a.brute, 12)),
+            Wave((a.crawler, 45), (a.spitter, 9), (a.brute, 9), (a.colossus, 1)),
+        };
         arena.crate = a.crate;
         arena.oreSprite = a.square;
         arena.quakeText = quakeText;
@@ -175,6 +184,14 @@ public static class ArenaSceneBuilder
         arena.secondaryButton = secondaryButton;
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    static HordeWave Wave(params (EnemyData enemy, int count)[] groups)
+    {
+        HordeWave wave = new HordeWave { groups = new HordeGroup[groups.Length] };
+        for (int i = 0; i < groups.Length; i++)
+            wave.groups[i] = new HordeGroup { enemy = groups[i].enemy, count = groups[i].count };
+        return wave;
     }
 
     // Invisible child sprite a weapon flashes on each attack (the weapon sets its alpha, size and rotation).

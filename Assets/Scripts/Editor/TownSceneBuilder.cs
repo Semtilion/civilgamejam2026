@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the detail panel (Give button) and the Dive button.
+// news, one button per faction leader, the detail panel (Give button), the Dive button and the epilogue screen.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -43,11 +43,20 @@ public static class TownSceneBuilder
         Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 56), 24);
         ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -158);
 
-        // Bottom-right: dive (becomes "New game" once the town has fallen)
+        // Bottom-right: dive ("Defend the town" on the horde day)
         Button dive = NewButton("DIVE", canvas, new Vector2(360, 110), 36);
         RectTransform diveRect = (RectTransform)dive.transform;
         diveRect.anchoredPosition = new Vector2(-40, 40);
         Pin(diveRect, new Vector2(1f, 0f));
+
+        // Epilogue: covers everything once the game has ended (last child, so it draws on top and blocks clicks)
+        Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.04f, 0.96f));
+        Stretch(epilogue.rectTransform);
+        Text epilogueTitle = NewText("Title", epilogue.transform, new Vector2(0, 330), new Vector2(1600, 100), 72, TextAnchor.MiddleCenter);
+        Text epilogueBody = NewText("Body", epilogue.transform, new Vector2(0, 20), new Vector2(1500, 460), 30, TextAnchor.MiddleCenter);
+        Button newGame = NewButton("New game", epilogue.transform, new Vector2(360, 100), 36);
+        ((RectTransform)newGame.transform).anchoredPosition = new Vector2(0, -350);
+        epilogue.gameObject.SetActive(false);
 
         TownManager town = new GameObject("Town Manager").AddComponent<TownManager>();
         town.config = a.townConfig;
@@ -59,6 +68,10 @@ public static class TownSceneBuilder
         town.detailBody = detailBody;
         town.giveButton = giveButton;
         town.diveButton = dive;
+        town.epiloguePanel = epilogue.gameObject;
+        town.epilogueTitle = epilogueTitle;
+        town.epilogueBody = epilogueBody;
+        town.newGameButton = newGame;
 
         EditorSceneManager.SaveScene(scene);
     }

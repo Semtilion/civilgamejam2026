@@ -87,6 +87,14 @@ public class LevelUp : MonoBehaviour
         }
     }
 
+    // Free level-up picks (the final horde starts with some).
+    public void GrantPicks(int count)
+    {
+        if (!levelingEnabled) return;
+        pendingPicks += count;
+        TryShowCards();
+    }
+
     public void AddXp(int amount)
     {
         if (!levelingEnabled) return;

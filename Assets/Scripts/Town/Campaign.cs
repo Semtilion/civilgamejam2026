@@ -49,6 +49,19 @@ public class Campaign
     public int materials;
     public float quakeMeter; // %
 
+    // Run stats for the ending screen (every dive counts, lost ones too).
+    public int totalKills;
+    public int totalOres;
+    public int deepestDepth;
+
+    // The game is over (the Town shows the epilogue): won or lost, and why.
+    public bool Ended { get; private set; }
+    public bool Won { get; private set; }
+    public string endingReason;
+
+    // Day 15: the only thing left is to defend the town from the horde.
+    public bool IsHordeDay => day >= config.hordeDay && !Ended;
+
     // The day the current requests are due (and new ones arrive).
     public int NextQuestDay => day + config.questInterval - (day - 1) % config.questInterval;
 
@@ -118,6 +131,22 @@ public class Campaign
         RefreshQuests();
     }
 
+    // ---------- Run stats and endings ----------
+
+    public void RecordDive(int kills, int depth, int ores)
+    {
+        totalKills += kills;
+        totalOres += ores;
+        deepestDepth = Mathf.Max(deepestDepth, depth);
+    }
+
+    public void EndGame(bool won, string reason)
+    {
+        Ended = true;
+        Won = won;
+        endingReason = reason;
+    }
+
     // ---------- Days ----------
 
     // Called by the arena when a dive ends. Survived: keep the materials, kills count for requests, mined ores lower
@@ -150,8 +179,8 @@ public class Campaign
             quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);
             if (System.Array.IndexOf(config.earthquakeDays, day) >= 0) Earthquake();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
-            if (day == config.hordeDay)
-                news.Add($"Day {day}: the final horde should attack today. (Not built yet.)");
+            if (day == config.hordeDay && !Ended)
+                news.Add($"Day {day}: the horde is coming! Defend the town.");
         }
     }
 
@@ -191,7 +220,11 @@ public class Campaign
         }
 
         quakeMeter = Mathf.Min(100f, config.quakeStart + config.quakePassivePerDay * (day - 1));
-        if (GameOver) news.Add("Every faction is gone. The town has fallen.");
+        if (GameOver && !Ended)
+        {
+            news.Add("Every faction is gone. The town has fallen.");
+            EndGame(false, "The earthquakes wiped out every faction.");
+        }
     }
 
     // Request day: unfinished requests fail (that NPC's help weakens a tier), then every leader left asks for something new.

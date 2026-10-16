@@ -36,7 +36,8 @@ public class Player : MonoBehaviour
     public Sprite idleSprite;
     [Tooltip("Looped while moving.")]
     public Sprite[] walkSprites;
-    public float walkFps = 8f;
+    [Tooltip("Walk pose swaps per second (animation only; move speed is separate).")]
+    public float walkFps = 6f;
 
     [Header("Motion (moves only the Body child, pivoted at the feet)")]
     [Tooltip("How high he bounces on each step, in world units.")]

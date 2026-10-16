@@ -3,8 +3,8 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
-// selected leader (their faction's people, their help, their request, Give button), and Dive. State lives in
-// Campaign.Current. When every faction is wiped out, Dive becomes "New game".
+// selected leader (their faction's people, their help, their request, Give button), and Dive ("Defend the town" on the
+// horde day). State lives in Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen.
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -21,6 +21,11 @@ public class TownManager : MonoBehaviour
     public Text detailBody;
     public Button giveButton;
     public Button diveButton;
+    [Header("Epilogue (shown when the game has ended)")]
+    public GameObject epiloguePanel;
+    public Text epilogueTitle;
+    public Text epilogueBody;
+    public Button newGameButton;
 
     Campaign campaign;
     int selected;
@@ -40,22 +45,14 @@ public class TownManager : MonoBehaviour
             npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
-        diveButton.onClick.AddListener(OnDive);
-
-        Refresh();
-    }
-
-    void OnDive()
-    {
-        if (campaign.GameOver)
+        diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene)); // the arena runs the horde on day 15
+        newGameButton.onClick.AddListener(() =>
         {
             Campaign.StartNew(config);
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        }
-        else
-        {
-            SceneManager.LoadScene(arenaScene);
-        }
+        });
+
+        Refresh();
     }
 
     void Refresh()
@@ -69,7 +66,32 @@ public class TownManager : MonoBehaviour
         for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
         ShowDetail(selected);
 
-        SetLabel(diveButton, campaign.GameOver ? "Town fallen\nNew game" : "DIVE");
+        SetLabel(diveButton, campaign.IsHordeDay ? "DEFEND\nTHE TOWN" : "DIVE");
+        ShowEpilogue();
+    }
+
+    // Result, what became of each faction, and a few run stats.
+    void ShowEpilogue()
+    {
+        epiloguePanel.SetActive(campaign.Ended);
+        if (!campaign.Ended) return;
+
+        epilogueTitle.text = campaign.Won ? "THE ISLAND IS SAVED" : "THE TOWN HAS FALLEN";
+        string body = campaign.endingReason + "\n";
+        for (int i = 0; i < config.npcs.Length; i++)
+        {
+            NpcDefinition definition = config.npcs[i];
+            NpcState npc = campaign.npcs[i];
+            if (!npc.Alive)
+                body += $"\nThe {definition.faction} were wiped out.";
+            else if (campaign.HelpMultiplier(i) < 1f)
+                body += $"\nThe {definition.faction} barely survived: {npc.population} of {definition.startPopulation} remain.";
+            else
+                body += $"\nThe {definition.faction} endured: {npc.population} of {definition.startPopulation} remain.";
+        }
+        body += $"\n\nDay reached: {campaign.day}     Deepest depth: {campaign.deepestDepth}     " +
+                $"Enemies killed: {campaign.totalKills}     Ores destroyed: {campaign.totalOres}";
+        epilogueBody.text = body;
     }
 
     string NextThreat()
