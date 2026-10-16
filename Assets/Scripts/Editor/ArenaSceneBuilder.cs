@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Arena.unity (called from Jam > Build Game Scenes): cave, hero with every weapon, camera, HUD,
-// straggler arrow, pause panel, leveling UI and the ArenaManager, all wired up.
+// pause panel, leveling UI and the ArenaManager, all wired up.
 public static class ArenaSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Arena.unity";
@@ -69,18 +69,12 @@ public static class ArenaSceneBuilder
         Text quakeText = NewText("Quake", canvas, new Vector2(24, 84), new Vector2(900, 32), 24, TextAnchor.MiddleLeft);
         Pin(quakeText.rectTransform, new Vector2(0f, 0f));
 
-        // Top-center: timer, boss bar
-        Text timerText = NewText("Timer", canvas, new Vector2(0, -25), new Vector2(300, 64), 52, TextAnchor.MiddleCenter);
-        Pin(timerText.rectTransform, new Vector2(0.5f, 1f));
+        // Top-center: kill goal, boss bar
+        Text goalText = NewText("Goal", canvas, new Vector2(0, -25), new Vector2(600, 64), 48, TextAnchor.MiddleCenter);
+        Pin(goalText.rectTransform, new Vector2(0.5f, 1f));
         RectTransform bossBar = NewBar("Boss Bar", canvas, new Vector2(0, -130), new Vector2(800, 22), new Color(0.90f, 0.45f, 0.20f), out RectTransform bossFill);
         Pin(bossBar, new Vector2(0.5f, 1f));
         Text bossName = NewText("Boss Name", bossBar, new Vector2(0, 26), new Vector2(800, 30), 24, TextAnchor.MiddleCenter);
-
-        // Edge arrow pointing at the nearest straggler (ArenaManager moves and rotates it)
-        Text arrow = NewText("Enemy Arrow", canvas, Vector2.zero, new Vector2(60, 60), 48, TextAnchor.MiddleCenter);
-        arrow.text = "▲";
-        arrow.color = new Color(1f, 0.85f, 0.2f);
-        arrow.gameObject.SetActive(false);
 
         // Center: pause panel (depth cleared / defeat / victory)
         Image panel = NewImage("Panel", canvas, Vector2.zero, new Vector2(1000, 440), new Color(0f, 0f, 0f, 0.85f));
@@ -149,8 +143,7 @@ public static class ArenaSceneBuilder
         arena.hpFill = hpFill;
         arena.hpText = hpText;
         arena.depthText = depthText;
-        arena.timerText = timerText;
-        arena.enemyArrow = arrow.rectTransform;
+        arena.goalText = goalText;
         arena.bossBar = bossBar.gameObject;
         arena.bossFill = bossFill;
         arena.bossName = bossName;

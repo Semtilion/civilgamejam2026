@@ -50,6 +50,6 @@ MonoBehaviour:
   materialQuestAmount: 15
   upgradeCosts: 0a000000140000001e00000028000000i
   startPopulation: 100
-  daysLostOnDefeat: 2
-  earthquakeDays: 050000000a000000i
+  daysLostOnDefeat: 1
+  earthquakeDays: 04000000070000000a0000000d000000i
   hordeDay: 15

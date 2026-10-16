@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 [System.Serializable]
@@ -13,11 +14,11 @@ public class SpawnEntry
     [Min(0f)] public float depth1Multiplier = 1f;
 }
 
-// Runs one dungeon dive (Vampire Survivors style). Every depth: survive the timer while the horde builds up.
-// Normal depth: then spawning stops and the depth is cleared once the stragglers are dead.
-// Boss depth (every `bossEvery` depths): then the boss appears while the horde keeps coming; kill it to clear.
-// The boss on `forceDepth` is the force itself (victory). After each cleared depth: go deeper or return to town.
-// The hero starts with the town's weapons and NPC buffs (Campaign); kills and materials go back to the town.
+// Runs one dungeon dive (Vampire Survivors style). Every depth: kill N enemies while the horde builds up.
+// Normal depth: reaching N clears it (leftovers vanish). Boss depth (every `bossEvery` depths): reaching N summons the
+// boss while the horde keeps coming; kill it to clear. The boss on `forceDepth` is the force itself (victory).
+// After each cleared depth: go deeper or return to town.
+// The hero starts with the town's weapons and NPC buffs (Campaign); kills, materials and ores go back to the town.
 public class ArenaManager : MonoBehaviour
 {
     public const float WallThickness = 1f;
@@ -30,7 +31,10 @@ public class ArenaManager : MonoBehaviour
     public Vector2 arenaSize = new Vector2(64f, 40f);
 
     [Header("Depth")]
-    public float depthTime = 90f;
+    [Tooltip("Kills needed to clear depth 1...")]
+    public int killsToClear = 40;
+    [Tooltip("...plus this many more for every depth below the first.")]
+    public int extraKillsPerDepth = 10;
     [Tooltip("A boss appears on every depth divisible by this (5, 10, ...).")]
     [Min(1)] public int bossEvery = 5;
     public int forceDepth = 10;
@@ -43,7 +47,7 @@ public class ArenaManager : MonoBehaviour
     public SpawnEntry[] spawnTable;
     [Tooltip("Seconds between spawns at the start of a depth...")]
     public float spawnIntervalStart = 1f;
-    [Tooltip("...and when the timer runs out (also used during a boss).")]
+    [Tooltip("...and once the kill count is reached (also used during a boss).")]
     public float spawnIntervalEnd = 0.25f;
     public int maxEnemies = 250;
     public EnemyData boss;
@@ -69,9 +73,8 @@ public class ArenaManager : MonoBehaviour
     public Text hpText;
     public Text depthText;
     public Text quakeText;
-    public Text timerText;
-    [Tooltip("Points at the nearest enemy left while clearing stragglers.")]
-    public RectTransform enemyArrow;
+    [Tooltip("Top-center: kills toward the depth's goal, or BOSS.")]
+    [FormerlySerializedAs("timerText")] public Text goalText;
     public GameObject bossBar;
     public RectTransform bossFill;
     public Text bossName;
@@ -88,16 +91,17 @@ public class ArenaManager : MonoBehaviour
 
     Campaign campaign;
     int depth;
-    int kills;
+    int kills;      // whole dive
+    int depthKills; // this depth, toward the goal
     int diveMaterials;
     int diveOres;
     readonly Dictionary<EnemyData, int> diveKills = new Dictionary<EnemyData, int>();
-    float timeLeft;
     float spawnTimer;
+    bool bossSpawned;
     Enemy currentBoss;
 
+    int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
     bool IsBossDepth => depth % bossEvery == 0 || depth >= forceDepth;
-    bool ClearingStragglers => timeLeft <= 0f && !IsBossDepth;
     float StatScale => 1f + statScalePerDepth * (depth - 1);
 
     void Awake()
@@ -107,7 +111,7 @@ public class ArenaManager : MonoBehaviour
 
     void Start()
     {
-        if (leveling == null || config == null || enemyArrow == null || quakeText == null || crate == null)
+        if (leveling == null || config == null || quakeText == null || crate == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -139,8 +143,9 @@ public class ArenaManager : MonoBehaviour
         depth++;
         ClearField();
         player.transform.position = Bounds.center;
-        timeLeft = depthTime;
+        depthKills = 0;
         spawnTimer = 0f;
+        bossSpawned = false;
         currentBoss = null;
         bossBar.SetActive(false);
         panel.SetActive(false);
@@ -169,46 +174,23 @@ public class ArenaManager : MonoBehaviour
         return point;
     }
 
+    // The horde keeps spawning until the depth is cleared (the panel pauses everything).
     void Update()
     {
         UpdateHud();
-        UpdateArrow();
         if (!IsPlaying) return;
 
-        if (timeLeft > 0f)
+        spawnTimer -= Time.deltaTime;
+        if (spawnTimer <= 0f)
         {
-            timeLeft -= Time.deltaTime;
-            if (timeLeft <= 0f)
-            {
-                if (IsBossDepth) SpawnBoss();
-                else CrumbleShooters();
-            }
+            spawnTimer = CurrentSpawnInterval();
+            if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy();
         }
-
-        if (!ClearingStragglers)
-        {
-            spawnTimer -= Time.deltaTime;
-            if (spawnTimer <= 0f)
-            {
-                spawnTimer = CurrentSpawnInterval();
-                if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy();
-            }
-        }
-        else if (NearestLivingEnemy() == null)
-        {
-            DepthCleared(0, 0); // every straggler is dead
-        }
-    }
-
-    // Stationary Spitters are a chore to hunt down, so they vanish when the clean-up starts: no kill, no loot.
-    void CrumbleShooters()
-    {
-        foreach (Enemy enemy in Enemy.All)
-            if (enemy.data.behavior == EnemyBehavior.Shooter) Destroy(enemy.gameObject);
     }
 
     void SpawnBoss()
     {
+        bossSpawned = true;
         EnemyData data = depth >= forceDepth && forceBoss != null ? forceBoss : boss;
         currentBoss = Enemy.Spawn(data, OffscreenPoint(), StatScale, player, this);
         bossName.text = data.displayName;
@@ -217,6 +199,8 @@ public class ArenaManager : MonoBehaviour
 
     public void OnEnemyKilled(Enemy enemy)
     {
+        if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
+
         if (enemy.data.behavior == EnemyBehavior.Crate) // broken crate: just its materials, not a kill
         {
             Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount, this);
@@ -224,25 +208,32 @@ public class ArenaManager : MonoBehaviour
         }
 
         kills++;
+        depthKills++;
         diveKills[enemy.data] = diveKills.TryGetValue(enemy.data, out int count) ? count + 1 : 1;
 
-        if (enemy != currentBoss)
+        if (enemy == currentBoss)
         {
-            if (Random.value < enemy.data.materialChance)
-                Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount, this);
-            if (leveling.levelingEnabled && enemy.data.xp > 0)
-                Pickup.Drop(PickupKind.Xp, xpSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, enemy.data.xp, this);
+            if (depth >= forceDepth)
+            {
+                ShowPanel("THE FORCE IS DESTROYED", "The island is safe. You win!", "New game", NewGame);
+                return;
+            }
+            int bossMaterials = Random.value < enemy.data.materialChance ? enemy.data.materialAmount : 0;
+            DepthCleared(bossMaterials, enemy.data.xp);
             return;
         }
 
-        if (depth >= forceDepth)
-        {
-            ShowPanel("THE FORCE IS DESTROYED", "The island is safe. You win!", "New game", NewGame);
-            return;
-        }
+        if (Random.value < enemy.data.materialChance)
+            Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount, this);
+        if (leveling.levelingEnabled && enemy.data.xp > 0)
+            Pickup.Drop(PickupKind.Xp, xpSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, enemy.data.xp, this);
 
-        int bossMaterials = Random.value < enemy.data.materialChance ? enemy.data.materialAmount : 0;
-        DepthCleared(bossMaterials, enemy.data.xp);
+        // Kill goal reached: a boss depth summons its boss, a normal depth is cleared.
+        if (!bossSpawned && depthKills >= KillsNeeded)
+        {
+            if (IsBossDepth) SpawnBoss();
+            else DepthCleared(0, 0);
+        }
     }
 
     // Everything still on the floor (plus any boss loot) is collected, then: go deeper or go home.
@@ -265,8 +256,7 @@ public class ArenaManager : MonoBehaviour
 
     public void OnPlayerDied()
     {
-        ShowPanel("DEFEATED", $"Everything found on this dive is lost.\nRecovering takes {config.daysLostOnDefeat} days.",
-            "Return to town", () => EndDive(false));
+        ShowPanel("DEFEATED", "Everything found on this dive is lost.", "Return to town", () => EndDive(false));
     }
 
     public void Collect(PickupKind kind, int amount)
@@ -280,7 +270,7 @@ public class ArenaManager : MonoBehaviour
         diveOres++;
     }
 
-    // Back to town: the campaign takes the loot (or not), the days pass, and the Town scene loads.
+    // Back to town: the campaign takes the loot (or not), the day passes, and the Town scene loads.
     void EndDive(bool survived)
     {
         campaign.EndDive(survived, diveKills, diveMaterials, diveOres);
@@ -297,10 +287,10 @@ public class ArenaManager : MonoBehaviour
 
     // ---------- Spawning ----------
 
-    // Spawns speed up over the timer, and more on deeper levels.
+    // Spawns speed up as the kill count gets closer to the goal, and more on deeper levels.
     float CurrentSpawnInterval()
     {
-        float progress = 1f - Mathf.Clamp01(timeLeft / depthTime);
+        float progress = Mathf.Clamp01((float)depthKills / KillsNeeded);
         float interval = Mathf.Lerp(spawnIntervalStart, spawnIntervalEnd, progress);
         return interval / (1f + spawnScalePerDepth * (depth - 1));
     }
@@ -351,37 +341,6 @@ public class ArenaManager : MonoBehaviour
         return new Vector2(Random.Range(inside.xMin, inside.xMax), Random.Range(inside.yMin, inside.yMax));
     }
 
-    // Living enemies that have to be dealt with (crates don't count).
-    static bool IsThreat(Enemy enemy)
-    {
-        return !enemy.IsDead && enemy.data.behavior != EnemyBehavior.Crate;
-    }
-
-    Enemy NearestLivingEnemy()
-    {
-        Enemy nearest = null;
-        float best = float.MaxValue;
-        foreach (Enemy enemy in Enemy.All)
-        {
-            if (!IsThreat(enemy)) continue;
-            float distance = ((Vector2)(enemy.transform.position - player.transform.position)).sqrMagnitude;
-            if (distance < best)
-            {
-                best = distance;
-                nearest = enemy;
-            }
-        }
-        return nearest;
-    }
-
-    int LivingEnemyCount()
-    {
-        int count = 0;
-        foreach (Enemy enemy in Enemy.All)
-            if (IsThreat(enemy)) count++;
-        return count;
-    }
-
     // Destroy every enemy, crate, shot, dagger, pickup and ore (they leave their lists at the end of the frame).
     void ClearField()
     {
@@ -400,34 +359,14 @@ public class ArenaManager : MonoBehaviour
         hpText.text = $"{player.Hp} / {player.maxHp}";
         string depthLabel = depth >= forceDepth ? $"Depth {depth} (the force)" : IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}";
         depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}     Materials {diveMaterials}";
+
         float oreDrop = diveOres * config.orePercent;
         string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";
         quakeText.text = $"{quake}     Ores mined {diveOres} (-{oreDrop:0}% if you get home)";
 
-        int seconds = Mathf.CeilToInt(Mathf.Max(0f, timeLeft));
-        if (timeLeft > 0f) timerText.text = $"{seconds / 60}:{seconds % 60:00}";
-        else timerText.text = IsBossDepth ? "BOSS" : $"Enemies left: {LivingEnemyCount()}";
+        goalText.text = bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
 
         if (currentBoss != null) SetFill(bossFill, (float)currentBoss.hp / currentBoss.maxHp);
-    }
-
-    // While clearing stragglers: an arrow at the screen edge points to the nearest enemy left, if it's off-screen.
-    void UpdateArrow()
-    {
-        Enemy target = IsPlaying && ClearingStragglers ? NearestLivingEnemy() : null;
-        Vector2 screen = target != null ? (Vector2)cam.WorldToScreenPoint(target.transform.position) : Vector2.zero;
-        bool offScreen = target != null && (screen.x < 0f || screen.x > Screen.width || screen.y < 0f || screen.y > Screen.height);
-        enemyArrow.gameObject.SetActive(offScreen);
-        if (!offScreen) return;
-
-        Vector2 center = new Vector2(Screen.width, Screen.height) / 2f;
-        Vector2 direction = (screen - center).normalized;
-        const float margin = 60f;
-        // Slide out from the center along the direction until the arrow hits the edge (minus the margin).
-        float reachX = direction.x != 0f ? (center.x - margin) / Mathf.Abs(direction.x) : float.MaxValue;
-        float reachY = direction.y != 0f ? (center.y - margin) / Mathf.Abs(direction.y) : float.MaxValue;
-        enemyArrow.position = center + direction * Mathf.Min(reachX, reachY);
-        enemyArrow.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f); // the glyph points up
     }
 
     // Pauses the game and shows a message with one or two buttons.

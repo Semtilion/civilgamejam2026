@@ -44,14 +44,17 @@ public class TownConfig : ScriptableObject
     [Header("Days")]
     public int startPopulation = 100;
     [Tooltip("Days that pass when the hero dies in the dungeon (a normal dive = 1 day).")]
-    public int daysLostOnDefeat = 2;
-    public int[] earthquakeDays = { 5, 10 };
+    public int daysLostOnDefeat = 1;
+    public int[] earthquakeDays = { 4, 7, 10, 13 };
     public int hordeDay = 15;
 
     [Header("Earthquakes (meter in %)")]
-    [Tooltip("Meter at the start of the game and right after each quake.")]
-    public float quakeStart = 20f;
-    public float quakePerDay = 15f;
+    [Tooltip("Meter at the start of the game; after a quake it goes back to this plus all the passive rise so far.")]
+    public float quakeStart = 30f;
+    [Tooltip("Daily rise that is undone by each quake.")]
+    public float quakePerDay = 10f;
+    [Tooltip("Daily rise that never goes away: every quake is worse than the last unless you mine ores.")]
+    public float quakePassivePerDay = 5f;
     [Tooltip("Meter removed per ore mined (only if the hero gets home safely).")]
     public float orePercent = 4f;
     [Tooltip("At this meter or above, a quake breaks the weakest unprotected NPC's building.")]

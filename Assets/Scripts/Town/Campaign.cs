@@ -64,8 +64,10 @@ public class Campaign
         }
     }
 
+    float DailyQuakeRise => config.quakePerDay + config.quakePassivePerDay;
+
     // How strong the next quake will be if no more ores are mined.
-    public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + config.quakePerDay * (NextQuakeDay - day));
+    public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
 
     Campaign(TownConfig townConfig)
     {
@@ -82,7 +84,7 @@ public class Campaign
     // ---------- Days ----------
 
     // Called by the arena when a dive ends. Survived: keep the materials, kills count for requests, mined ores lower
-    // the quake meter, 1 day passes. Defeated: everything found (ores too) is lost and `daysLostOnDefeat` days pass.
+    // the quake meter, 1 day passes. Defeated: everything found (ores too) is lost, `daysLostOnDefeat` (1) days pass.
     public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int oresMined)
     {
         if (survived)
@@ -96,19 +98,19 @@ public class Campaign
         }
         else
         {
-            news.Add($"You were defeated. Everything found on the dive is lost, and recovering takes {config.daysLostOnDefeat} days.");
+            news.Add("You were defeated. Everything found on the dive is lost.");
             AdvanceDays(config.daysLostOnDefeat);
         }
     }
 
-    // Each day: the quake meter rises; on a quake day the quake hits (before new requests, so finished ones still
-    // protect their NPC's home); on a request day the requests are refreshed.
+    // Each day: the quake meter rises (cycle + passive); on a quake day the quake hits (before new requests, so
+    // finished ones still protect their NPC's home); on a request day the requests are refreshed.
     void AdvanceDays(int count)
     {
         for (int i = 0; i < count; i++)
         {
             day++;
-            quakeMeter = Mathf.Min(100f, quakeMeter + config.quakePerDay);
+            quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);
             if (System.Array.IndexOf(config.earthquakeDays, day) >= 0) Earthquake();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
             if (day == config.hordeDay)
@@ -119,7 +121,8 @@ public class Campaign
     // 1) Homes still broken from the last quake collapse: those NPCs die.
     // 2) If the meter is at the break threshold or above, the weakest NPC whose request isn't finished
     //    (finished = their home is braced) gets their building broken: no help until repaired.
-    // 3) The meter resets. (Population doesn't change yet; it's waiting for a rework.)
+    // 3) The meter goes back to the start value plus all the passive rise so far (danger keeps growing).
+    //    (Population doesn't change yet; it's waiting for a rework.)
     void Earthquake()
     {
         news.Add($"Day {day}: EARTHQUAKE! Strength {quakeMeter:0}%.");
@@ -165,7 +168,7 @@ public class Campaign
             news.Add("The town held. Nothing broke.");
         }
 
-        quakeMeter = config.quakeStart;
+        quakeMeter = Mathf.Min(100f, config.quakeStart + config.quakePassivePerDay * (day - 1));
     }
 
     // Request day: unfinished requests fail (that NPC's help weakens a tier), then everyone alive asks for something new.
