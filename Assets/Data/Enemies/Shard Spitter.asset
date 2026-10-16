@@ -20,7 +20,8 @@ MonoBehaviour:
   moveSpeed: 2.2
   contactDamage: 5
   behavior: 1
-  preferredDistance: 6
+  fireRange: 10
+  fireWarning: 0.5
   fireInterval: 2.5
   projectileSpeed: 4
   projectileDamage: 8
@@ -28,3 +29,6 @@ MonoBehaviour:
   chargeWindup: 0.8
   chargeSpeed: 12
   chargeDuration: 0.6
+  xp: 2
+  materialChance: 0.15
+  materialAmount: 1

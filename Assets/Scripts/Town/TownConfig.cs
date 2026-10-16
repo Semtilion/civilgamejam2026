@@ -1,0 +1,72 @@
+using UnityEngine;
+
+[System.Serializable]
+public class NpcDefinition
+{
+    public string name = "NPC";
+    [Tooltip("The hero stat this NPC's help raises.")]
+    public StatType stat;
+    [Tooltip("Per tier. Max HP: flat points. Everything else: a fraction (0.05 = +5%).")]
+    public float amountPerTier;
+    [Tooltip("Their first completed request gives this weapon.")]
+    public bool unlocksWeapon;
+    public WeaponId weapon;
+    [Tooltip("Upgrades weapons with materials (gone if this NPC dies).")]
+    public bool isSmith;
+}
+
+[System.Serializable]
+public class KillQuestOption
+{
+    public EnemyData enemy;
+    public int count;
+}
+
+// All the town's rules and numbers in one asset (used by both the Town and the Arena scenes).
+[CreateAssetMenu(menuName = "Jam/Town Config")]
+public class TownConfig : ScriptableObject
+{
+    public NpcDefinition[] npcs;
+
+    [Header("Requests (quests)")]
+    [Tooltip("Every NPC gets a new request on day 1 and then every this many days. The deadline is the next request day.")]
+    public int questInterval = 3;
+    public int maxTier = 5;
+    public KillQuestOption[] killQuests;
+    [Tooltip("Chance (0-1) that a new request is 'bring materials' instead of a kill request.")]
+    [Range(0f, 1f)] public float materialQuestChance = 0.25f;
+    public int materialQuestAmount = 15;
+
+    [Header("Weapon upgrades (smith)")]
+    [Tooltip("Materials to go from level 1->2, 2->3, 3->4, 4->5.")]
+    public int[] upgradeCosts = { 10, 20, 30, 40 };
+
+    [Header("Days")]
+    public int startPopulation = 100;
+    [Tooltip("Days that pass when the hero dies in the dungeon (a normal dive = 1 day).")]
+    public int daysLostOnDefeat = 2;
+    public int[] earthquakeDays = { 5, 10 };
+    public int hordeDay = 15;
+
+    [Header("Earthquakes (meter in %)")]
+    [Tooltip("Meter at the start of the game and right after each quake.")]
+    public float quakeStart = 20f;
+    public float quakePerDay = 15f;
+    [Tooltip("Meter removed per ore mined (only if the hero gets home safely).")]
+    public float orePercent = 4f;
+    [Tooltip("At this meter or above, a quake breaks the weakest unprotected NPC's building.")]
+    public float breakAt = 40f;
+    [Tooltip("The same threshold once the town is reinforced.")]
+    public float reinforcedBreakAt = 60f;
+    public int repairCost = 20;
+    public int reinforceCost = 50;
+
+    public Quest NewQuest()
+    {
+        if (killQuests.Length == 0 || Random.value < materialQuestChance)
+            return new Quest { needed = materialQuestAmount };
+
+        KillQuestOption option = killQuests[Random.Range(0, killQuests.Length)];
+        return new Quest { target = option.enemy, needed = option.count };
+    }
+}

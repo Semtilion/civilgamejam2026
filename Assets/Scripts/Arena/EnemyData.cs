@@ -3,8 +3,9 @@ using UnityEngine;
 public enum EnemyBehavior
 {
     Chaser,  // runs straight at the hero
-    Shooter, // keeps its distance and fires projectiles
-    Boss     // chases, and every few seconds winds up and charges
+    Shooter, // never moves; flashes red, then fires at where the hero was when the flash started
+    Boss,    // chases, and every few seconds winds up and charges
+    Crate    // a breakable supply crate: never moves, harmless, weapons break it for materials (not a kill)
 }
 
 // Stats for one enemy type. Enemies are built from this at spawn time (no prefab needed).
@@ -23,9 +24,20 @@ public class EnemyData : ScriptableObject
     public float moveSpeed = 2f;
     public int contactDamage = 5;
     public EnemyBehavior behavior;
+    [Tooltip("XP gem dropped on death. A boss's XP (plus every gem on the floor) is collected automatically.")]
+    public int xp = 1;
 
-    [Header("Shooter only")]
-    public float preferredDistance = 6f;
+    [Header("Loot")]
+    [Tooltip("Chance (0-1) to drop materials on death. Bosses' materials are collected automatically.")]
+    [Range(0f, 1f)] public float materialChance;
+    public int materialAmount = 1;
+
+    [Header("Shooter only (stands still, ignores moveSpeed)")]
+    [Tooltip("Only starts a shot when the hero is this close.")]
+    public float fireRange = 10f;
+    [Tooltip("Red flash before each shot. The aim locks when the flash starts.")]
+    public float fireWarning = 0.5f;
+    [Tooltip("Seconds per shot, including the warning flash.")]
     public float fireInterval = 2.5f;
     public float projectileSpeed = 4f;
     public int projectileDamage = 8;

@@ -28,3 +28,6 @@ MonoBehaviour:
   chargeWindup: 0.7
   chargeSpeed: 14
   chargeDuration: 0.7
+  xp: 0
+  materialChance: 0
+  materialAmount: 0

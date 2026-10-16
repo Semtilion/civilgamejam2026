@@ -39,6 +39,8 @@ public class Projectile : MonoBehaviour
 
     void Update()
     {
+        if (!player.arena.IsPlaying) return;
+
         transform.position += (Vector3)(velocity * Time.deltaTime);
         age += Time.deltaTime;
 
