@@ -33,6 +33,9 @@ public class EnemyData : ScriptableObject
     public int materialAmount = 1;
     [Tooltip("Crystals dropped when a Crate-type enemy (e.g. a crystal cluster) is broken.")]
     public int crystalAmount;
+    [Tooltip("Chance (0-1) to drop gold coins on death (crates never do).")]
+    [Range(0f, 1f)] public float goldChance;
+    public int goldAmount;
 
     [Header("Shooter only (stands still, ignores moveSpeed)")]
     [Tooltip("Only starts a shot when the hero is this close.")]

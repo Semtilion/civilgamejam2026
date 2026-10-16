@@ -31,3 +31,5 @@ MonoBehaviour:
   xp: 1
   materialChance: 0.05
   materialAmount: 1
+  goldChance: 0.1
+  goldAmount: 2

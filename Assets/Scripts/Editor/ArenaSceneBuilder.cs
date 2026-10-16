@@ -98,7 +98,7 @@ public static class ArenaSceneBuilder
         RectTransform hpBar = NewBar("HP Bar", canvas, new Vector2(40, -40), new Vector2(420, 30), new Color(0.80f, 0.15f, 0.15f), out RectTransform hpFill);
         Pin(hpBar, new Vector2(0f, 1f));
         Text hpText = NewText("HP Text", hpBar, Vector2.zero, new Vector2(420, 30), 20, TextAnchor.MiddleCenter);
-        Text depthText = NewText("Depth", canvas, new Vector2(40, -80), new Vector2(900, 36), 26, TextAnchor.MiddleLeft);
+        Text depthText = NewText("Depth", canvas, new Vector2(40, -80), new Vector2(1100, 36), 26, TextAnchor.MiddleLeft);
         Pin(depthText.rectTransform, new Vector2(0f, 1f));
 
         // Bottom-left (above the level): quake meter + ores mined this dive
@@ -121,7 +121,7 @@ public static class ArenaSceneBuilder
         // Center: pause panel (depth cleared / defeat / victory)
         Image panel = NewImage("Panel", canvas, Vector2.zero, new Vector2(1000, 440), new Color(0f, 0f, 0f, 0.85f));
         Text panelTitle = NewText("Title", panel.transform, new Vector2(0, 140), new Vector2(950, 80), 56, TextAnchor.MiddleCenter);
-        Text panelBody = NewText("Body", panel.transform, new Vector2(0, 20), new Vector2(900, 140), 26, TextAnchor.MiddleCenter);
+        Text panelBody = NewText("Body", panel.transform, new Vector2(0, 5), new Vector2(900, 180), 24, TextAnchor.MiddleCenter);
         RectTransform buttonRow = NewRow("Buttons", panel.transform, new Vector2(0, -140), new Vector2(900, 90), 40);
         Button primaryButton = NewButton("Primary", buttonRow, new Vector2(320, 80));
         Button secondaryButton = NewButton("Secondary", buttonRow, new Vector2(320, 80));
@@ -203,6 +203,7 @@ public static class ArenaSceneBuilder
         arena.xpSprite = a.circle;
         arena.materialSprite = a.square;
         arena.crystalSprite = a.circle; // tinted violet by Pickup
+        arena.goldSprite = a.circle;    // tinted yellow by Pickup
         arena.cam = camera;
         arena.hpFill = hpFill;
         arena.hpText = hpText;

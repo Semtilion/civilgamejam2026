@@ -75,10 +75,10 @@ public static class GameBuilder
         a.heroWalk = new[] { HeroSprite("Hero_Walk1"), HeroSprite("Hero_Walk2") }.Where(s => s != null).ToArray();
 
         //                         name               behavior                color                          radius  hp  speed touch  xp  mat% mat
-        a.crawler  = EnemyAsset("Crystal Crawler",  EnemyBehavior.Chaser,  new Color(0.60f, 0.30f, 0.70f), 0.3f,   10, 3.2f,  5,   1, 0.05f,  1, a.circle);
-        a.brute    = EnemyAsset("Crystal Brute",    EnemyBehavior.Chaser,  new Color(0.70f, 0.30f, 0.30f), 0.6f,   60, 1.4f, 15,   3, 0.25f,  1, a.circle);
-        a.spitter  = EnemyAsset("Shard Spitter",    EnemyBehavior.Shooter, new Color(0.30f, 0.70f, 0.70f), 0.4f,   20, 2.2f,  5,   2, 0.15f,  1, a.circle);
-        a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle);
+        a.crawler  = EnemyAsset("Crystal Crawler",  EnemyBehavior.Chaser,  new Color(0.60f, 0.30f, 0.70f), 0.3f,   10, 3.2f,  5,   1, 0.05f,  1, a.circle, goldChance: 0.10f, gold: 2);
+        a.brute    = EnemyAsset("Crystal Brute",    EnemyBehavior.Chaser,  new Color(0.70f, 0.30f, 0.30f), 0.6f,   60, 1.4f, 15,   3, 0.25f,  1, a.circle, goldChance: 0.25f, gold: 5);
+        a.spitter  = EnemyAsset("Shard Spitter",    EnemyBehavior.Shooter, new Color(0.30f, 0.70f, 0.70f), 0.4f,   20, 2.2f,  5,   2, 0.15f,  1, a.circle, goldChance: 0.15f, gold: 3);
+        a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle, goldChance: 1f, gold: 50);
         a.force    = EnemyAsset("The Force",        EnemyBehavior.Boss,    new Color(0.45f, 0.10f, 0.55f), 2.2f,  800, 1.8f, 30,   0, 0f,     0, a.circle);
         a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square);
         a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
@@ -203,7 +203,8 @@ public static class GameBuilder
     }
 
     static EnemyData EnemyAsset(string name, EnemyBehavior behavior, Color color, float radius, int hp, float speed,
-        int contactDamage, int xp, float materialChance, int materialAmount, Sprite sprite, int crystals = 0)
+        int contactDamage, int xp, float materialChance, int materialAmount, Sprite sprite, int crystals = 0,
+        float goldChance = 0f, int gold = 0)
     {
         string path = $"{EnemiesFolder}/{name}.asset";
         EnemyData enemy = AssetDatabase.LoadAssetAtPath<EnemyData>(path);
@@ -221,6 +222,8 @@ public static class GameBuilder
         enemy.materialChance = materialChance;
         enemy.materialAmount = materialAmount;
         enemy.crystalAmount = crystals;
+        enemy.goldChance = goldChance;
+        enemy.goldAmount = gold;
         enemy.sprite = sprite;
         if (name == "The Force")
         {
@@ -241,10 +244,10 @@ public static class GameBuilder
         config = ScriptableObject.CreateInstance<TownConfig>();
         config.npcs = new[]
         {
-            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, stat = StatType.MaxHp,  amountPerTier = 10f,   unlocksWeapon = true, weapon = WeaponId.Whip },
-            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  stat = StatType.Damage, amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit, hasShop = true },
-            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, stat = StatType.Damage, amountPerTier = 0.05f, unlocksWeapon = true, weapon = WeaponId.Dagger },
-        };
+            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksWeapon = true, weapon = WeaponId.Whip },
+            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
+            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksWeapon = true, weapon = WeaponId.Dagger },
+        }; // their district buildings are TownConfig.buildings (code defaults)
         config.killQuests = new[]
         {
             new KillQuestOption { enemy = a.crawler, count = 40 },

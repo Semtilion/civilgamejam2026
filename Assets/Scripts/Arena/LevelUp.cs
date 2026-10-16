@@ -43,9 +43,11 @@ public class LevelUp : MonoBehaviour
     public Text[] cardDescriptions;
 
     public bool IsChoosing => cardPanel.activeSelf;
+    // XP gem multiplier (the Scrying Pool building), set by the arena at the start of every dive.
+    public float XpGain { get; set; } = 1f;
 
     int level = 1;
-    int xp;
+    float xp; // fractions add up with XpGain
     int pendingPicks;
     readonly int[] statRanks = new int[CardStats.Length];
     readonly List<Card> shownCards = new List<Card>();
@@ -67,7 +69,7 @@ public class LevelUp : MonoBehaviour
     void Update()
     {
         if (xpHud.activeSelf != levelingEnabled) xpHud.SetActive(levelingEnabled);
-        xpFill.anchorMax = new Vector2(Mathf.Clamp01((float)xp / XpToNext), 1f);
+        xpFill.anchorMax = new Vector2(Mathf.Clamp01(xp / XpToNext), 1f);
         levelText.text = $"Lv {level}";
 
         if (IsChoosing) PickWithKeys();
@@ -95,7 +97,19 @@ public class LevelUp : MonoBehaviour
         TryShowCards();
     }
 
+    // XP from gems (x XpGain).
     public void AddXp(int amount)
+    {
+        Gain(amount * XpGain);
+    }
+
+    // A share of the XP needed for the current level (the XP shrine: 0.25 = a quarter of the bar; XpGain doesn't apply).
+    public void AddLevelShare(float share)
+    {
+        Gain(XpToNext * share);
+    }
+
+    void Gain(float amount)
     {
         if (!levelingEnabled) return;
 
@@ -107,12 +121,6 @@ public class LevelUp : MonoBehaviour
             pendingPicks++;
         }
         TryShowCards();
-    }
-
-    // A share of the XP needed for the current level (the XP shrine: 0.25 = a quarter of the bar).
-    public void AddLevelShare(float share)
-    {
-        AddXp(Mathf.CeilToInt(XpToNext * share));
     }
 
     // Shows the cards if a level-up is waiting and no other panel is open.

@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum PickupKind { Xp, Materials, Crystal }
+public enum PickupKind { Xp, Materials, Crystal, Gold }
 
-// Something an enemy dropped: an XP gem, materials or a crystal. Once the hero comes within pickup range
+// Something an enemy dropped: an XP gem, materials, a crystal or gold. Once the hero comes within pickup range
 // it flies to the hero; touching it collects it (ArenaManager.Collect).
 public class Pickup : MonoBehaviour
 {
@@ -13,6 +13,7 @@ public class Pickup : MonoBehaviour
     static readonly Color XpColor = new Color(0.30f, 0.90f, 1f);
     public static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f); // also the materials shrine's color
     static readonly Color CrystalColor = new Color(0.85f, 0.55f, 1f);
+    static readonly Color GoldColor = new Color(1f, 0.85f, 0.15f);
 
     public PickupKind kind;
     public int amount;
@@ -28,7 +29,8 @@ public class Pickup : MonoBehaviour
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        renderer.color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor : CrystalColor;
+        renderer.color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor :
+            kind == PickupKind.Crystal ? CrystalColor : GoldColor;
         renderer.sortingOrder = 0;
 
         Pickup pickup = go.AddComponent<Pickup>();

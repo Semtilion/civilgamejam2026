@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class NpcState
 {
-    public int tier;
     public int population;     // the faction's people; lost people never come back
     public bool everCompleted; // their first completed request unlocks their weapon
     public Quest quest;        // null = request done (also braces their faction's homes for a quake)
@@ -21,9 +20,9 @@ public class Quest
     public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} materials";
 }
 
-// The whole playthrough: day, materials, NPCs (faction leaders) and their requests and people, unlocked weapons,
-// the quake meter, and a news log. Kept in a static so it survives switching between the Town and Arena scenes.
-// Rules come from TownConfig.
+// The whole playthrough: day, materials / crystals / gold, NPCs (faction leaders) with their requests, people and
+// district buildings, unlocked weapons, relics, the quake meter, and a news log. Kept in a static so it survives
+// switching between the Town and Arena scenes. Rules come from TownConfig.
 public class Campaign
 {
     public static Campaign Current { get; private set; }
@@ -45,12 +44,14 @@ public class Campaign
     public readonly NpcState[] npcs;
     public readonly bool[] weaponUnlocked = new bool[Weapon.Names.Length]; // by WeaponId
     public readonly bool[] relicOwned = new bool[Relics.Names.Length];     // by RelicId
+    public readonly int[] buildingLevels;                                  // by TownConfig.buildings index
     public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
     public int crystals;
+    public int gold;
     public float quakeMeter; // %
-    public readonly int[] shopRanks; // by TownConfig.shopItems index
+    float passiveRise;       // all the passive quake rise so far (never undone by quakes)
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
@@ -79,7 +80,10 @@ public class Campaign
         }
     }
 
-    float DailyQuakeRise => config.quakePerDay + config.quakePassivePerDay;
+    // Ley Stones lower the passive rise, Stone Foundations the value the meter goes back to after a quake.
+    float PassivePerDay => Mathf.Max(0f, config.quakePassivePerDay - BuildingBonus(BuildingEffect.QuakePassive));
+    float DailyQuakeRise => config.quakePerDay + PassivePerDay;
+    float QuakeBaseline => Mathf.Max(0f, config.quakeStart - BuildingBonus(BuildingEffect.QuakeStart)) + passiveRise;
 
     // How strong the next quake will be if no more ores are mined.
     public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
@@ -115,8 +119,8 @@ public class Campaign
         }
     }
 
-    // How much of an NPC's help still counts: 1 = full, 0.5 = their faction is below half, 0 = wiped out.
-    public float HelpMultiplier(int npcIndex)
+    // How strongly a leader's district buildings work: 1 = full, 0.5 = their faction is below half, 0 = wiped out.
+    public float DistrictStrength(int npcIndex)
     {
         NpcState npc = npcs[npcIndex];
         if (!npc.Alive) return 0f;
@@ -130,7 +134,7 @@ public class Campaign
         weaponUnlocked[(int)WeaponId.Sword] = true;
         npcs = new NpcState[config.npcs.Length];
         for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState { population = config.npcs[i].startPopulation };
-        shopRanks = new int[config.shopItems.Length];
+        buildingLevels = new int[config.buildings.Length];
         news.Add("Day 1: the faction leaders ask for your help before the earthquake comes.");
         RefreshQuests();
     }
@@ -153,18 +157,21 @@ public class Campaign
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive ends. Survived: keep the materials, crystals and relics, kills count for requests,
-    // mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost, `daysLostOnDefeat` (1) days pass.
-    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int oresMined,
-        IReadOnlyList<RelicId> foundRelics)
+    // Called by the arena when a dive ends. Survived: keep the materials, crystals, gold and relics, kills count for
+    // requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
+    // `daysLostOnDefeat` (1) days pass.
+    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int foundGold,
+        int oresMined, IReadOnlyList<RelicId> foundRelics)
     {
         if (survived)
         {
             materials += foundMaterials;
             crystals += foundCrystals;
+            gold += foundGold;
             float drop = oresMined * config.orePercent;
             quakeMeter = Mathf.Max(0f, quakeMeter - drop);
-            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals and {oresMined} ores destroyed (quake meter -{drop:0}%).");
+            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals, {foundGold} gold and " +
+                     $"{oresMined} ores destroyed (quake meter -{drop:0}%).");
             foreach (RelicId relic in foundRelics)
             {
                 relicOwned[(int)relic] = true;
@@ -187,6 +194,7 @@ public class Campaign
         for (int i = 0; i < count; i++)
         {
             day++;
+            passiveRise += PassivePerDay;
             quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);
             if (System.Array.IndexOf(config.earthquakeDays, day) >= 0) Earthquake();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
@@ -195,9 +203,9 @@ public class Campaign
         }
     }
 
-    // A quake at `quakeHarmAt`% or more costs every faction whose leader's request isn't finished (finished = braced,
-    // safe) strength x `lossPerQuakePercent` % of its starting people. Lost people never come back.
-    // Then the meter goes back to the start value plus all the passive rise so far (danger keeps growing).
+    // A quake at `quakeHarmAt`% or more hits every faction whose leader's request isn't finished (finished = braced,
+    // safe): it loses strength x `lossPerQuakePercent` % of its starting people (they never come back), and one of its
+    // district's buildings loses a level. Then the meter goes back to the start value plus all the passive rise so far.
     void Earthquake()
     {
         news.Add($"Day {day}: EARTHQUAKE! Strength {quakeMeter:0}%.");
@@ -220,21 +228,18 @@ public class Campaign
                     continue;
                 }
 
-                bool wasFullHelp = HelpMultiplier(i) == 1f;
+                bool wasFull = DistrictStrength(i) == 1f;
                 int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * lossShare));
                 npc.population -= lost;
                 string line = $"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation}).";
-                if (!npc.Alive)
-                {
-                    line += $" They are wiped out, and {definition.name} is gone.";
-                    if (definition.hasShop) line += " The crystal shop closes, and its upgrades are lost.";
-                }
-                else if (wasFullHelp && HelpMultiplier(i) < 1f) line += $" Under half left: {definition.name}'s help is halved.";
+                if (!npc.Alive) line += $" They are wiped out, and {definition.name} is gone. Their district stands empty.";
+                else if (wasFull && DistrictStrength(i) < 1f) line += $" Under half left: their district works at half strength.";
                 news.Add(line);
+                DamageDistrict(i);
             }
         }
 
-        quakeMeter = Mathf.Min(100f, config.quakeStart + config.quakePassivePerDay * (day - 1));
+        quakeMeter = Mathf.Min(100f, QuakeBaseline);
         if (GameOver && !Ended)
         {
             news.Add("Every faction is gone. The town has fallen.");
@@ -242,7 +247,20 @@ public class Campaign
         }
     }
 
-    // Request day: unfinished requests fail (that NPC's help weakens a tier), then every leader left asks for something new.
+    // A random built building in this leader's district loses a level.
+    void DamageDistrict(int npcIndex)
+    {
+        List<int> built = new List<int>();
+        for (int b = 0; b < config.buildings.Length; b++)
+            if (config.buildings[b].district == npcIndex && buildingLevels[b] > 0) built.Add(b);
+        if (built.Count == 0) return;
+
+        int hit = built[Random.Range(0, built.Count)];
+        buildingLevels[hit]--;
+        news.Add($"The quake damaged the {config.buildings[hit].name} (level {buildingLevels[hit]}).");
+    }
+
+    // Request day: unfinished requests fail (no gold, homes unbraced), then every leader left asks for something new.
     void RefreshQuests()
     {
         for (int i = 0; i < npcs.Length; i++)
@@ -253,11 +271,7 @@ public class Campaign
                 npc.quest = null;
                 continue;
             }
-            if (npc.quest != null && day > 1)
-            {
-                npc.tier = Mathf.Max(0, npc.tier - 1);
-                news.Add($"{config.npcs[i].name}'s request wasn't met. Their help weakens (tier {npc.tier}).");
-            }
+            if (npc.quest != null && day > 1) news.Add($"{config.npcs[i].name}'s request wasn't met.");
             npc.quest = config.NewQuest();
         }
         if (day > 1 && !GameOver) news.Add($"Day {day}: new requests from the faction leaders.");
@@ -290,13 +304,14 @@ public class Campaign
         CompleteQuest(npcIndex);
     }
 
+    // A finished request pays gold and braces the faction's homes; the first one also unlocks the leader's weapon.
     void CompleteQuest(int npcIndex)
     {
         NpcState npc = npcs[npcIndex];
         NpcDefinition definition = config.npcs[npcIndex];
         npc.quest = null;
-        npc.tier = Mathf.Min(config.maxTier, npc.tier + 1);
-        news.Add($"{definition.name}'s request is done! Their help grows (tier {npc.tier}), and the {definition.faction}' homes are braced.");
+        gold += config.questGold;
+        news.Add($"{definition.name}'s request is done! They pay you {config.questGold} gold, and the {definition.faction}' homes are braced.");
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
@@ -307,49 +322,53 @@ public class Campaign
         }
     }
 
-    // ---------- Crystal shop (the Shaman) ----------
+    // ---------- District buildings ----------
 
-    // The NPC who runs the shop (TownConfig "Has Shop"), or -1.
-    int ShopOwner
+    // Level N costs N x the per-level prices (crystals only for buildings that cost them).
+    public int BuildingMaterialCost(int b) => (buildingLevels[b] + 1) * config.materialsPerLevel;
+    public int BuildingGoldCost(int b) => (buildingLevels[b] + 1) * config.goldPerLevel;
+    public int BuildingCrystalCost(int b) => config.buildings[b].costsCrystals ? (buildingLevels[b] + 1) * config.crystalsPerLevel : 0;
+
+    // Only in a district whose faction is alive, below the max level, and if you can pay.
+    public bool CanBuild(int b)
     {
-        get
-        {
-            for (int i = 0; i < config.npcs.Length; i++)
-                if (config.npcs[i].hasShop) return i;
-            return -1;
-        }
+        return npcs[config.buildings[b].district].Alive && buildingLevels[b] < config.maxBuildingLevel &&
+               materials >= BuildingMaterialCost(b) && gold >= BuildingGoldCost(b) && crystals >= BuildingCrystalCost(b);
     }
 
-    // Open while the shop owner's faction is alive. Once they're wiped out, the shop and its upgrades are gone.
-    public bool ShopOpen => ShopOwner >= 0 && npcs[ShopOwner].Alive;
-
-    // Rank N of an upgrade costs N crystals plus N x `materialsPerCrystal` materials.
-    public int ShopCrystalCost(int item) => shopRanks[item] + 1;
-    public int ShopMaterialCost(int item) => (shopRanks[item] + 1) * config.materialsPerCrystal;
-
-    public bool CanBuy(int item)
+    public void Build(int b)
     {
-        return ShopOpen && shopRanks[item] < config.maxShopRank &&
-               crystals >= ShopCrystalCost(item) && materials >= ShopMaterialCost(item);
+        if (!CanBuild(b)) return;
+        materials -= BuildingMaterialCost(b);
+        gold -= BuildingGoldCost(b);
+        crystals -= BuildingCrystalCost(b);
+        buildingLevels[b]++;
+        Building building = config.buildings[b];
+        news.Add($"Built: {building.name} level {buildingLevels[b]} ({building.EffectText(building.amountPerLevel * buildingLevels[b])} in total).");
     }
 
-    public void Buy(int item)
+    // What one building gives right now: level x amount per level x its district's strength.
+    public float BuildingAmount(int b)
     {
-        if (!CanBuy(item)) return;
-        crystals -= ShopCrystalCost(item);
-        materials -= ShopMaterialCost(item);
-        shopRanks[item]++;
-        ShopItem shopItem = config.shopItems[item];
-        news.Add($"{config.npcs[ShopOwner].name} empowers you: {shopItem.name} rank {shopRanks[item]} " +
-                 $"({Player.StatText(shopItem.stat, shopItem.amountPerRank * shopRanks[item])} in total).");
+        Building building = config.buildings[b];
+        return building.amountPerLevel * buildingLevels[b] * DistrictStrength(building.district);
+    }
+
+    // The total of every building with this effect (not used for Stat buildings: those apply one stat each).
+    public float BuildingBonus(BuildingEffect effect)
+    {
+        float total = 0f;
+        for (int b = 0; b < config.buildings.Length; b++)
+            if (config.buildings[b].effect == effect) total += BuildingAmount(b);
+        return total;
     }
 
     // ---------- Dive setup ----------
 
     // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive,
-    // relic weapons are added after this by Relics.ResetForNewRun),
-    // plus each NPC's help (halved if their faction is below half, none if wiped out) and the crystal shop upgrades
-    // (only while the shop is open). Call after Player.ResetForNewRun.
+    // relic weapons are added after this by Relics.ResetForNewRun), plus the stat buildings of every district
+    // (half strength under half, none if wiped out). Call after Player.ResetForNewRun.
+    // The other building effects (XP, materials, healing) are read by the arena; the quake ones are used here.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
         foreach (Weapon weapon in weapons)
@@ -358,16 +377,11 @@ public class Campaign
             weapon.enabled = weapon.id == WeaponId.Sword;
         }
 
-        for (int i = 0; i < npcs.Length; i++)
+        for (int b = 0; b < config.buildings.Length; b++)
         {
-            float help = HelpMultiplier(i);
-            if (help > 0f && npcs[i].tier > 0)
-                player.AddStat(config.npcs[i].stat, config.npcs[i].amountPerTier * npcs[i].tier * help);
+            float amount = BuildingAmount(b);
+            if (config.buildings[b].effect == BuildingEffect.Stat && amount > 0f)
+                player.AddStat(config.buildings[b].stat, amount);
         }
-
-        if (!ShopOpen) return;
-        for (int i = 0; i < shopRanks.Length; i++)
-            if (shopRanks[i] > 0)
-                player.AddStat(config.shopItems[i].stat, config.shopItems[i].amountPerRank * shopRanks[i]);
     }
 }

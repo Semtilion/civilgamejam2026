@@ -6,26 +6,45 @@ public class NpcDefinition
     public string name = "NPC";
     [Tooltip("The group this NPC leads (e.g. Soldiers, Mages, Peasants).")]
     public string faction = "Faction";
-    [Tooltip("The faction's people at the start. Lost people never come back: below half = help halved, 0 = wiped out.")]
+    [Tooltip("The faction's people at the start. Lost people never come back: below half = their district works at half " +
+             "strength, 0 = wiped out (the district stops).")]
     public int startPopulation = 100;
-    [Tooltip("The hero stat this NPC's help raises.")]
-    public StatType stat;
-    [Tooltip("Per tier. Max HP: flat points. Everything else: a fraction (0.05 = +5%).")]
-    public float amountPerTier;
     [Tooltip("Their first completed request unlocks this weapon (it can then appear on level-up cards in the dungeon).")]
     public bool unlocksWeapon;
     public WeaponId weapon;
-    [Tooltip("Runs the crystal shop (the Shaman). If this faction is wiped out, the shop closes and its upgrades are lost.")]
-    public bool hasShop;
 }
 
+// What a district building does per level (see Building.amountPerLevel for the units).
+public enum BuildingEffect { Stat, QuakePassive, QuakeStart, XpGain, MaterialBonus, DepthHeal }
+
 [System.Serializable]
-public class ShopItem
+public class Building
 {
     public string name;
+    [Tooltip("Whose district it's in: index into Npcs (0 Guard, 1 Shaman, 2 Elder).")]
+    public int district;
+    public BuildingEffect effect;
+    [Tooltip("Stat buildings only.")]
     public StatType stat;
-    [Tooltip("Per rank, in Player.AddStat units (Max HP: flat; the rest: 0.1 = +10%).")]
-    public float amountPerRank;
+    [Tooltip("Per level. Stat: Player.AddStat units (Max HP flat, the rest 0.05 = +5%). QuakePassive / QuakeStart: " +
+             "% points. XpGain / DepthHeal: a share (0.15 = 15%). MaterialBonus: materials added to every drop.")]
+    public float amountPerLevel;
+    [Tooltip("Also costs crystals (the Shaman's district).")]
+    public bool costsCrystals;
+
+    // "+10 max HP", "-1% quake rise/day", ... for `amount` of this building's effect.
+    public string EffectText(float amount)
+    {
+        switch (effect)
+        {
+            case BuildingEffect.Stat: return Player.StatText(stat, amount);
+            case BuildingEffect.QuakePassive: return $"-{amount:0.#}% quake rise/day";
+            case BuildingEffect.QuakeStart: return $"quake resets {amount:0.#}% lower";
+            case BuildingEffect.XpGain: return $"+{amount * 100f:0}% XP";
+            case BuildingEffect.MaterialBonus: return $"+{amount:0.#} material per drop";
+            default: return $"heal {amount * 100f:0}% HP per depth"; // DepthHeal
+        }
+    }
 }
 
 [System.Serializable]
@@ -43,29 +62,37 @@ public class TownConfig : ScriptableObject
     public NpcDefinition[] npcs;
 
     [Header("Factions")]
-    [Tooltip("Below this share of its starting people, a faction's help is halved.")]
+    [Tooltip("Below this share of its starting people, a faction's district works at half strength.")]
     [Range(0f, 1f)] public float halfHelpBelow = 0.5f;
 
     [Header("Requests (quests)")]
     [Tooltip("Every NPC gets a new request on day 1 and then every this many days. The deadline is the next request day.")]
     public int questInterval = 3;
-    public int maxTier = 5;
+    [Tooltip("Gold paid for every finished request.")]
+    public int questGold = 50;
     public KillQuestOption[] killQuests;
     [Tooltip("Chance (0-1) that a new request is 'bring materials' instead of a kill request.")]
     [Range(0f, 1f)] public float materialQuestChance = 0.25f;
     public int materialQuestAmount = 15;
 
-    [Header("Crystal shop (run by the NPC with Has Shop)")]
-    public ShopItem[] shopItems =
+    [Header("Districts (each leader's buildings)")]
+    public Building[] buildings =
     {
-        new ShopItem { name = "Max HP", stat = StatType.MaxHp, amountPerRank = 10f },
-        new ShopItem { name = "Damage", stat = StatType.Damage, amountPerRank = 0.1f },
-        new ShopItem { name = "Attack speed", stat = StatType.AttackSpeed, amountPerRank = 0.05f },
-        new ShopItem { name = "Pickup range", stat = StatType.PickupRange, amountPerRank = 0.25f },
+        new Building { name = "Barracks", district = 0, effect = BuildingEffect.Stat, stat = StatType.MaxHp, amountPerLevel = 10f },
+        new Building { name = "Armory", district = 0, effect = BuildingEffect.Stat, stat = StatType.Damage, amountPerLevel = 0.05f },
+        new Building { name = "Training Yard", district = 0, effect = BuildingEffect.Stat, stat = StatType.AttackSpeed, amountPerLevel = 0.05f },
+        new Building { name = "Ley Stones", district = 1, effect = BuildingEffect.QuakePassive, amountPerLevel = 1f, costsCrystals = true },
+        new Building { name = "Scrying Pool", district = 1, effect = BuildingEffect.XpGain, amountPerLevel = 0.15f, costsCrystals = true },
+        new Building { name = "Crystal Altar", district = 1, effect = BuildingEffect.Stat, stat = StatType.Area, amountPerLevel = 0.1f, costsCrystals = true },
+        new Building { name = "Stone Foundations", district = 2, effect = BuildingEffect.QuakeStart, amountPerLevel = 5f },
+        new Building { name = "Workshop", district = 2, effect = BuildingEffect.MaterialBonus, amountPerLevel = 1f },
+        new Building { name = "Infirmary", district = 2, effect = BuildingEffect.DepthHeal, amountPerLevel = 0.2f },
     };
-    public int maxShopRank = 5;
-    [Tooltip("Rank N of an upgrade costs N crystals plus N x this many materials.")]
-    public int materialsPerCrystal = 5;
+    public int maxBuildingLevel = 3;
+    [Tooltip("Level N of a building costs N x these (crystals only for buildings that cost crystals).")]
+    public int materialsPerLevel = 10;
+    public int goldPerLevel = 40;
+    public int crystalsPerLevel = 1;
 
     [Header("Days")]
     [Tooltip("Days that pass when the hero dies in the dungeon (a normal dive = 1 day).")]

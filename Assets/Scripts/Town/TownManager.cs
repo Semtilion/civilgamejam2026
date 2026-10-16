@@ -1,11 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
-// selected leader (their faction's people, their help, their request, Give button, and the Shaman's crystal shop), and
-// Dive ("Defend the town" on the horde day). State lives in Campaign.Current. When the game has ended (won or lost),
-// the epilogue covers the screen.
+// selected leader (their faction's people, their request, Give button, and their district's buildings), the relics you
+// own, and Dive ("Defend the town" on the horde day). State lives in Campaign.Current. When the game has ended (won or
+// lost), the epilogue covers the screen.
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -21,8 +22,8 @@ public class TownManager : MonoBehaviour
     public Text detailTitle;
     public Text detailBody;
     public Button giveButton;
-    [Tooltip("The crystal shop, shown in the shop owner's detail panel: one button per TownConfig shop item.")]
-    public Button[] shopButtons;
+    [Tooltip("The selected leader's district: one button per building in it.")]
+    public Button[] buildingButtons;
     public Button diveButton;
     [Tooltip("Lists the relics you own.")]
     public Text relicsText;
@@ -34,6 +35,7 @@ public class TownManager : MonoBehaviour
 
     Campaign campaign;
     int selected;
+    readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
 
     // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
     int NpcCount => Mathf.Min(npcButtons.Length, config.npcs.Length);
@@ -50,10 +52,10 @@ public class TownManager : MonoBehaviour
             npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
-        for (int i = 0; i < shopButtons.Length; i++)
+        for (int i = 0; i < buildingButtons.Length; i++)
         {
-            int item = i; // copy for the lambda
-            shopButtons[i].onClick.AddListener(() => { campaign.Buy(item); Refresh(); });
+            int slot = i; // copy for the lambda
+            buildingButtons[i].onClick.AddListener(() => { campaign.Build(shownBuildings[slot]); Refresh(); });
         }
         diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene)); // the arena runs the horde on day 15
         newGameButton.onClick.AddListener(() =>
@@ -67,8 +69,8 @@ public class TownManager : MonoBehaviour
 
     void Refresh()
     {
-        statusText.text = $"Day {campaign.day}     Materials {campaign.materials}     Crystals {campaign.crystals}     " +
-                          $"Population {campaign.Population}/{campaign.StartPopulation}     {NextThreat()}";
+        statusText.text = $"Day {campaign.day}    Materials {campaign.materials}    Crystals {campaign.crystals}    " +
+                          $"Gold {campaign.gold}    Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
 
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
@@ -95,7 +97,7 @@ public class TownManager : MonoBehaviour
             NpcState npc = campaign.npcs[i];
             if (!npc.Alive)
                 body += $"\nThe {definition.faction} were wiped out.";
-            else if (campaign.HelpMultiplier(i) < 1f)
+            else if (campaign.DistrictStrength(i) < 1f)
                 body += $"\nThe {definition.faction} barely survived: {npc.population} of {definition.startPopulation} remain.";
             else
                 body += $"\nThe {definition.faction} endured: {npc.population} of {definition.startPopulation} remain.";
@@ -109,7 +111,7 @@ public class TownManager : MonoBehaviour
     {
         int quakeDay = campaign.NextQuakeDay;
         if (quakeDay > 0)
-            return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (costs people from {config.quakeHarmAt:0}%)";
+            return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (harmful from {config.quakeHarmAt:0}%)";
         return campaign.day <= config.hordeDay ? $"Horde on day {config.hordeDay}" : "";
     }
 
@@ -138,9 +140,9 @@ public class TownManager : MonoBehaviour
         NpcState npc = campaign.npcs[i];
         if (!npc.Alive) return $"{definition.name}\n{definition.faction}: WIPED OUT";
 
-        string halved = campaign.HelpMultiplier(i) < 1f ? "  (help halved)" : "";
+        string half = campaign.DistrictStrength(i) < 1f ? "  (half strength)" : "";
         string request = npc.quest == null ? "Request done (braced)" : $"{npc.quest.Describe()} ({QuestProgress(npc.quest)})";
-        return $"{definition.name}   tier {npc.tier}/{config.maxTier}\n{definition.faction} {npc.population}/{definition.startPopulation}{halved}\n{request}";
+        return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}\n{request}";
     }
 
     void ShowDetail(int i)
@@ -152,53 +154,31 @@ public class TownManager : MonoBehaviour
         string body;
         if (!npc.Alive)
         {
-            body = $"The {definition.faction} were wiped out. {definition.name} is gone, and so is their help.";
-            if (definition.hasShop) body += "\nThe crystal shop is closed, and its upgrades are lost.";
+            body = $"The {definition.faction} were wiped out. {definition.name} is gone, and their district stands empty: " +
+                   "its buildings no longer work.";
         }
         else
         {
             int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
-            float help = campaign.HelpMultiplier(i);
-            body = $"{definition.faction}: {npc.population}/{definition.startPopulation} people. Lost people never come back. " +
-                   $"Under {halfLine}, their help is halved; at 0 the faction is wiped out.";
-            body += $"\nHelp: {Player.StatText(definition.stat, definition.amountPerTier)} per tier. " +
-                    $"Tier {npc.tier}/{config.maxTier} = {Player.StatText(definition.stat, definition.amountPerTier * npc.tier * help)}" +
-                    (help < 1f ? " (halved)." : ".");
+            body = $"{definition.faction}: {npc.population}/{definition.startPopulation} people (lost ones never come back). " +
+                   $"Under {halfLine}: district at half strength. At 0: wiped out.";
             body += npc.quest != null
-                ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}."
+                ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}. Pays {config.questGold} gold."
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
             if (definition.unlocksWeapon)
             {
                 string weapon = Weapon.Names[(int)definition.weapon];
                 body += npc.everCompleted
                     ? $"\nYou have their {weapon}: it can show up on level-up cards in the dungeon."
-                    : $"\nTheir first finished request gives you the {weapon}.";
+                    : $"\nTheir first finished request also gives you the {weapon}.";
             }
             body += npc.quest == null
-                ? $"\nHomes braced: the next quake can't hurt the {definition.faction}."
-                : $"\nHomes at risk: the next quake will cost the {definition.faction} people. Finish the request to brace them.";
-            if (definition.hasShop)
-                body += $"\nCrystal shop: permanent upgrades, rank N costs N crystals + {config.materialsPerCrystal}N materials. " +
-                        $"Lost if the {definition.faction} are wiped out.";
+                ? $"\nHomes braced: the next quake can't hurt the {definition.faction} or their district."
+                : $"\nAt risk: a harmful quake costs the {definition.faction} people and a building level. Finish the request to brace them.";
         }
         detailBody.text = body;
 
-        // The crystal shop: only in the shop owner's panel, while their faction is alive.
-        bool shop = definition.hasShop && campaign.ShopOpen;
-        for (int s = 0; s < shopButtons.Length; s++)
-        {
-            bool show = shop && s < config.shopItems.Length;
-            shopButtons[s].gameObject.SetActive(show);
-            if (!show) continue;
-
-            ShopItem item = config.shopItems[s];
-            int rank = campaign.shopRanks[s];
-            SetLabel(shopButtons[s], rank >= config.maxShopRank
-                ? $"{item.name} MAX\n{Player.StatText(item.stat, item.amountPerRank * rank)} in total"
-                : $"{Player.StatText(item.stat, item.amountPerRank)}   {rank}/{config.maxShopRank}\n" +
-                  $"{campaign.ShopCrystalCost(s)} crystals + {campaign.ShopMaterialCost(s)} materials");
-            shopButtons[s].interactable = campaign.CanBuy(s);
-        }
+        ShowBuildings(i);
 
         bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
         giveButton.gameObject.SetActive(materialsRequest);
@@ -206,6 +186,40 @@ public class TownManager : MonoBehaviour
         {
             SetLabel(giveButton, $"Give {npc.quest.needed} materials");
             giveButton.interactable = campaign.CanGive(i);
+        }
+    }
+
+    // One button per building in this leader's district: name, level, effect per level and the next level's price.
+    // Hidden once the faction is wiped out.
+    void ShowBuildings(int npcIndex)
+    {
+        shownBuildings.Clear();
+        if (campaign.npcs[npcIndex].Alive)
+            for (int b = 0; b < config.buildings.Length; b++)
+                if (config.buildings[b].district == npcIndex) shownBuildings.Add(b);
+
+        for (int slot = 0; slot < buildingButtons.Length; slot++)
+        {
+            bool show = slot < shownBuildings.Count;
+            buildingButtons[slot].gameObject.SetActive(show);
+            if (!show) continue;
+
+            int b = shownBuildings[slot];
+            Building building = config.buildings[b];
+            int level = campaign.buildingLevels[b];
+            string label;
+            if (level >= config.maxBuildingLevel)
+            {
+                label = $"{building.name}  MAX\n{building.EffectText(building.amountPerLevel * level)}";
+            }
+            else
+            {
+                string crystals = building.costsCrystals ? $" + {campaign.BuildingCrystalCost(b)} crystals" : "";
+                label = $"{building.name}  {level}/{config.maxBuildingLevel}\nPer level: {building.EffectText(building.amountPerLevel)}\n" +
+                        $"{campaign.BuildingMaterialCost(b)} materials + {campaign.BuildingGoldCost(b)} gold{crystals}";
+            }
+            SetLabel(buildingButtons[slot], label);
+            buildingButtons[slot].interactable = campaign.CanBuild(b);
         }
     }
 

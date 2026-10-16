@@ -1,10 +1,12 @@
+using System.Linq;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the detail panel (Give button, crystal shop), the Dive button and the epilogue screen.
+// news, one button per faction leader, the detail panel (Give button, district buildings), the relics box, the Dive button
+// and the epilogue screen.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -36,13 +38,13 @@ public static class TownSceneBuilder
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
         }
 
-        // Bottom: detail panel for the selected leader (the shop row only shows for the Shaman)
+        // Bottom: detail panel for the selected leader, with their district's buildings
         Image detail = NewImage("Detail Panel", canvas, new Vector2(-100, -230), new Vector2(1200, 400), new Color(0f, 0f, 0f, 0.6f));
         Text detailTitle = NewText("Title", detail.transform, new Vector2(0, 160), new Vector2(1100, 60), 36, TextAnchor.MiddleCenter);
-        Text detailBody = NewText("Body", detail.transform, new Vector2(0, 30), new Vector2(1100, 200), 20, TextAnchor.UpperLeft);
-        RectTransform shopRow = NewRow("Crystal Shop", detail.transform, new Vector2(0, -108), new Vector2(1160, 64), 15);
-        Button[] shopButtons = new Button[a.townConfig.shopItems.Length];
-        for (int i = 0; i < shopButtons.Length; i++) shopButtons[i] = NewButton($"Shop {i + 1}", shopRow, new Vector2(265, 64), 18);
+        Text detailBody = NewText("Body", detail.transform, new Vector2(0, 40), new Vector2(1100, 180), 20, TextAnchor.UpperLeft);
+        RectTransform buildingRow = NewRow("District", detail.transform, new Vector2(0, -100), new Vector2(1160, 80), 15);
+        Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
+        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(360, 80), 17);
         Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 48), 22);
         ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -170);
 
@@ -74,7 +76,7 @@ public static class TownSceneBuilder
         town.detailTitle = detailTitle;
         town.detailBody = detailBody;
         town.giveButton = giveButton;
-        town.shopButtons = shopButtons;
+        town.buildingButtons = buildingButtons;
         town.diveButton = dive;
         town.relicsText = relicsText;
         town.epiloguePanel = epilogue.gameObject;
@@ -83,5 +85,14 @@ public static class TownSceneBuilder
         town.newGameButton = newGame;
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    // The detail panel needs one building button per building in the biggest district.
+    static int MostBuildingsInADistrict(TownConfig config)
+    {
+        int most = 0;
+        for (int npc = 0; npc < config.npcs.Length; npc++)
+            most = Mathf.Max(most, config.buildings.Count(b => b.district == npc));
+        return most;
     }
 }
