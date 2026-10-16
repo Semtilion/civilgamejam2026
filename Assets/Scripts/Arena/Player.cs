@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Hero stats that town NPC buffs and level-up cards can raise. See Player.AddStat.
-public enum StatType { MaxHp, MoveSpeed, Damage, PhysicalDamage, MagicDamage, AttackSpeed, Area, PickupRange }
+// Hero stats that town NPC buffs, the crystal shop and level-up cards can raise. See Player.AddStat.
+// Saved as numbers in assets (TownConfig): only add new ones at the end.
+public enum StatType { MaxHp, MoveSpeed, Damage, AttackSpeed, Area, PickupRange }
 
 // The hero: moves with the project's "Player/Move" action (WASD, arrow keys, gamepad stick), stays inside the arena,
 // has HP and a short invulnerability after each hit.
@@ -10,7 +11,7 @@ public enum StatType { MaxHp, MoveSpeed, Damage, PhysicalDamage, MagicDamage, At
 public class Player : MonoBehaviour
 {
     static readonly string[] StatLabels =
-        { "max HP", "move speed", "damage", "physical damage", "magic damage", "attack speed", "area", "pickup range" };
+        { "max HP", "move speed", "damage", "attack speed", "area", "pickup range" };
 
     [Header("Base stats (every dive starts from these)")]
     public int baseMaxHp = 100;
@@ -26,8 +27,8 @@ public class Player : MonoBehaviour
     public int maxHp;
     public float moveSpeed;
     public float pickupRange;
-    public float physicalDamageMultiplier = 1f;
-    public float magicDamageMultiplier = 1f;
+    [Tooltip("Every weapon's damage (there is one damage type).")]
+    public float damageMultiplier = 1f;
     public float attackSpeedMultiplier = 1f;
     public float areaMultiplier = 1f;
 
@@ -149,7 +150,7 @@ public class Player : MonoBehaviour
     }
 
     // MaxHp: flat points (also heals them). MoveSpeed / PickupRange: a fraction of the base value (0.1 = +10%).
-    // The rest add to their multiplier (0.1 = +10%). Damage raises both physical and magic.
+    // The rest add to their multiplier (0.1 = +10%).
     public void AddStat(StatType stat, float amount)
     {
         switch (stat)
@@ -159,19 +160,14 @@ public class Player : MonoBehaviour
                 Heal(Mathf.RoundToInt(amount));
                 break;
             case StatType.MoveSpeed: moveSpeed += baseMoveSpeed * amount; break;
-            case StatType.Damage:
-                physicalDamageMultiplier += amount;
-                magicDamageMultiplier += amount;
-                break;
-            case StatType.PhysicalDamage: physicalDamageMultiplier += amount; break;
-            case StatType.MagicDamage: magicDamageMultiplier += amount; break;
+            case StatType.Damage: damageMultiplier += amount; break;
             case StatType.AttackSpeed: attackSpeedMultiplier += amount; break;
             case StatType.Area: areaMultiplier += amount; break;
             case StatType.PickupRange: pickupRange += basePickupRange * amount; break;
         }
     }
 
-    // "+10 max HP", "+5% physical damage", ... (same units as AddStat).
+    // "+10 max HP", "+5% damage", ... (same units as AddStat).
     public static string StatText(StatType stat, float amount)
     {
         return stat == StatType.MaxHp ? $"+{amount:0} {StatLabels[(int)stat]}" : $"+{amount * 100f:0}% {StatLabels[(int)stat]}";
@@ -183,8 +179,7 @@ public class Player : MonoBehaviour
         maxHp = baseMaxHp;
         moveSpeed = baseMoveSpeed;
         pickupRange = basePickupRange;
-        physicalDamageMultiplier = 1f;
-        magicDamageMultiplier = 1f;
+        damageMultiplier = 1f;
         attackSpeedMultiplier = 1f;
         areaMultiplier = 1f;
 

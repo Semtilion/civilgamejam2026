@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Relic weapon (magic): lobs a fire bomb at the nearest enemy in range; it bursts into a burning patch that hurts
+// Relic weapon: lobs a fire bomb at the nearest enemy in range; it bursts into a burning patch that hurts
 // every enemy inside on every tick. Damage is per tick. Bonus: bigger patch.
 public class FireBombThrow : Weapon
 {

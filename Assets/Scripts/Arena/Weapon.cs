@@ -16,8 +16,6 @@ public abstract class Weapon : MonoBehaviour
 
     [Header("Weapon")]
     public WeaponId id;
-    [Tooltip("Magic weapons use the hero's magic damage (Shaman); the others use physical damage.")]
-    public bool isMagic;
     [Tooltip("Shown on the level-up card that offers this weapon.")]
     public string description;
     [Tooltip("Shown on the level-up cards for levels 3 and 5.")]
@@ -35,8 +33,7 @@ public abstract class Weapon : MonoBehaviour
 
     public string DisplayName => Names[(int)id];
     protected int BonusCount => (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
-    protected float DamageMultiplier => isMagic ? player.magicDamageMultiplier : player.physicalDamageMultiplier;
-    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * DamageMultiplier * player.arena.relics.DamageMultiplier);
+    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * player.damageMultiplier * player.arena.relics.DamageMultiplier);
 
     protected virtual void Awake()
     {

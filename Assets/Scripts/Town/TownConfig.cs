@@ -59,7 +59,7 @@ public class TownConfig : ScriptableObject
     public ShopItem[] shopItems =
     {
         new ShopItem { name = "Max HP", stat = StatType.MaxHp, amountPerRank = 10f },
-        new ShopItem { name = "Magic damage", stat = StatType.MagicDamage, amountPerRank = 0.1f },
+        new ShopItem { name = "Damage", stat = StatType.Damage, amountPerRank = 0.1f },
         new ShopItem { name = "Attack speed", stat = StatType.AttackSpeed, amountPerRank = 0.05f },
         new ShopItem { name = "Pickup range", stat = StatType.PickupRange, amountPerRank = 0.25f },
     };

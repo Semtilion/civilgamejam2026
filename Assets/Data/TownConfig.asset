@@ -23,7 +23,7 @@ MonoBehaviour:
   - name: Shaman
     faction: Mages
     startPopulation: 50
-    stat: 4
+    stat: 2
     amountPerTier: 0.08
     unlocksWeapon: 1
     weapon: 3
@@ -31,7 +31,7 @@ MonoBehaviour:
   - name: Elder
     faction: Peasants
     startPopulation: 200
-    stat: 3
+    stat: 2
     amountPerTier: 0.05
     unlocksWeapon: 1
     weapon: 1

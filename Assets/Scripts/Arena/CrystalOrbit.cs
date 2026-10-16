@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// The Shaman's magic weapon: crystals circle the hero all the time and hit whatever they touch.
+// The Shaman's weapon: crystals circle the hero all the time and hit whatever they touch.
 // An enemy can be hit by the orbit at most once per `interval` (0.5s). Bonus: +1 crystal.
 public class CrystalOrbit : Weapon
 {

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Relic weapon (physical): throws a heavy axe at the nearest enemy in range. It spins out, then flies back to the
+// Relic weapon: throws a heavy axe at the nearest enemy in range. It spins out, then flies back to the
 // hero, hitting everything it passes (once on the way out, once on the way back). Bonus: +1 axe (fanned out).
 public class AxeThrow : Weapon
 {

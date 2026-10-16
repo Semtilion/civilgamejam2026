@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Relic weapon (magic): every interval, a lightning bolt strikes a random enemy on screen (never a crate).
+// Relic weapon: every interval, a lightning bolt strikes a random enemy on screen (never a crate).
 // Bonus: +1 bolt (each on a different enemy).
 public class LightningStaff : Weapon
 {

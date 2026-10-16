@@ -56,16 +56,16 @@ public static class ArenaSceneBuilder
         player.idleSprite = a.heroIdle;
         player.walkSprites = a.heroWalk;
 
-        //                      weapon                                       id                    magic  card text                                                          bonus text             dmg +lvl interval
-        SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        false, "Hits every enemy around you.",                                     "+sweep radius",        10, 3, 1.0f);
-        DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       false, "Throws a dagger at the nearest enemy.",                            "+1 dagger per throw",   8, 2, 1.2f);
-        WhipLash whip       = SetWeapon(hero.AddComponent<WhipLash>(),     WeaponId.Whip,         false, "Lashes a line toward the nearest enemy, reaching past the sword.", "+longer lash",         12, 3, 1.3f);
-        CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, true,  "Crystals circle you and hit whatever they touch (magic).",          "+1 crystal",            8, 2, 0.5f);
+        //                      weapon                                       id                    card text                                                          bonus text             dmg +lvl interval
+        SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        "Hits every enemy around you.",                                     "+sweep radius",        10, 3, 1.0f);
+        DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       "Throws a dagger at the nearest enemy.",                            "+1 dagger per throw",   8, 2, 1.2f);
+        WhipLash whip       = SetWeapon(hero.AddComponent<WhipLash>(),     WeaponId.Whip,         "Lashes a line toward the nearest enemy, reaching past the sword.", "+longer lash",         12, 3, 1.3f);
+        CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, "Crystals circle you and hit whatever they touch.",                  "+1 crystal",            8, 2, 0.5f);
         // Relic weapons (equipped only once you own the relic)
-        SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    false, "Slams the ground every few seconds, hitting every enemy around you hard.", "+slam radius", 20, 4, 2.5f);
-        LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, true,  "A lightning bolt strikes a random enemy on screen (magic).",             "+1 bolt",     15, 3, 1.2f);
-        FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       true,  "Lobs a fire bomb that leaves a burning patch (magic).",                   "+bigger fire", 6, 2, 2.0f);
-        AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            false, "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
+        SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    "Slams the ground every few seconds, hitting every enemy around you hard.", "+slam radius", 20, 4, 2.5f);
+        LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, "A lightning bolt strikes a random enemy on screen.",                     "+1 bolt",     15, 3, 1.2f);
+        FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       "Lobs a fire bomb that leaves a burning patch.",                           "+bigger fire", 6, 2, 2.0f);
+        AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
         sword.sweepVisual = NewFlashSprite("Sweep", a.circle, hero.transform);
         dagger.daggerSprite = a.square;
         whip.lashVisual = NewFlashSprite("Lash", a.square, hero.transform);
@@ -323,11 +323,10 @@ public static class ArenaSceneBuilder
         return renderer;
     }
 
-    static T SetWeapon<T>(T weapon, WeaponId id, bool isMagic, string description, string bonusText,
+    static T SetWeapon<T>(T weapon, WeaponId id, string description, string bonusText,
         int damage, int damagePerLevel, float interval) where T : Weapon
     {
         weapon.id = id;
-        weapon.isMagic = isMagic;
         weapon.description = description;
         weapon.bonusText = bonusText;
         weapon.baseDamage = damage;
