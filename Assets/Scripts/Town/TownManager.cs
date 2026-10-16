@@ -2,8 +2,9 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The town hub (Darkest Dungeon hamlet style): status bar, news, one button per NPC, a detail panel for the selected
-// NPC (their help, their request, their home, Give / Repair buttons), Reinforce and Dive. State lives in Campaign.Current.
+// The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
+// selected leader (their faction's people, their help, their request, Give button), and Dive. State lives in
+// Campaign.Current. When every faction is wiped out, Dive becomes "New game".
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -19,8 +20,6 @@ public class TownManager : MonoBehaviour
     public Text detailTitle;
     public Text detailBody;
     public Button giveButton;
-    public Button repairButton;
-    public Button reinforceButton;
     public Button diveButton;
 
     Campaign campaign;
@@ -41,16 +40,28 @@ public class TownManager : MonoBehaviour
             npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
-        repairButton.onClick.AddListener(() => { campaign.Repair(selected); Refresh(); });
-        reinforceButton.onClick.AddListener(() => { campaign.Reinforce(); Refresh(); });
-        diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene));
+        diveButton.onClick.AddListener(OnDive);
 
         Refresh();
     }
 
+    void OnDive()
+    {
+        if (campaign.GameOver)
+        {
+            Campaign.StartNew(config);
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+        else
+        {
+            SceneManager.LoadScene(arenaScene);
+        }
+    }
+
     void Refresh()
     {
-        statusText.text = $"Day {campaign.day}      Materials {campaign.materials}      Population {campaign.population}      {NextThreat()}";
+        statusText.text = $"Day {campaign.day}      Materials {campaign.materials}      " +
+                          $"Population {campaign.Population}/{campaign.StartPopulation}      {NextThreat()}";
 
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
@@ -58,15 +69,14 @@ public class TownManager : MonoBehaviour
         for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
         ShowDetail(selected);
 
-        SetLabel(reinforceButton, campaign.reinforced ? "Town reinforced" : $"Reinforce town\n{config.reinforceCost} materials");
-        reinforceButton.interactable = campaign.CanReinforce;
+        SetLabel(diveButton, campaign.GameOver ? "Town fallen\nNew game" : "DIVE");
     }
 
     string NextThreat()
     {
         int quakeDay = campaign.NextQuakeDay;
         if (quakeDay > 0)
-            return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (homes break at {campaign.BreakAt:0}%)";
+            return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (costs people from {config.quakeHarmAt:0}%)";
         return campaign.day <= config.hordeDay ? $"Horde on day {config.hordeDay}" : "";
     }
 
@@ -79,11 +89,11 @@ public class TownManager : MonoBehaviour
     {
         NpcDefinition definition = config.npcs[i];
         NpcState npc = campaign.npcs[i];
-        if (!npc.alive) return $"{definition.name}\n(dead)";
+        if (!npc.Alive) return $"{definition.name}\n{definition.faction}: WIPED OUT";
 
-        string request = npc.quest == null ? "Request done (home braced)" : $"{npc.quest.Describe()}\n({QuestProgress(npc.quest)})";
-        string home = npc.buildingBroken ? "\nHOME BROKEN" : "";
-        return $"{definition.name}   tier {npc.tier}/{config.maxTier}\n{request}{home}";
+        string halved = campaign.HelpMultiplier(i) < 1f ? "  (help halved)" : "";
+        string request = npc.quest == null ? "Request done (braced)" : $"{npc.quest.Describe()} ({QuestProgress(npc.quest)})";
+        return $"{definition.name}   tier {npc.tier}/{config.maxTier}\n{definition.faction} {npc.population}/{definition.startPopulation}{halved}\n{request}";
     }
 
     void ShowDetail(int i)
@@ -91,16 +101,21 @@ public class TownManager : MonoBehaviour
         NpcDefinition definition = config.npcs[i];
         NpcState npc = campaign.npcs[i];
 
-        detailTitle.text = definition.name + (npc.alive ? "" : " (dead)");
+        detailTitle.text = $"{definition.name}, leader of the {definition.faction}";
         string body;
-        if (!npc.alive)
+        if (!npc.Alive)
         {
-            body = "Killed by the disaster. Their help is gone for good.";
+            body = $"The {definition.faction} were wiped out. {definition.name} is gone, and so is their help.";
         }
         else
         {
-            body = $"Help: {Player.StatText(definition.stat, definition.amountPerTier)} per tier. " +
-                   $"Tier {npc.tier}/{config.maxTier} = {Player.StatText(definition.stat, definition.amountPerTier * npc.tier)}.";
+            int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
+            float help = campaign.HelpMultiplier(i);
+            body = $"{definition.faction}: {npc.population}/{definition.startPopulation} people. Lost people never come back. " +
+                   $"Under {halfLine}, their help is halved; at 0 the faction is wiped out.";
+            body += $"\nHelp: {Player.StatText(definition.stat, definition.amountPerTier)} per tier. " +
+                    $"Tier {npc.tier}/{config.maxTier} = {Player.StatText(definition.stat, definition.amountPerTier * npc.tier * help)}" +
+                    (help < 1f ? " (halved)." : ".");
             body += npc.quest != null
                 ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}."
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
@@ -111,26 +126,18 @@ public class TownManager : MonoBehaviour
                     ? $"\nYou have their {weapon}: it can show up on level-up cards in the dungeon."
                     : $"\nTheir first finished request gives you the {weapon}.";
             }
-            body += npc.buildingBroken
-                ? "\nHOME BROKEN: no help until repaired. If the next quake hits first, they die."
-                : npc.quest == null ? "\nHome braced: safe from the next quake." : "\nHome at risk: finish their request to brace it.";
+            body += npc.quest == null
+                ? $"\nHomes braced: the next quake can't hurt the {definition.faction}."
+                : $"\nHomes at risk: the next quake will cost the {definition.faction} people. Finish the request to brace them.";
         }
         detailBody.text = body;
 
-        bool materialsRequest = npc.alive && npc.quest != null && !npc.quest.IsKill;
+        bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
         giveButton.gameObject.SetActive(materialsRequest);
         if (materialsRequest)
         {
             SetLabel(giveButton, $"Give {npc.quest.needed} materials");
             giveButton.interactable = campaign.CanGive(i);
-        }
-
-        bool broken = npc.alive && npc.buildingBroken;
-        repairButton.gameObject.SetActive(broken);
-        if (broken)
-        {
-            SetLabel(repairButton, $"Repair home ({config.repairCost} materials)");
-            repairButton.interactable = campaign.CanRepair(i);
         }
     }
 

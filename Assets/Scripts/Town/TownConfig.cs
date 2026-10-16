@@ -4,6 +4,10 @@ using UnityEngine;
 public class NpcDefinition
 {
     public string name = "NPC";
+    [Tooltip("The group this NPC leads (e.g. Soldiers, Mages, Peasants).")]
+    public string faction = "Faction";
+    [Tooltip("The faction's people at the start. Lost people never come back: below half = help halved, 0 = wiped out.")]
+    public int startPopulation = 100;
     [Tooltip("The hero stat this NPC's help raises.")]
     public StatType stat;
     [Tooltip("Per tier. Max HP: flat points. Everything else: a fraction (0.05 = +5%).")]
@@ -24,7 +28,12 @@ public class KillQuestOption
 [CreateAssetMenu(menuName = "Jam/Town Config")]
 public class TownConfig : ScriptableObject
 {
+    [Tooltip("Every NPC leads a faction (see NpcDefinition).")]
     public NpcDefinition[] npcs;
+
+    [Header("Factions")]
+    [Tooltip("Below this share of its starting people, a faction's help is halved.")]
+    [Range(0f, 1f)] public float halfHelpBelow = 0.5f;
 
     [Header("Requests (quests)")]
     [Tooltip("Every NPC gets a new request on day 1 and then every this many days. The deadline is the next request day.")]
@@ -36,7 +45,6 @@ public class TownConfig : ScriptableObject
     public int materialQuestAmount = 15;
 
     [Header("Days")]
-    public int startPopulation = 100;
     [Tooltip("Days that pass when the hero dies in the dungeon (a normal dive = 1 day).")]
     public int daysLostOnDefeat = 1;
     public int[] earthquakeDays = { 4, 7, 10, 13 };
@@ -51,12 +59,10 @@ public class TownConfig : ScriptableObject
     public float quakePassivePerDay = 5f;
     [Tooltip("Meter removed per ore mined (only if the hero gets home safely).")]
     public float orePercent = 4f;
-    [Tooltip("At this meter or above, a quake breaks the weakest unprotected NPC's building.")]
-    public float breakAt = 40f;
-    [Tooltip("The same threshold once the town is reinforced.")]
-    public float reinforcedBreakAt = 60f;
-    public int repairCost = 20;
-    public int reinforceCost = 50;
+    [Tooltip("Quakes weaker than this cost no one.")]
+    public float quakeHarmAt = 40f;
+    [Tooltip("Share of an unbraced faction's starting people lost per 1% of quake strength (0.2: a 75% quake costs 15%).")]
+    public float lossPerQuakePercent = 0.2f;
 
     public Quest NewQuest()
     {

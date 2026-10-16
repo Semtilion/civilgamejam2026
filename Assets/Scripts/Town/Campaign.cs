@@ -4,10 +4,11 @@ using UnityEngine;
 public class NpcState
 {
     public int tier;
-    public bool alive = true;
-    public bool everCompleted;  // their first completed request unlocks their weapon
-    public bool buildingBroken; // no help until repaired; the next quake kills them
-    public Quest quest;         // null = request done (also braces their home for a quake), waiting for the next request day
+    public int population;     // the faction's people; lost people never come back
+    public bool everCompleted; // their first completed request unlocks their weapon
+    public Quest quest;        // null = request done (also braces their faction's homes for a quake)
+
+    public bool Alive => population > 0; // 0 = faction wiped out, the leader is gone
 }
 
 public class Quest
@@ -20,8 +21,9 @@ public class Quest
     public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} materials";
 }
 
-// The whole playthrough: day, materials, NPCs and their requests, weapon levels, the quake meter, and a news log.
-// Kept in a static so it survives switching between the Town and Arena scenes. Rules come from TownConfig.
+// The whole playthrough: day, materials, NPCs (faction leaders) and their requests and people, unlocked weapons,
+// the quake meter, and a news log. Kept in a static so it survives switching between the Town and Arena scenes.
+// Rules come from TownConfig.
 public class Campaign
 {
     public static Campaign Current { get; private set; }
@@ -45,13 +47,10 @@ public class Campaign
     public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
-    public int population;
     public float quakeMeter; // %
-    public bool reinforced;
 
     // The day the current requests are due (and new ones arrive).
     public int NextQuestDay => day + config.questInterval - (day - 1) % config.questInterval;
-    public float BreakAt => reinforced ? config.reinforcedBreakAt : config.breakAt;
 
     // The next quake day after today, or -1 if there are no more.
     public int NextQuakeDay
@@ -69,15 +68,53 @@ public class Campaign
     // How strong the next quake will be if no more ores are mined.
     public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
 
+    public int Population
+    {
+        get
+        {
+            int total = 0;
+            foreach (NpcState npc in npcs) total += npc.population;
+            return total;
+        }
+    }
+
+    public int StartPopulation
+    {
+        get
+        {
+            int total = 0;
+            foreach (NpcDefinition definition in config.npcs) total += definition.startPopulation;
+            return total;
+        }
+    }
+
+    // Every faction wiped out: the town has fallen.
+    public bool GameOver
+    {
+        get
+        {
+            foreach (NpcState npc in npcs)
+                if (npc.Alive) return false;
+            return true;
+        }
+    }
+
+    // How much of an NPC's help still counts: 1 = full, 0.5 = their faction is below half, 0 = wiped out.
+    public float HelpMultiplier(int npcIndex)
+    {
+        NpcState npc = npcs[npcIndex];
+        if (!npc.Alive) return 0f;
+        return npc.population < config.npcs[npcIndex].startPopulation * config.halfHelpBelow ? 0.5f : 1f;
+    }
+
     Campaign(TownConfig townConfig)
     {
         config = townConfig;
-        population = config.startPopulation;
         quakeMeter = config.quakeStart;
         weaponUnlocked[(int)WeaponId.Sword] = true;
         npcs = new NpcState[config.npcs.Length];
-        for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState();
-        news.Add("Day 1: the townsfolk ask for your help before the earthquake comes.");
+        for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState { population = config.npcs[i].startPopulation };
+        news.Add("Day 1: the faction leaders ask for your help before the earthquake comes.");
         RefreshQuests();
     }
 
@@ -104,7 +141,7 @@ public class Campaign
     }
 
     // Each day: the quake meter rises (cycle + passive); on a quake day the quake hits (before new requests, so
-    // finished ones still protect their NPC's home); on a request day the requests are refreshed.
+    // finished ones still protect their faction); on a request day the requests are refreshed.
     void AdvanceDays(int count)
     {
         for (int i = 0; i < count; i++)
@@ -118,66 +155,56 @@ public class Campaign
         }
     }
 
-    // 1) Homes still broken from the last quake collapse: those NPCs die.
-    // 2) If the meter is at the break threshold or above, the weakest NPC whose request isn't finished
-    //    (finished = their home is braced) gets their building broken: no help until repaired.
-    // 3) The meter goes back to the start value plus all the passive rise so far (danger keeps growing).
-    //    (Population doesn't change yet; it's waiting for a rework.)
+    // A quake at `quakeHarmAt`% or more costs every faction whose leader's request isn't finished (finished = braced,
+    // safe) strength x `lossPerQuakePercent` % of its starting people. Lost people never come back.
+    // Then the meter goes back to the start value plus all the passive rise so far (danger keeps growing).
     void Earthquake()
     {
         news.Add($"Day {day}: EARTHQUAKE! Strength {quakeMeter:0}%.");
 
-        for (int i = 0; i < npcs.Length; i++)
+        if (quakeMeter < config.quakeHarmAt)
         {
-            if (!npcs[i].alive || !npcs[i].buildingBroken) continue;
-            npcs[i].alive = false;
-            news.Add($"{config.npcs[i].name}'s home was still broken and collapsed. They didn't survive.");
-        }
-
-        if (quakeMeter >= BreakAt)
-        {
-            int weakest = -1;
-            int ties = 0;
-            for (int i = 0; i < npcs.Length; i++)
-            {
-                NpcState npc = npcs[i];
-                if (!npc.alive || npc.quest == null) continue; // dead, or home braced by a finished request
-                if (weakest < 0 || npc.tier < npcs[weakest].tier)
-                {
-                    weakest = i;
-                    ties = 1;
-                }
-                else if (npc.tier == npcs[weakest].tier && Random.Range(0, ++ties) == 0)
-                {
-                    weakest = i; // equal chance among NPCs tied for the lowest tier
-                }
-            }
-
-            if (weakest >= 0)
-            {
-                npcs[weakest].buildingBroken = true;
-                news.Add($"{config.npcs[weakest].name}'s home was wrecked: no help until repaired ({config.repairCost} materials). Another quake would kill them.");
-            }
-            else
-            {
-                news.Add("Every home was braced in time. Nothing broke.");
-            }
+            news.Add("The town held. No one was lost.");
         }
         else
         {
-            news.Add("The town held. Nothing broke.");
+            float lossShare = quakeMeter * config.lossPerQuakePercent / 100f;
+            for (int i = 0; i < npcs.Length; i++)
+            {
+                NpcState npc = npcs[i];
+                NpcDefinition definition = config.npcs[i];
+                if (!npc.Alive) continue;
+                if (npc.quest == null)
+                {
+                    news.Add($"The {definition.faction}' homes were braced: no one lost.");
+                    continue;
+                }
+
+                bool wasFullHelp = HelpMultiplier(i) == 1f;
+                int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * lossShare));
+                npc.population -= lost;
+                string line = $"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation}).";
+                if (!npc.Alive) line += $" They are wiped out, and {definition.name} is gone.";
+                else if (wasFullHelp && HelpMultiplier(i) < 1f) line += $" Under half left: {definition.name}'s help is halved.";
+                news.Add(line);
+            }
         }
 
         quakeMeter = Mathf.Min(100f, config.quakeStart + config.quakePassivePerDay * (day - 1));
+        if (GameOver) news.Add("Every faction is gone. The town has fallen.");
     }
 
-    // Request day: unfinished requests fail (that NPC's help weakens a tier), then everyone alive asks for something new.
+    // Request day: unfinished requests fail (that NPC's help weakens a tier), then every leader left asks for something new.
     void RefreshQuests()
     {
         for (int i = 0; i < npcs.Length; i++)
         {
             NpcState npc = npcs[i];
-            if (!npc.alive) continue;
+            if (!npc.Alive)
+            {
+                npc.quest = null;
+                continue;
+            }
             if (npc.quest != null && day > 1)
             {
                 npc.tier = Mathf.Max(0, npc.tier - 1);
@@ -185,7 +212,7 @@ public class Campaign
             }
             npc.quest = config.NewQuest();
         }
-        if (day > 1) news.Add($"Day {day}: new requests from the townsfolk.");
+        if (day > 1 && !GameOver) news.Add($"Day {day}: new requests from the faction leaders.");
     }
 
     // ---------- Requests ----------
@@ -195,7 +222,7 @@ public class Campaign
         for (int i = 0; i < npcs.Length; i++)
         {
             Quest quest = npcs[i].quest;
-            if (!npcs[i].alive || quest == null || !quest.IsKill) continue;
+            if (!npcs[i].Alive || quest == null || !quest.IsKill) continue;
 
             if (kills.TryGetValue(quest.target, out int count)) quest.progress += count;
             if (quest.progress >= quest.needed) CompleteQuest(i);
@@ -205,7 +232,7 @@ public class Campaign
     public bool CanGive(int npcIndex)
     {
         NpcState npc = npcs[npcIndex];
-        return npc.alive && npc.quest != null && !npc.quest.IsKill && materials >= npc.quest.needed;
+        return npc.Alive && npc.quest != null && !npc.quest.IsKill && materials >= npc.quest.needed;
     }
 
     public void GiveMaterials(int npcIndex)
@@ -221,7 +248,7 @@ public class Campaign
         NpcDefinition definition = config.npcs[npcIndex];
         npc.quest = null;
         npc.tier = Mathf.Min(config.maxTier, npc.tier + 1);
-        news.Add($"{definition.name}'s request is done! Their help grows (tier {npc.tier}).");
+        news.Add($"{definition.name}'s request is done! Their help grows (tier {npc.tier}), and the {definition.faction}' homes are braced.");
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
@@ -232,37 +259,10 @@ public class Campaign
         }
     }
 
-    // ---------- Buildings ----------
-
-    public bool CanRepair(int npcIndex)
-    {
-        NpcState npc = npcs[npcIndex];
-        return npc.alive && npc.buildingBroken && materials >= config.repairCost;
-    }
-
-    public void Repair(int npcIndex)
-    {
-        if (!CanRepair(npcIndex)) return;
-        materials -= config.repairCost;
-        npcs[npcIndex].buildingBroken = false;
-        news.Add($"{config.npcs[npcIndex].name}'s home is repaired. Their help is back.");
-    }
-
-    public bool CanReinforce => !reinforced && materials >= config.reinforceCost;
-
-    // One-time: buildings only break from a quake at `reinforcedBreakAt` or above.
-    public void Reinforce()
-    {
-        if (!CanReinforce) return;
-        materials -= config.reinforceCost;
-        reinforced = true;
-        news.Add($"The town is reinforced. Homes now only break at {config.reinforcedBreakAt:0}%+ quakes.");
-    }
-
     // ---------- Dive setup ----------
 
     // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive),
-    // plus the help of every living NPC whose home is standing, on top of base stats. Call after Player.ResetForNewRun.
+    // plus each NPC's help (halved if their faction is below half, none if wiped out). Call after Player.ResetForNewRun.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
         foreach (Weapon weapon in weapons)
@@ -273,8 +273,9 @@ public class Campaign
 
         for (int i = 0; i < npcs.Length; i++)
         {
-            if (npcs[i].alive && !npcs[i].buildingBroken && npcs[i].tier > 0)
-                player.AddStat(config.npcs[i].stat, config.npcs[i].amountPerTier * npcs[i].tier);
+            float help = HelpMultiplier(i);
+            if (help > 0f && npcs[i].tier > 0)
+                player.AddStat(config.npcs[i].stat, config.npcs[i].amountPerTier * npcs[i].tier * help);
         }
     }
 }

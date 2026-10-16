@@ -146,9 +146,9 @@ public static class GameBuilder
         config = ScriptableObject.CreateInstance<TownConfig>();
         config.npcs = new[]
         {
-            new NpcDefinition { name = "Guard", stat = StatType.MaxHp, amountPerTier = 10f, unlocksWeapon = true, weapon = WeaponId.Whip },
-            new NpcDefinition { name = "Shaman", stat = StatType.MagicDamage, amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
-            new NpcDefinition { name = "NPC 3", stat = StatType.PhysicalDamage, amountPerTier = 0.05f, unlocksWeapon = true, weapon = WeaponId.Dagger },
+            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, stat = StatType.MaxHp,          amountPerTier = 10f,   unlocksWeapon = true, weapon = WeaponId.Whip },
+            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  stat = StatType.MagicDamage,    amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
+            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, stat = StatType.PhysicalDamage, amountPerTier = 0.05f, unlocksWeapon = true, weapon = WeaponId.Dagger },
         };
         config.killQuests = new[]
         {

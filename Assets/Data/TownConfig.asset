@@ -14,16 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TownConfig
   npcs:
   - name: Guard
+    faction: Soldiers
+    startPopulation: 100
     stat: 0
     amountPerTier: 10
     unlocksWeapon: 1
     weapon: 2
   - name: Shaman
+    faction: Mages
+    startPopulation: 50
     stat: 4
     amountPerTier: 0.08
     unlocksWeapon: 1
     weapon: 3
-  - name: NPC 3
+  - name: Elder
+    faction: Peasants
+    startPopulation: 200
     stat: 3
     amountPerTier: 0.05
     unlocksWeapon: 1
@@ -39,7 +45,6 @@ MonoBehaviour:
     count: 8
   materialQuestChance: 0.25
   materialQuestAmount: 15
-  startPopulation: 100
   daysLostOnDefeat: 1
   earthquakeDays: 04000000070000000a0000000d000000i
   hordeDay: 15
