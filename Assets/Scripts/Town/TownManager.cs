@@ -24,6 +24,8 @@ public class TownManager : MonoBehaviour
     [Tooltip("The crystal shop, shown in the shop owner's detail panel: one button per TownConfig shop item.")]
     public Button[] shopButtons;
     public Button diveButton;
+    [Tooltip("Lists the relics you own.")]
+    public Text relicsText;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
@@ -73,6 +75,7 @@ public class TownManager : MonoBehaviour
 
         for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
         ShowDetail(selected);
+        relicsText.text = RelicsSummary();
 
         SetLabel(diveButton, campaign.IsHordeDay ? "DEFEND\nTHE TOWN" : "DIVE");
         ShowEpilogue();
@@ -108,6 +111,20 @@ public class TownManager : MonoBehaviour
         if (quakeDay > 0)
             return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (costs people from {config.quakeHarmAt:0}%)";
         return campaign.day <= config.hordeDay ? $"Horde on day {config.hordeDay}" : "";
+    }
+
+    string RelicsSummary()
+    {
+        string list = "";
+        int owned = 0;
+        for (int i = 0; i < campaign.relicOwned.Length; i++)
+        {
+            if (!campaign.relicOwned[i]) continue;
+            owned++;
+            list += "\n" + Relics.Names[i];
+        }
+        if (owned == 0) list = "\nNone yet. Bosses in the dungeon guard them.";
+        return $"RELICS {owned}/{campaign.relicOwned.Length}{list}";
     }
 
     string QuestProgress(Quest quest)

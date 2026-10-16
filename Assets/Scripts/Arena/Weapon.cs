@@ -1,16 +1,18 @@
 using UnityEngine;
 
 // Every weapon in the game. The town tracks which are unlocked by this id (Campaign.weaponUnlocked).
-public enum WeaponId { Sword, Dagger, Whip, CrystalOrbit }
+// The last four only come from relics (see Relics).
+public enum WeaponId { Sword, Dagger, Whip, CrystalOrbit, QuakeHammer, LightningStaff, FireBomb, Axe }
 
 // Base for the hero's auto-firing weapons. All weapons sit on the hero; owned = component enabled.
-// A dive starts with the Sword only; unlocked weapons and level-ups come from level-up cards and reset every dive.
-// Levels 1-5: every level adds damage, levels 3 and 5 also add the weapon's bonus (BonusCount).
-// The hero's damage / attack speed / area multipliers (town buffs, level-up cards) apply to every weapon.
+// A dive starts with the Sword (plus relic weapons); unlocked weapons and level-ups come from level-up cards and reset
+// every dive. Levels 1-5: every level adds damage, levels 3 and 5 also add the weapon's bonus (BonusCount).
+// The hero's damage / attack speed / area multipliers (town buffs, level-up cards, relics) apply to every weapon.
 public abstract class Weapon : MonoBehaviour
 {
     public const int MaxLevel = 5;
-    public static readonly string[] Names = { "Sword", "Dagger", "Whip", "Crystal Orbit" }; // in WeaponId order
+    public static readonly string[] Names = // in WeaponId order
+        { "Sword", "Dagger", "Whip", "Crystal Orbit", "Quake Hammer", "Lightning Staff", "Fire Bomb", "Axe" };
 
     [Header("Weapon")]
     public WeaponId id;
@@ -34,7 +36,7 @@ public abstract class Weapon : MonoBehaviour
     public string DisplayName => Names[(int)id];
     protected int BonusCount => (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
     protected float DamageMultiplier => isMagic ? player.magicDamageMultiplier : player.physicalDamageMultiplier;
-    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * DamageMultiplier);
+    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * DamageMultiplier * player.arena.relics.DamageMultiplier);
 
     protected virtual void Awake()
     {

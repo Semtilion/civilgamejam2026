@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Follows the hero smoothly, without showing past the arena walls.
+// Follows the hero smoothly, without showing past the arena walls. Can shake (a tremor).
 public class CameraFollow : MonoBehaviour
 {
     public Transform target;
@@ -8,6 +8,10 @@ public class CameraFollow : MonoBehaviour
     public float smoothing = 10f;
 
     Camera cam;
+    float shakeLeft;
+    float shakeTime;
+    float shakeStrength;
+    Vector3 shakeOffset; // added on top of the follow position, removed again next frame
 
     void Awake()
     {
@@ -28,7 +32,24 @@ public class CameraFollow : MonoBehaviour
         goal.y = ClampAxis(goal.y, area.yMin - marginY + halfHeight, area.yMax + marginY - halfHeight);
         goal.z = transform.position.z;
 
-        transform.position = Vector3.Lerp(transform.position, goal, 1f - Mathf.Exp(-smoothing * Time.deltaTime));
+        Vector3 follow = Vector3.Lerp(transform.position - shakeOffset, goal, 1f - Mathf.Exp(-smoothing * Time.deltaTime));
+
+        // Random jolts that fade out; none while the game is paused.
+        shakeOffset = Vector3.zero;
+        if (shakeLeft > 0f && Time.deltaTime > 0f)
+        {
+            shakeLeft -= Time.deltaTime;
+            shakeOffset = (Vector3)(Random.insideUnitCircle * shakeStrength * Mathf.Clamp01(shakeLeft / shakeTime));
+        }
+        transform.position = follow + shakeOffset;
+    }
+
+    // Shakes the view for `duration` seconds, up to `strength` units off.
+    public void Shake(float duration, float strength)
+    {
+        shakeTime = duration;
+        shakeLeft = duration;
+        shakeStrength = strength;
     }
 
     // If the arena is smaller than the view on this axis, just center it.

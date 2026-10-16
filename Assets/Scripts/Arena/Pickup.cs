@@ -11,7 +11,7 @@ public class Pickup : MonoBehaviour
 
     const float FlySpeed = 14f;
     static readonly Color XpColor = new Color(0.30f, 0.90f, 1f);
-    static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f);
+    public static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f); // also the materials shrine's color
     static readonly Color CrystalColor = new Color(0.85f, 0.55f, 1f);
 
     public PickupKind kind;

@@ -44,6 +44,7 @@ public class Campaign
     public readonly TownConfig config;
     public readonly NpcState[] npcs;
     public readonly bool[] weaponUnlocked = new bool[Weapon.Names.Length]; // by WeaponId
+    public readonly bool[] relicOwned = new bool[Relics.Names.Length];     // by RelicId
     public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
@@ -152,9 +153,10 @@ public class Campaign
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive ends. Survived: keep the materials and crystals, kills count for requests, mined
-    // ores lower the quake meter, 1 day passes. Defeated: everything found is lost, `daysLostOnDefeat` (1) days pass.
-    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int oresMined)
+    // Called by the arena when a dive ends. Survived: keep the materials, crystals and relics, kills count for requests,
+    // mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost, `daysLostOnDefeat` (1) days pass.
+    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int oresMined,
+        IReadOnlyList<RelicId> foundRelics)
     {
         if (survived)
         {
@@ -163,6 +165,11 @@ public class Campaign
             float drop = oresMined * config.orePercent;
             quakeMeter = Mathf.Max(0f, quakeMeter - drop);
             news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals and {oresMined} ores destroyed (quake meter -{drop:0}%).");
+            foreach (RelicId relic in foundRelics)
+            {
+                relicOwned[(int)relic] = true;
+                news.Add($"You bring home a relic: {Relics.Names[(int)relic]}! It's yours for every dive from now on.");
+            }
             AddKills(kills);
             AdvanceDays(1);
         }
@@ -339,7 +346,8 @@ public class Campaign
 
     // ---------- Dive setup ----------
 
-    // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive),
+    // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive,
+    // relic weapons are added after this by Relics.ResetForNewRun),
     // plus each NPC's help (halved if their faction is below half, none if wiped out) and the crystal shop upgrades
     // (only while the shop is open). Call after Player.ResetForNewRun.
     public void ApplyLoadout(Player player, Weapon[] weapons)

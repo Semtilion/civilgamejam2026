@@ -61,13 +61,25 @@ public static class ArenaSceneBuilder
         DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       false, "Throws a dagger at the nearest enemy.",                            "+1 dagger per throw",   8, 2, 1.2f);
         WhipLash whip       = SetWeapon(hero.AddComponent<WhipLash>(),     WeaponId.Whip,         false, "Lashes a line toward the nearest enemy, reaching past the sword.", "+longer lash",         12, 3, 1.3f);
         CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, true,  "Crystals circle you and hit whatever they touch (magic).",          "+1 crystal",            8, 2, 0.5f);
+        // Relic weapons (equipped only once you own the relic)
+        SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    false, "Slams the ground every few seconds, hitting every enemy around you hard.", "+slam radius", 20, 4, 2.5f);
+        LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, true,  "A lightning bolt strikes a random enemy on screen (magic).",             "+1 bolt",     15, 3, 1.2f);
+        FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       true,  "Lobs a fire bomb that leaves a burning patch (magic).",                   "+bigger fire", 6, 2, 2.0f);
+        AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            false, "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
         sword.sweepVisual = NewFlashSprite("Sweep", a.circle, hero.transform);
         dagger.daggerSprite = a.square;
         whip.lashVisual = NewFlashSprite("Lash", a.square, hero.transform);
         orbit.crystalSprite = a.circle;
-        dagger.enabled = false;
-        whip.enabled = false;
-        orbit.enabled = false;
+        hammer.radius = 3.5f;
+        hammer.bonusRadius = 0.5f;
+        hammer.knockback = 10f;
+        hammer.sweepVisual = NewFlashSprite("Slam", a.circle, hero.transform);
+        hammer.sweepVisual.color = new Color(0.85f, 0.55f, 0.30f, 0f); // brown dust (the alpha is set by the weapon)
+        staff.boltSprite = a.square;
+        staff.impactSprite = a.circle;
+        bomb.bombSprite = a.circle;
+        axe.axeSprite = a.square;
+        foreach (Weapon weapon in new Weapon[] { dagger, whip, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
 
         // Camera from the template
         Camera camera = Object.FindAnyObjectByType<Camera>(); // the template has exactly one
@@ -142,7 +154,7 @@ public static class ArenaSceneBuilder
 
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();
-        leveling.weapons = new Weapon[] { sword, dagger, whip, orbit };
+        leveling.weapons = new Weapon[] { sword, dagger, whip, orbit, hammer, staff, bomb, axe };
         leveling.player = player;
         leveling.xpHud = xpHud.gameObject;
         leveling.xpFill = xpFill;
@@ -179,6 +191,12 @@ public static class ArenaSceneBuilder
         arena.oreColor = pillar != null ? Color.white : new Color(0.45f, 0.55f, 0.75f);
         arena.oreScale = pillar != null ? 1f : 1.2f;
         arena.whiteSquare = a.square;
+        arena.rockSprite = a.circle;
+        Relics relics = arena.gameObject.AddComponent<Relics>();
+        relics.arena = arena;
+        relics.circleSprite = a.circle;
+        relics.squareSprite = a.square;
+        arena.relics = relics;
         arena.quakeText = quakeText;
         arena.player = player;
         arena.leveling = leveling;

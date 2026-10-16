@@ -46,6 +46,10 @@ public static class TownSceneBuilder
         Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 48), 22);
         ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -170);
 
+        // Right of the detail panel: the relics you own
+        Image relicsPanel = NewImage("Relics Panel", canvas, new Vector2(720, -210), new Vector2(400, 340), new Color(0f, 0f, 0f, 0.6f));
+        Text relicsText = NewText("Relics", relicsPanel.transform, Vector2.zero, new Vector2(360, 310), 22, TextAnchor.UpperLeft);
+
         // Bottom-right: dive ("Defend the town" on the horde day)
         Button dive = NewButton("DIVE", canvas, new Vector2(360, 110), 36);
         RectTransform diveRect = (RectTransform)dive.transform;
@@ -72,6 +76,7 @@ public static class TownSceneBuilder
         town.giveButton = giveButton;
         town.shopButtons = shopButtons;
         town.diveButton = dive;
+        town.relicsText = relicsText;
         town.epiloguePanel = epilogue.gameObject;
         town.epilogueTitle = epilogueTitle;
         town.epilogueBody = epilogueBody;

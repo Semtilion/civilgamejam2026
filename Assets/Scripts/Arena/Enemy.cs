@@ -12,6 +12,7 @@ public class Enemy : MonoBehaviour
     const float KnockbackTime = 0.15f;
     const float FlashTime = 0.08f;
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
+    static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
 
     [Header("Live stats (scaled from data for this depth)")]
     public EnemyData data;
@@ -21,6 +22,8 @@ public class Enemy : MonoBehaviour
     ArenaManager arena;
     SpriteRenderer sprite;
     float stunTimer, fireTimer, flashTimer, stateTimer;
+    float slowTimer, slowPace = 1f; // Frost Shard: moves and attacks at slowPace speed while slowTimer runs
+    float delta;                    // this frame's time for moving and attacking (slowed while chilled)
     Vector2 knockbackVelocity;
     BossState bossState;
     Vector2 chargeDirection;
@@ -70,6 +73,8 @@ public class Enemy : MonoBehaviour
     {
         if (!arena.IsPlaying) return; // frozen while a panel is open
 
+        if (slowTimer > 0f) slowTimer -= Time.deltaTime;
+        delta = Time.deltaTime * (slowTimer > 0f ? slowPace : 1f);
         Move();
 
         // Touch damage. The hero's invulnerability after a hit stops this from landing every frame.
@@ -81,7 +86,8 @@ public class Enemy : MonoBehaviour
 
         if (flashTimer > 0f) flashTimer -= Time.deltaTime;
         bool warning = aiming || bossState == BossState.WindUp;
-        sprite.color = flashTimer > 0f ? Color.white : warning ? WarningColor : data.color;
+        Color normal = slowTimer > 0f ? Color.Lerp(data.color, IceColor, 0.6f) : data.color; // icy while chilled
+        sprite.color = flashTimer > 0f ? Color.white : warning ? WarningColor : normal;
     }
 
     void Move()
@@ -91,16 +97,16 @@ public class Enemy : MonoBehaviour
 
         if (stunTimer > 0f)
         {
-            stunTimer -= Time.deltaTime; // sliding from knockback
-            position += knockbackVelocity * Time.deltaTime;
+            stunTimer -= delta; // sliding from knockback
+            position += knockbackVelocity * delta;
         }
         else if (data.behavior == EnemyBehavior.Chaser)
         {
-            position = Vector2.MoveTowards(position, target, data.moveSpeed * Time.deltaTime);
+            position = Vector2.MoveTowards(position, target, data.moveSpeed * delta);
         }
         else if (data.behavior == EnemyBehavior.Boss)
         {
-            position += BossVelocity(target - position) * Time.deltaTime;
+            position += BossVelocity(target - position) * delta;
         }
         // Shooters never move.
 
@@ -114,7 +120,7 @@ public class Enemy : MonoBehaviour
     Vector2 BossVelocity(Vector2 toPlayer)
     {
         Vector2 direction = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : Vector2.zero;
-        stateTimer -= Time.deltaTime;
+        stateTimer -= delta;
         switch (bossState)
         {
             case BossState.Chase:
@@ -147,7 +153,7 @@ public class Enemy : MonoBehaviour
     // Reload -> (hero in range) flash red and lock the aim -> fire -> reload. Once the flash starts, the shot always comes.
     void UpdateShooter()
     {
-        fireTimer -= Time.deltaTime;
+        fireTimer -= delta;
         if (!aiming)
         {
             Vector2 toPlayer = player.transform.position - transform.position;
@@ -166,12 +172,15 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    public void TakeDamage(int amount, Vector2 hitFrom, float knockback)
+    // `weaponHit`: a hit from one of the hero's weapons, which rolls the on-hit relics. Relic effects pass false,
+    // so they never trigger more effects.
+    public void TakeDamage(int amount, Vector2 hitFrom, float knockback, bool weaponHit = true)
     {
         if (IsDead) return; // already dying this frame
 
         hp -= amount;
         flashTimer = FlashTime;
+        if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)
         {
             arena.OnEnemyKilled(this);
@@ -185,5 +194,12 @@ public class Enemy : MonoBehaviour
             knockbackVelocity = ((Vector2)transform.position - hitFrom).normalized * knockback;
             stunTimer = KnockbackTime;
         }
+    }
+
+    // Frost Shard: moves and attacks `amount` slower (0.5 = half speed) for `duration` seconds.
+    public void Slow(float duration, float amount)
+    {
+        slowTimer = duration;
+        slowPace = 1f - amount;
     }
 }

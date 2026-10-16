@@ -109,6 +109,12 @@ public class LevelUp : MonoBehaviour
         TryShowCards();
     }
 
+    // A share of the XP needed for the current level (the XP shrine: 0.25 = a quarter of the bar).
+    public void AddLevelShare(float share)
+    {
+        AddXp(Mathf.CeilToInt(XpToNext * share));
+    }
+
     // Shows the cards if a level-up is waiting and no other panel is open.
     // ArenaManager calls this again when its own panel closes (e.g. after "Go deeper").
     public void TryShowCards()

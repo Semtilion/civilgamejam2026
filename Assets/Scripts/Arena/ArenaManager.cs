@@ -32,11 +32,14 @@ public class HordeWave
 // (every `bossEvery` depths): reaching N summons the boss while the horde keeps coming; killing it opens the teleporter.
 // The boss on `forceDepth` is the force itself (victory). Once the teleporter is open, spawning stops; stepping in
 // clears the depth: go deeper or return to town. Kills, materials, crystals and ores go back to the town.
+// Ores and shrines (MineSpot) are used by standing next to them; every mined ore shakes the cave and may set off a trap.
+// Every boss but the Force drops a relic (Relics, on this object).
 // Horde: the same cave, `hordeWaves` one after another; beat them all to win, die and the town falls.
 // The hero starts with the town's NPC buffs (Campaign).
 public class ArenaManager : MonoBehaviour
 {
     enum HordeState { Break, Spawning, Fighting }
+    enum Trap { None, Ambush, RockRain }
 
     public const float WallThickness = 1f; // walls left/right of the arena (how far the camera may show past the bounds)
     public const float WallHeight = 2f;    // walls above/below the arena (wall top + brick face)
@@ -87,6 +90,41 @@ public class ArenaManager : MonoBehaviour
     public Color oreColor = Color.white;
     public float oreScale = 1f;
 
+    [Header("Shrines (the ore art tinted by type; used like an ore)")]
+    public int shrinesPerDepth = 1;
+    [Tooltip("Seconds of standing next to a shrine to use it.")]
+    public float shrineTime = 5f;
+    [Tooltip("XP shrine: this share of the XP needed for the current level (0.25 = a quarter of the bar).")]
+    public float shrineXpShare = 0.25f;
+    [Tooltip("Materials shrine: this many on depth 1...")]
+    public int shrineMaterials = 20;
+    [Tooltip("...plus this many more for every depth below the first.")]
+    public int shrineMaterialsPerDepth = 5;
+    [Tooltip("Crystal shrine: this many on depth 1...")]
+    public int shrineCrystals = 1;
+    [Tooltip("...plus this many more for every depth below the first.")]
+    public int shrineCrystalsPerDepth = 1;
+
+    [Header("Tremors (every mined ore shakes the cave, then: nothing, an ambush or a rock rain)")]
+    public float tremorTime = 1f;
+    [Tooltip("How far the view jolts (units).")]
+    public float tremorStrength = 0.25f;
+    [Tooltip("Ambush: this many enemies (the normal spawn mix) in a ring just off-screen on depth 1...")]
+    public int ambushEnemies = 8;
+    [Tooltip("...plus this many more for every depth below the first.")]
+    public int ambushEnemiesPerDepth = 2;
+    [Tooltip("Rock rain: rocks fall at random spots on screen for this many seconds...")]
+    public float rockRainTime = 4f;
+    [Tooltip("...one every this many seconds.")]
+    public float rockInterval = 0.1f;
+    [Tooltip("Seconds the shadow shows before a rock lands.")]
+    public float rockWarning = 1f;
+    public float rockRadius = 1f;
+    [Tooltip("Damage to the hero (depth 1; scaled like enemy damage). Enemies are never hurt.")]
+    public int rockDamage = 15;
+    [Tooltip("Shadow and rock (placeholder circle).")]
+    public Sprite rockSprite;
+
     [Header("Teleporter (opens when the depth's goal is done)")]
     [Tooltip("The pulsing glow (placeholder circle).")]
     public Sprite teleporterSprite;
@@ -108,6 +146,8 @@ public class ArenaManager : MonoBehaviour
     [Header("Scene references")]
     public Player player;
     public LevelUp leveling;
+    [Tooltip("On this object: the relics owned and found, and their effects.")]
+    public Relics relics;
     public Sprite xpSprite;
     public Sprite materialSprite;
     public Sprite crystalSprite;
@@ -147,6 +187,8 @@ public class ArenaManager : MonoBehaviour
     readonly Dictionary<EnemyData, int> diveKills = new Dictionary<EnemyData, int>();
     float spawnTimer;
     bool bossSpawned;
+    bool bossDue;  // the kill goal summoned the boss; it spawns in the next Update
+    bool relicDue; // a boss died; its relic is found in the next Update
     Enemy currentBoss;
     GameObject teleporter; // null = not open
     Transform teleporterGlow;
@@ -156,7 +198,15 @@ public class ArenaManager : MonoBehaviour
     float waveBreakLeft;
     readonly List<EnemyData> waveQueue = new List<EnemyData>(); // still to spawn in this wave
 
+    CameraFollow cameraFollow;
+    Trap trap;          // what comes after the current tremor
+    float trapDelay;    // seconds until it comes (0 = no tremor going on)
+    float rockRainLeft; // seconds of rock rain left
+    float rockTimer;
+
     static readonly Color TeleporterColor = new Color(0.4f, 0.9f, 1f, 0.8f);
+    static readonly Color XpShrineColor = new Color(0.55f, 0.80f, 1f);    // light blue
+    static readonly Color CrystalShrineColor = new Color(0.65f, 0.35f, 0.95f); // purple
 
     int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
     bool IsBossDepth => depth % bossEvery == 0 || depth >= forceDepth;
@@ -170,12 +220,14 @@ public class ArenaManager : MonoBehaviour
     void Start()
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
-            hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null)
+            hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null ||
+            rockSprite == null || relics == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
             return;
         }
+        cameraFollow = cam.GetComponent<CameraFollow>();
         campaign = Campaign.Current ?? Campaign.StartNew(config); // also lets you press Play in this scene directly
         horde = campaign.IsHordeDay;
         if (horde) StartHorde();
@@ -184,7 +236,7 @@ public class ArenaManager : MonoBehaviour
 
     // ---------- Dive flow ----------
 
-    // Base stats + NPC buffs, the Sword only, level 1, nothing found yet.
+    // Base stats + NPC buffs + shop upgrades, the Sword (and relic weapons), owned relics, level 1, nothing found yet.
     void StartDive()
     {
         ResetRun();
@@ -195,6 +247,7 @@ public class ArenaManager : MonoBehaviour
     {
         player.ResetForNewRun();
         campaign.ApplyLoadout(player, leveling.weapons);
+        relics.ResetForNewRun(campaign.relicOwned); // after the loadout: Glass Cannon cuts the final max HP
         leveling.ResetForNewRun(campaign.weaponUnlocked);
         kills = 0;
         diveMaterials = 0;
@@ -213,7 +266,11 @@ public class ArenaManager : MonoBehaviour
         depthKills = 0;
         spawnTimer = 0f;
         bossSpawned = false;
+        bossDue = false;
+        relicDue = false;
         currentBoss = null;
+        trapDelay = 0f;
+        rockRainLeft = 0f;
         bossBar.SetActive(false);
         panel.SetActive(false);
         Time.timeScale = 1f;
@@ -221,13 +278,20 @@ public class ArenaManager : MonoBehaviour
         leveling.TryShowCards(); // level-ups earned at the end of the last depth are picked now
     }
 
-    // Supply crates (broken by weapons for materials), crystal clusters (broken for crystals) and ore veins
-    // (mined to weaken the quake), scattered away from the middle where the hero starts.
+    // Supply crates (broken by weapons for materials), crystal clusters (broken for crystals), ore veins (mined to
+    // weaken the quake) and shrines (a random type each), scattered away from the middle where the hero starts.
     void PlaceCratesAndOres()
     {
         for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
         for (int i = 0; i < clustersPerDepth; i++) Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this);
-        for (int i = 0; i < oresPerDepth; i++) OreVein.Place(oreSprite, oreColor, oreScale, whiteSquare, RandomFloorPoint(Bounds.center), this);
+        for (int i = 0; i < oresPerDepth; i++)
+            MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
+        for (int i = 0; i < shrinesPerDepth; i++)
+        {
+            SpotKind kind = (SpotKind)Random.Range(1, 4); // XpShrine, MaterialsShrine or CrystalShrine
+            Color color = kind == SpotKind.XpShrine ? XpShrineColor : kind == SpotKind.MaterialsShrine ? Pickup.MaterialsColor : CrystalShrineColor;
+            MineSpot.Place(kind, oreSprite, color, oreScale, shrineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
+        }
     }
 
     // A random spot in the cave at least 6 units from `awayFrom` (the hero's start, or the hero for the teleporter).
@@ -255,6 +319,22 @@ public class ArenaManager : MonoBehaviour
             return;
         }
 
+        UpdateTraps(); // traps still come after the teleporter opens
+
+        // Set by OnEnemyKilled, done here: a weapon may still be looping over Enemy.All when the kill happens
+        // (spawning would change the list mid-loop), and the relic pauses the game with a panel.
+        if (bossDue)
+        {
+            bossDue = false;
+            SpawnBoss();
+        }
+        if (relicDue)
+        {
+            relicDue = false;
+            FindRelic();
+            if (!IsPlaying) return; // its panel is up
+        }
+
         // The horde keeps spawning until the teleporter opens; stepping into it clears the depth.
         if (teleporter != null)
         {
@@ -269,13 +349,12 @@ public class ArenaManager : MonoBehaviour
         if (spawnTimer <= 0f)
         {
             spawnTimer = CurrentSpawnInterval();
-            if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy();
+            if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy(OffscreenPoint());
         }
     }
 
     void SpawnBoss()
     {
-        bossSpawned = true;
         EnemyData data = depth >= forceDepth && forceBoss != null ? forceBoss : boss;
         ShowBoss(Enemy.Spawn(data, OffscreenPoint(), StatScale, player, this));
     }
@@ -303,6 +382,7 @@ public class ArenaManager : MonoBehaviour
         kills++;
         depthKills++;
         diveKills[enemy.data] = diveKills.TryGetValue(enemy.data, out int count) ? count + 1 : 1;
+        relics.OnKill(); // Bloodstone
 
         if (horde)
         {
@@ -323,12 +403,20 @@ public class ArenaManager : MonoBehaviour
         if (enemy == currentBoss)
         {
             OpenTeleporter();
+            relicDue = true; // every boss but the Force drops a relic
         }
         else if (!bossSpawned && teleporter == null && depthKills >= KillsNeeded)
         {
-            // Kill goal reached: a boss depth summons its boss, a normal depth opens the teleporter.
-            if (IsBossDepth) SpawnBoss();
-            else OpenTeleporter();
+            // Kill goal reached: a boss depth summons its boss (next Update), a normal depth opens the teleporter.
+            if (IsBossDepth)
+            {
+                bossSpawned = true;
+                bossDue = true;
+            }
+            else
+            {
+                OpenTeleporter();
+            }
         }
     }
 
@@ -368,7 +456,7 @@ public class ArenaManager : MonoBehaviour
         }
     }
 
-    bool OnScreen(Vector2 worldPosition)
+    public bool OnScreen(Vector2 worldPosition)
     {
         Vector3 viewport = cam.WorldToViewportPoint(worldPosition);
         return viewport.x >= 0f && viewport.x <= 1f && viewport.y >= 0f && viewport.y <= 1f;
@@ -389,15 +477,33 @@ public class ArenaManager : MonoBehaviour
         diveMaterials += foundMaterials;
         diveCrystals += foundCrystals;
 
+        string relicLine = "";
+        if (relics.FoundThisDive.Count > 0)
+        {
+            List<string> names = new List<string>();
+            foreach (RelicId relic in relics.FoundThisDive) names.Add(Relics.Names[(int)relic]);
+            relicLine = $"\nRelics found: {string.Join(", ", names)} (yours if you get home).";
+        }
+
         ShowPanel($"Depth {depth} cleared!",
             $"+{foundMaterials} materials and +{foundCrystals} crystals collected from the floor.\n" +
-            $"Go deeper, or return to town with {diveMaterials} materials and {diveCrystals} crystals?",
+            $"Go deeper, or return to town with {diveMaterials} materials and {diveCrystals} crystals?" + relicLine,
             "Go deeper", NextDepth, "Return to town", () => EndDive(true));
         leveling.AddXp(xp); // the cards wait until "Go deeper"
     }
 
+    // A boss died: one random relic you don't have yet. It works right away; the game pauses to show it.
+    void FindRelic()
+    {
+        if (!relics.TryFind(out RelicId relic)) return; // you have them all
+        ShowNotice($"RELIC: {Relics.Names[(int)relic]}",
+            relics.Describe(relic) + "\nIt works right away, and it's yours for good if you get home safely.");
+    }
+
     public void OnPlayerDied()
     {
+        if (relics.TrySecondWind()) return; // back up, the fight goes on
+
         if (horde)
             ShowPanel("DEFEATED", "The horde overruns the town.", "Continue", () => FinishGame(false, "The horde overran the town on the last night."));
         else
@@ -411,16 +517,103 @@ public class ArenaManager : MonoBehaviour
         else leveling.AddXp(amount);
     }
 
-    public void OreMined()
+    // An ore or a shrine was used up (MineSpot). Shrine loot goes straight into the dive's loot (lost if the hero dies).
+    public void SpotMined(SpotKind kind)
     {
-        diveOres++;
+        switch (kind)
+        {
+            case SpotKind.Ore:
+                diveOres++;
+                Tremor();
+                break;
+            case SpotKind.XpShrine:
+                leveling.AddLevelShare(shrineXpShare);
+                break;
+            case SpotKind.MaterialsShrine:
+                diveMaterials += shrineMaterials + shrineMaterialsPerDepth * (depth - 1);
+                break;
+            case SpotKind.CrystalShrine:
+                diveCrystals += shrineCrystals + shrineCrystalsPerDepth * (depth - 1);
+                break;
+        }
+    }
+
+    // ---------- Tremors and traps ----------
+
+    // A destroyed ore shakes the cave; when the shaking ends: nothing, an ambush or a rock rain (equal chance).
+    void Tremor()
+    {
+        cameraFollow.Shake(tremorTime, tremorStrength);
+        trap = (Trap)Random.Range(0, 3);
+        trapDelay = tremorTime;
+    }
+
+    void UpdateTraps()
+    {
+        if (trapDelay > 0f)
+        {
+            trapDelay -= Time.deltaTime;
+            if (trapDelay <= 0f)
+            {
+                if (trap == Trap.Ambush) Ambush();
+                else if (trap == Trap.RockRain) rockRainLeft = rockRainTime;
+            }
+        }
+
+        if (rockRainLeft > 0f)
+        {
+            rockRainLeft -= Time.deltaTime;
+            rockTimer -= Time.deltaTime;
+            if (rockTimer <= 0f)
+            {
+                rockTimer = rockInterval;
+                FallingRock.Drop(rockSprite, RandomScreenPoint(), rockRadius, rockWarning, Mathf.RoundToInt(rockDamage * StatScale), player);
+            }
+        }
+    }
+
+    // Enemies (the normal spawn mix) evenly spaced in a ring just outside the view, closing in from every side.
+    // Near a wall, the ring's points are pulled back inside the cave.
+    void Ambush()
+    {
+        int count = ambushEnemies + ambushEnemiesPerDepth * (depth - 1);
+        float halfHeight = cam.orthographicSize + 1f;
+        float halfWidth = cam.orthographicSize * cam.aspect + 1f;
+        Vector2 center = cam.transform.position;
+        Rect inside = InsideBounds;
+        float turn = Random.value * Mathf.PI * 2f; // a different ring every time
+
+        for (int i = 0; i < count && Enemy.All.Count < maxEnemies; i++)
+        {
+            float angle = turn + Mathf.PI * 2f * i / count;
+            Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            // Out from the center until the view's edge (plus 1) on whichever side comes first.
+            float reachX = direction.x != 0f ? halfWidth / Mathf.Abs(direction.x) : float.MaxValue;
+            float reachY = direction.y != 0f ? halfHeight / Mathf.Abs(direction.y) : float.MaxValue;
+            Vector2 point = center + direction * Mathf.Min(reachX, reachY);
+            point.x = Mathf.Clamp(point.x, inside.xMin, inside.xMax);
+            point.y = Mathf.Clamp(point.y, inside.yMin, inside.yMax);
+            SpawnRandomEnemy(point);
+        }
+    }
+
+    // A random spot in the camera view, inside the cave.
+    Vector2 RandomScreenPoint()
+    {
+        float halfHeight = cam.orthographicSize;
+        float halfWidth = halfHeight * cam.aspect;
+        Rect inside = InsideBounds;
+        Vector2 point = (Vector2)cam.transform.position + new Vector2(Random.Range(-halfWidth, halfWidth), Random.Range(-halfHeight, halfHeight));
+        point.x = Mathf.Clamp(point.x, inside.xMin, inside.xMax);
+        point.y = Mathf.Clamp(point.y, inside.yMin, inside.yMax);
+        return point;
     }
 
     // Back to town: the campaign takes the loot (or not), the day passes, and the Town scene loads.
     void EndDive(bool survived)
     {
         campaign.RecordDive(kills, depth, diveOres);
-        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveOres);
+        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveOres, relics.FoundThisDive);
         Time.timeScale = 1f;
         SceneManager.LoadScene(townScene);
     }
@@ -541,7 +734,8 @@ public class ArenaManager : MonoBehaviour
         return depth == 1 ? entry.weight * entry.depth1Multiplier : entry.weight;
     }
 
-    void SpawnRandomEnemy()
+    // A weighted pick from the spawn table, at `position`.
+    void SpawnRandomEnemy(Vector2 position)
     {
         if (spawnTable.Length == 0) return;
 
@@ -559,8 +753,11 @@ public class ArenaManager : MonoBehaviour
                 break;
             }
         }
-        if (pick != null) Enemy.Spawn(pick, OffscreenPoint(), StatScale, player, this);
+        if (pick != null) Enemy.Spawn(pick, position, StatScale, player, this);
     }
+
+    // The cave minus a 1-unit margin along the walls (where enemies and rocks may appear).
+    Rect InsideBounds => new Rect(Bounds.xMin + 1f, Bounds.yMin + 1f, Bounds.width - 2f, Bounds.height - 2f);
 
     // A point on a rectangle just outside the camera view, inside the arena, so enemies don't pop in on screen.
     Vector2 OffscreenPoint()
@@ -568,7 +765,7 @@ public class ArenaManager : MonoBehaviour
         float halfHeight = cam.orthographicSize + 1f;
         float halfWidth = cam.orthographicSize * cam.aspect + 1f;
         Vector2 center = cam.transform.position;
-        Rect inside = new Rect(Bounds.xMin + 1f, Bounds.yMin + 1f, Bounds.width - 2f, Bounds.height - 2f);
+        Rect inside = InsideBounds;
 
         for (int attempt = 0; attempt < 20; attempt++)
         {
@@ -582,7 +779,8 @@ public class ArenaManager : MonoBehaviour
         return new Vector2(Random.Range(inside.xMin, inside.xMax), Random.Range(inside.yMin, inside.yMax));
     }
 
-    // Destroy every enemy, crate, shot, dagger, pickup, ore and the teleporter (lists empty at the end of the frame).
+    // Destroy every enemy, crate, shot, dagger, axe, fire bomb, pickup, ore, shrine, falling rock and the teleporter
+    // (lists empty at the end of the frame).
     void ClearField()
     {
         if (teleporter != null) Destroy(teleporter);
@@ -590,8 +788,11 @@ public class ArenaManager : MonoBehaviour
         foreach (Enemy enemy in Enemy.All) Destroy(enemy.gameObject);
         foreach (Projectile projectile in Projectile.All) Destroy(projectile.gameObject);
         foreach (Dagger dagger in Dagger.All) Destroy(dagger.gameObject);
+        foreach (Axe axe in Axe.All) Destroy(axe.gameObject);
+        foreach (FireBomb bomb in FireBomb.All) Destroy(bomb.gameObject);
         foreach (Pickup pickup in Pickup.All) Destroy(pickup.gameObject);
-        foreach (OreVein ore in OreVein.All) Destroy(ore.gameObject);
+        foreach (MineSpot spot in MineSpot.All) Destroy(spot.gameObject);
+        foreach (FallingRock rock in FallingRock.All) Destroy(rock.gameObject);
     }
 
     // ---------- UI ----------
@@ -651,6 +852,22 @@ public class ArenaManager : MonoBehaviour
         SetButton(primaryButton, primaryLabel, primary);
         secondaryButton.gameObject.SetActive(secondary != null);
         if (secondary != null) SetButton(secondaryButton, secondaryLabel, secondary);
+    }
+
+    // Pauses the game with a message and a Continue button, without clearing the cave: the fight goes on after.
+    void ShowNotice(string title, string body)
+    {
+        Time.timeScale = 0f;
+        panel.SetActive(true);
+        panelTitle.text = title;
+        panelBody.text = body;
+        SetButton(primaryButton, "Continue", () =>
+        {
+            panel.SetActive(false);
+            Time.timeScale = 1f;
+            leveling.TryShowCards(); // a level-up that waited for the panel
+        });
+        secondaryButton.gameObject.SetActive(false);
     }
 
     static void SetButton(Button button, string label, UnityAction action)

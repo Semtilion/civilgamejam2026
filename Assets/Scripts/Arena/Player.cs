@@ -134,6 +134,20 @@ public class Player : MonoBehaviour
         Hp = Mathf.Min(maxHp, Hp + amount);
     }
 
+    // Glass Cannon: max HP x factor (HP drops with it if needed).
+    public void ScaleMaxHp(float factor)
+    {
+        maxHp = Mathf.Max(1, Mathf.RoundToInt(maxHp * factor));
+        Hp = Mathf.Min(Hp, maxHp);
+    }
+
+    // Second Wind: back up from 0 HP with a share of max HP and a longer invulnerability.
+    public void Revive(float hpShare, float invulnerable)
+    {
+        Hp = Mathf.Max(1, Mathf.RoundToInt(maxHp * hpShare));
+        invulnerableTimer = invulnerable;
+    }
+
     // MaxHp: flat points (also heals them). MoveSpeed / PickupRange: a fraction of the base value (0.1 = +10%).
     // The rest add to their multiplier (0.1 = +10%). Damage raises both physical and magic.
     public void AddStat(StatType stat, float amount)

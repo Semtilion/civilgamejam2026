@@ -1,29 +1,34 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// An ore vein feeding the earthquake. Stand next to it for `ArenaManager.oreMineTime` seconds to mine it
-// (walking away resets the progress; taking hits doesn't). Mined ores lower the quake meter, but only if the hero
-// gets home safely (see Campaign.EndDive).
-public class OreVein : MonoBehaviour
+public enum SpotKind { Ore, XpShrine, MaterialsShrine, CrystalShrine }
+
+// An ore vein or a shrine. Stand next to it for `mineTime` seconds to use it (walking away resets the progress;
+// taking hits doesn't); then it's gone and ArenaManager.SpotMined gives the reward. Mined ores lower the quake meter,
+// but only if the hero gets home safely (see Campaign.EndDive), and every one shakes the cave (a tremor, maybe a trap).
+public class MineSpot : MonoBehaviour
 {
-    public static readonly List<OreVein> All = new List<OreVein>();
+    public static readonly List<MineSpot> All = new List<MineSpot>();
 
     const float BarWidth = 1.4f;
 
+    SpotKind kind;
+    float mineTime;
     ArenaManager arena;
     Transform barFill;
     GameObject bar;
     float progress;
 
-    // `sprite` drawn at `scale` with `color` (art: white, 1; placeholder square: tinted, bigger).
+    // `sprite` drawn at `scale` with `color` (ore art: white, 1; shrines: the same art tinted by type).
     // `barSprite` is a plain white square for the progress bar.
-    public static void Place(Sprite sprite, Color color, float scale, Sprite barSprite, Vector2 position, ArenaManager arena)
+    public static void Place(SpotKind kind, Sprite sprite, Color color, float scale, float mineTime, Sprite barSprite,
+        Vector2 position, ArenaManager arena)
     {
-        GameObject go = new GameObject("Ore Vein");
+        GameObject go = new GameObject(kind == SpotKind.Ore ? "Ore Vein" : kind.ToString());
         go.transform.position = position;
         NewPart("Rock", go.transform, sprite, Vector2.zero, Vector2.one * scale, color, -1);
 
-        // Mining progress bar just above the rock, only shown while mining
+        // Progress bar just above the sprite, only shown while mining
         float barY = sprite.bounds.size.y * scale / 2f + 0.25f;
         GameObject bar = new GameObject("Bar");
         bar.transform.SetParent(go.transform, false);
@@ -31,11 +36,13 @@ public class OreVein : MonoBehaviour
         Transform fill = NewPart("Fill", bar.transform, barSprite, new Vector2(0f, barY), new Vector2(0f, 0.15f), new Color(1f, 0.85f, 0.2f), 7);
         bar.SetActive(false);
 
-        OreVein ore = go.AddComponent<OreVein>();
-        ore.arena = arena;
-        ore.bar = bar;
-        ore.barFill = fill;
-        All.Add(ore);
+        MineSpot spot = go.AddComponent<MineSpot>();
+        spot.kind = kind;
+        spot.mineTime = mineTime;
+        spot.arena = arena;
+        spot.bar = bar;
+        spot.barFill = fill;
+        All.Add(spot);
     }
 
     static Transform NewPart(string name, Transform parent, Sprite sprite, Vector2 position, Vector2 size, Color color, int order)
@@ -61,7 +68,7 @@ public class OreVein : MonoBehaviour
 
         float reach = arena.oreMineRadius;
         bool near = ((Vector2)(arena.player.transform.position - transform.position)).sqrMagnitude <= reach * reach;
-        progress = near ? progress + Time.deltaTime / arena.oreMineTime : 0f;
+        progress = near ? progress + Time.deltaTime / mineTime : 0f;
 
         bar.SetActive(progress > 0f);
         float width = BarWidth * Mathf.Clamp01(progress);
@@ -70,7 +77,7 @@ public class OreVein : MonoBehaviour
 
         if (progress >= 1f)
         {
-            arena.OreMined();
+            arena.SpotMined(kind);
             Destroy(gameObject);
         }
     }

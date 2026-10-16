@@ -1,6 +1,7 @@
 using UnityEngine;
 
 // Starting weapon: hits every enemy within the radius around the hero and knocks them back. Bonus: bigger radius.
+// The Quake Hammer relic is a second one of these with bigger, slower numbers (set by the scene builder).
 public class SwordSweep : Weapon
 {
     const float FlashTime = 0.15f;
