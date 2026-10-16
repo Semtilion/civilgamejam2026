@@ -8,11 +8,9 @@ public class NpcDefinition
     public StatType stat;
     [Tooltip("Per tier. Max HP: flat points. Everything else: a fraction (0.05 = +5%).")]
     public float amountPerTier;
-    [Tooltip("Their first completed request gives this weapon.")]
+    [Tooltip("Their first completed request unlocks this weapon (it can then appear on level-up cards in the dungeon).")]
     public bool unlocksWeapon;
     public WeaponId weapon;
-    [Tooltip("Upgrades weapons with materials (gone if this NPC dies).")]
-    public bool isSmith;
 }
 
 [System.Serializable]
@@ -36,10 +34,6 @@ public class TownConfig : ScriptableObject
     [Tooltip("Chance (0-1) that a new request is 'bring materials' instead of a kill request.")]
     [Range(0f, 1f)] public float materialQuestChance = 0.25f;
     public int materialQuestAmount = 15;
-
-    [Header("Weapon upgrades (smith)")]
-    [Tooltip("Materials to go from level 1->2, 2->3, 3->4, 4->5.")]
-    public int[] upgradeCosts = { 10, 20, 30, 40 };
 
     [Header("Days")]
     public int startPopulation = 100;

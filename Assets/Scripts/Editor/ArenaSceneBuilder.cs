@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Arena.unity (called from Jam > Build Game Scenes): cave, hero with every weapon, camera, HUD,
-// pause panel, leveling UI and the ArenaManager, all wired up.
+// teleporter arrow, pause panel, leveling UI and the ArenaManager, all wired up.
 public static class ArenaSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Arena.unity";
@@ -76,6 +76,12 @@ public static class ArenaSceneBuilder
         Pin(bossBar, new Vector2(0.5f, 1f));
         Text bossName = NewText("Boss Name", bossBar, new Vector2(0, 26), new Vector2(800, 30), 24, TextAnchor.MiddleCenter);
 
+        // Edge arrow pointing at the teleporter while it's off-screen (ArenaManager moves and rotates it)
+        Text arrow = NewText("Teleporter Arrow", canvas, Vector2.zero, new Vector2(60, 60), 48, TextAnchor.MiddleCenter);
+        arrow.text = "▲";
+        arrow.color = new Color(0.4f, 0.9f, 1f);
+        arrow.gameObject.SetActive(false);
+
         // Center: pause panel (depth cleared / defeat / victory)
         Image panel = NewImage("Panel", canvas, Vector2.zero, new Vector2(1000, 440), new Color(0f, 0f, 0f, 0.85f));
         Text panelTitle = NewText("Title", panel.transform, new Vector2(0, 140), new Vector2(950, 80), 56, TextAnchor.MiddleCenter);
@@ -144,6 +150,8 @@ public static class ArenaSceneBuilder
         arena.hpText = hpText;
         arena.depthText = depthText;
         arena.goalText = goalText;
+        arena.teleporterArrow = arrow.rectTransform;
+        arena.teleporterSprite = a.circle;
         arena.bossBar = bossBar.gameObject;
         arena.bossFill = bossFill;
         arena.bossName = bossName;

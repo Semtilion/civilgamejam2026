@@ -1,9 +1,10 @@
 using UnityEngine;
 
-// Every weapon in the game. The town saves weapon levels by this id (Campaign.weaponLevels).
+// Every weapon in the game. The town tracks which are unlocked by this id (Campaign.weaponUnlocked).
 public enum WeaponId { Sword, Dagger, Whip, CrystalOrbit }
 
 // Base for the hero's auto-firing weapons. All weapons sit on the hero; owned = component enabled.
+// A dive starts with the Sword only; unlocked weapons and level-ups come from level-up cards and reset every dive.
 // Levels 1-5: every level adds damage, levels 3 and 5 also add the weapon's bonus (BonusCount).
 // The hero's damage / attack speed / area multipliers (town buffs, level-up cards) apply to every weapon.
 public abstract class Weapon : MonoBehaviour
@@ -15,19 +16,17 @@ public abstract class Weapon : MonoBehaviour
     public WeaponId id;
     [Tooltip("Magic weapons use the hero's magic damage (Shaman); the others use physical damage.")]
     public bool isMagic;
-    [Tooltip("What the weapon does (for UI and docs).")]
+    [Tooltip("Shown on the level-up card that offers this weapon.")]
     public string description;
-    [Tooltip("What levels 3 and 5 add (for UI and docs).")]
+    [Tooltip("Shown on the level-up cards for levels 3 and 5.")]
     public string bonusText;
     public int baseDamage = 10;
     public int damagePerLevel = 3;
     [Tooltip("Seconds between attacks, before attack speed bonuses.")]
     public float interval = 1f;
 
-    [Header("Live")]
+    [Header("Live (this dive)")]
     [Range(1, MaxLevel)] public int level = 1;
-    [Tooltip("Extra damage from level-up cards (this dive only).")]
-    public int cardDamage;
 
     protected Player player;
     float timer;
@@ -35,7 +34,7 @@ public abstract class Weapon : MonoBehaviour
     public string DisplayName => Names[(int)id];
     protected int BonusCount => (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
     protected float DamageMultiplier => isMagic ? player.magicDamageMultiplier : player.physicalDamageMultiplier;
-    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1) + cardDamage) * DamageMultiplier);
+    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * DamageMultiplier);
 
     protected virtual void Awake()
     {

@@ -3,7 +3,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per NPC, a detail panel for the selected
-// NPC (their buff, their request, Give / weapon upgrades), and the Dive button. All state lives in Campaign.Current.
+// NPC (their help, their request, their home, Give / Repair buttons), Reinforce and Dive. State lives in Campaign.Current.
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -20,13 +20,14 @@ public class TownManager : MonoBehaviour
     public Text detailBody;
     public Button giveButton;
     public Button repairButton;
-    [Tooltip("One per weapon, in WeaponId order. Only shown for the smith.")]
-    public Button[] upgradeButtons;
     public Button reinforceButton;
     public Button diveButton;
 
     Campaign campaign;
     int selected;
+
+    // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
+    int NpcCount => Mathf.Min(npcButtons.Length, config.npcs.Length);
 
     void Start()
     {
@@ -37,15 +38,11 @@ public class TownManager : MonoBehaviour
         {
             int index = i; // copy for the lambda
             npcButtons[i].onClick.AddListener(() => { selected = index; Refresh(); });
+            npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
         repairButton.onClick.AddListener(() => { campaign.Repair(selected); Refresh(); });
         reinforceButton.onClick.AddListener(() => { campaign.Reinforce(); Refresh(); });
-        for (int i = 0; i < upgradeButtons.Length; i++)
-        {
-            WeaponId weapon = (WeaponId)i;
-            upgradeButtons[i].onClick.AddListener(() => { campaign.Upgrade(weapon); Refresh(); });
-        }
         diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene));
 
         Refresh();
@@ -58,7 +55,7 @@ public class TownManager : MonoBehaviour
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
 
-        for (int i = 0; i < npcButtons.Length; i++) npcLabels[i].text = NpcSummary(i);
+        for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
         ShowDetail(selected);
 
         SetLabel(reinforceButton, campaign.reinforced ? "Town reinforced" : $"Reinforce town\n{config.reinforceCost} materials");
@@ -107,13 +104,17 @@ public class TownManager : MonoBehaviour
             body += npc.quest != null
                 ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}."
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
-            if (definition.unlocksWeapon && !npc.everCompleted)
-                body += $"\nTheir first finished request gives you the {Weapon.Names[(int)definition.weapon]}.";
+            if (definition.unlocksWeapon)
+            {
+                string weapon = Weapon.Names[(int)definition.weapon];
+                body += npc.everCompleted
+                    ? $"\nYou have their {weapon}: it can show up on level-up cards in the dungeon."
+                    : $"\nTheir first finished request gives you the {weapon}.";
+            }
             body += npc.buildingBroken
-                ? $"\nHOME BROKEN: no help until repaired. If the next quake hits first, they die."
+                ? "\nHOME BROKEN: no help until repaired. If the next quake hits first, they die."
                 : npc.quest == null ? "\nHome braced: safe from the next quake." : "\nHome at risk: finish their request to brace it.";
         }
-        if (definition.isSmith) body += npc.alive ? "\nUpgrades your weapons with materials:" : "\nNo one can upgrade your weapons anymore.";
         detailBody.text = body;
 
         bool materialsRequest = npc.alive && npc.quest != null && !npc.quest.IsKill;
@@ -130,22 +131,6 @@ public class TownManager : MonoBehaviour
         {
             SetLabel(repairButton, $"Repair home ({config.repairCost} materials)");
             repairButton.interactable = campaign.CanRepair(i);
-        }
-
-        bool showUpgrades = definition.isSmith && npc.alive;
-        for (int w = 0; w < upgradeButtons.Length; w++)
-        {
-            upgradeButtons[w].gameObject.SetActive(showUpgrades);
-            if (!showUpgrades) continue;
-
-            WeaponId weapon = (WeaponId)w;
-            int level = campaign.weaponLevels[w];
-            string name = Weapon.Names[w];
-            string label = level == 0 ? $"{name}\n(locked)"
-                : level >= Weapon.MaxLevel ? $"{name} Lv {level}\nMAX"
-                : $"{name} Lv {level} -> {level + 1}\n{campaign.UpgradeCost(weapon)} materials";
-            SetLabel(upgradeButtons[w], label);
-            upgradeButtons[w].interactable = campaign.CanUpgrade(weapon);
         }
     }
 

@@ -1,18 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// In-dive leveling (on by default, resets every dive): XP gems -> level up -> pause and pick 1 of 3 random cards.
-// Cards are deliberately small next to the town (the main source of power):
-// stat cards, and +damage for weapons already unlocked in town. Cards never give new weapons.
+// In-dive leveling (on by default, resets every dive): XP gems -> level up -> pause and pick 1 of 3 random cards,
+// by clicking or pressing 1 / 2 / 3. Cards: a weapon the town has unlocked (arrives at Lv 1), a level-up for a weapon
+// you have (damage, plus its bonus at Lv 3 and 5), or a small stat boost.
 public class LevelUp : MonoBehaviour
 {
     // Stat cards: what each one raises and by how much per pick (units as in Player.AddStat).
     static readonly StatType[] CardStats = { StatType.MaxHp, StatType.MoveSpeed, StatType.Damage, StatType.AttackSpeed, StatType.Area, StatType.PickupRange };
     static readonly float[] CardAmounts = { 4f, 0.02f, 0.02f, 0.02f, 0.02f, 0.05f };
     static readonly string[] CardNames = { "Max HP", "Move Speed", "Damage", "Attack Speed", "Area", "Pickup Range" };
-    const int MaxRank = 5;               // max picks per stat card and per weapon card
-    const float WeaponCardPower = 0.2f;  // a weapon card gives 20% of a smith level's damage (rounded up)
+    static readonly Key[] PickKeys = { Key.Digit1, Key.Digit2, Key.Digit3 };
+    static readonly Key[] PickKeysNumpad = { Key.Numpad1, Key.Numpad2, Key.Numpad3 };
+    const int MaxStatRank = 5;
 
     class Card
     {
@@ -21,7 +23,7 @@ public class LevelUp : MonoBehaviour
         public System.Action apply;
     }
 
-    [Tooltip("XP gems and level-up cards during dives. Off = all power from the town only.")]
+    [Tooltip("XP gems and level-up cards during dives. Off = the Sword only, all other power from the town.")]
     public bool levelingEnabled = true;
 
     [Header("XP needed for the next level = xpBase + xpPerLevel x current level")]
@@ -29,7 +31,7 @@ public class LevelUp : MonoBehaviour
     public int xpPerLevel = 5;
 
     [Header("Scene references")]
-    [Tooltip("Every weapon on the hero (the town decides which are owned).")]
+    [Tooltip("Every weapon on the hero.")]
     public Weapon[] weapons;
     public Player player;
     public GameObject xpHud;
@@ -46,19 +48,19 @@ public class LevelUp : MonoBehaviour
     int xp;
     int pendingPicks;
     readonly int[] statRanks = new int[CardStats.Length];
-    int[] weaponRanks = new int[0];
+    readonly List<Card> shownCards = new List<Card>();
+    bool[] unlockedWeapons = new bool[0]; // by WeaponId, from the town
 
     int XpToNext => xpBase + xpPerLevel * level;
 
-    // Level 1, no XP, no card bonuses. (Which weapons are owned is set by the town loadout.)
-    public void ResetForNewRun()
+    // Level 1, no XP, no stat cards. `unlocked` = the weapons the town has unlocked (Campaign.weaponUnlocked).
+    public void ResetForNewRun(bool[] unlocked)
     {
+        unlockedWeapons = unlocked;
         level = 1;
         xp = 0;
         pendingPicks = 0;
         System.Array.Clear(statRanks, 0, statRanks.Length);
-        weaponRanks = new int[weapons.Length];
-        foreach (Weapon weapon in weapons) weapon.cardDamage = 0;
         cardPanel.SetActive(false);
     }
 
@@ -67,6 +69,22 @@ public class LevelUp : MonoBehaviour
         if (xpHud.activeSelf != levelingEnabled) xpHud.SetActive(levelingEnabled);
         xpFill.anchorMax = new Vector2(Mathf.Clamp01((float)xp / XpToNext), 1f);
         levelText.text = $"Lv {level}";
+
+        if (IsChoosing) PickWithKeys();
+    }
+
+    void PickWithKeys()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null) return;
+        for (int i = 0; i < shownCards.Count && i < PickKeys.Length; i++)
+        {
+            if (keyboard[PickKeys[i]].wasPressedThisFrame || keyboard[PickKeysNumpad[i]].wasPressedThisFrame)
+            {
+                Pick(shownCards[i]);
+                return;
+            }
+        }
     }
 
     public void AddXp(int amount)
@@ -97,6 +115,7 @@ public class LevelUp : MonoBehaviour
         }
         Shuffle(cards);
 
+        shownCards.Clear();
         Time.timeScale = 0f;
         cardPanel.SetActive(true);
         for (int i = 0; i < cardButtons.Length; i++)
@@ -106,7 +125,8 @@ public class LevelUp : MonoBehaviour
             if (!show) continue;
 
             Card card = cards[i];
-            cardTitles[i].text = card.title;
+            shownCards.Add(card);
+            cardTitles[i].text = $"[{i + 1}] {card.title}";
             cardDescriptions[i].text = card.description;
             cardButtons[i].onClick.RemoveAllListeners();
             cardButtons[i].onClick.AddListener(() => Pick(card));
@@ -117,6 +137,7 @@ public class LevelUp : MonoBehaviour
     {
         card.apply();
         pendingPicks--;
+        shownCards.Clear();
         cardPanel.SetActive(false);
         Time.timeScale = 1f;
         TryShowCards(); // several level-ups at once (e.g. after clearing a depth)
@@ -126,33 +147,39 @@ public class LevelUp : MonoBehaviour
     {
         List<Card> cards = new List<Card>();
 
-        // +damage for weapons the town has unlocked (owned = enabled).
-        for (int i = 0; i < weapons.Length; i++)
+        foreach (Weapon weapon in weapons)
         {
-            Weapon weapon = weapons[i];
-            if (!weapon.enabled || weaponRanks[i] >= MaxRank) continue;
-            int index = i;
-            int bonus = Mathf.CeilToInt(weapon.damagePerLevel * WeaponCardPower);
-            cards.Add(new Card
+            bool unlocked = (int)weapon.id < unlockedWeapons.Length && unlockedWeapons[(int)weapon.id];
+            if (!weapon.enabled && unlocked)
             {
-                title = $"{weapon.DisplayName} {weaponRanks[i] + 1}/{MaxRank}",
-                description = $"+{bonus} damage\n(this dive only)",
-                apply = () =>
+                cards.Add(new Card
                 {
-                    weaponRanks[index]++;
-                    weapon.cardDamage += bonus;
-                },
-            });
+                    title = "NEW: " + weapon.DisplayName,
+                    description = weapon.description,
+                    apply = () => { weapon.level = 1; weapon.enabled = true; },
+                });
+            }
+            else if (weapon.enabled && weapon.level < Weapon.MaxLevel)
+            {
+                int next = weapon.level + 1;
+                string bonus = next == 3 || next == 5 ? "\n" + weapon.bonusText : "";
+                cards.Add(new Card
+                {
+                    title = $"{weapon.DisplayName} Lv {next}",
+                    description = $"+{weapon.damagePerLevel} damage{bonus}",
+                    apply = () => weapon.level++,
+                });
+            }
         }
 
         for (int i = 0; i < CardStats.Length; i++)
         {
-            if (statRanks[i] >= MaxRank) continue;
+            if (statRanks[i] >= MaxStatRank) continue;
             int index = i;
             cards.Add(new Card
             {
-                title = $"{CardNames[i]} {statRanks[i] + 1}/{MaxRank}",
-                description = Player.StatText(CardStats[i], CardAmounts[i]) + "\n(this dive only)",
+                title = $"{CardNames[i]} {statRanks[i] + 1}/{MaxStatRank}",
+                description = Player.StatText(CardStats[i], CardAmounts[i]),
                 apply = () =>
                 {
                     statRanks[index]++;

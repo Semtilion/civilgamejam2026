@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per NPC, the NPC detail panel (Give / weapon upgrades) and the Dive button.
+// news, one button per NPC, the NPC detail panel (Give / Repair) and the Reinforce and Dive buttons.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -44,10 +44,6 @@ public static class TownSceneBuilder
         ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(-200, -45);
         Button repairButton = NewButton("Repair", detail.transform, new Vector2(380, 60), 24);
         ((RectTransform)repairButton.transform).anchoredPosition = new Vector2(200, -45);
-        RectTransform upgradeRow = NewRow("Weapon Upgrades", detail.transform, new Vector2(0, -140), new Vector2(1100, 90), 20);
-        Button[] upgradeButtons = new Button[Weapon.Names.Length];
-        for (int i = 0; i < upgradeButtons.Length; i++)
-            upgradeButtons[i] = NewButton(Weapon.Names[i], upgradeRow, new Vector2(260, 80), 20);
 
         // Bottom-right: reinforce (one-time) and dive
         Button reinforce = NewButton("Reinforce", canvas, new Vector2(360, 90), 24);
@@ -69,7 +65,6 @@ public static class TownSceneBuilder
         town.detailBody = detailBody;
         town.giveButton = giveButton;
         town.repairButton = repairButton;
-        town.upgradeButtons = upgradeButtons;
         town.reinforceButton = reinforce;
         town.diveButton = dive;
 

@@ -149,7 +149,6 @@ public static class GameBuilder
             new NpcDefinition { name = "Guard", stat = StatType.MaxHp, amountPerTier = 10f, unlocksWeapon = true, weapon = WeaponId.Whip },
             new NpcDefinition { name = "Shaman", stat = StatType.MagicDamage, amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
             new NpcDefinition { name = "NPC 3", stat = StatType.PhysicalDamage, amountPerTier = 0.05f, unlocksWeapon = true, weapon = WeaponId.Dagger },
-            new NpcDefinition { name = "NPC 4 (Smith)", stat = StatType.MoveSpeed, amountPerTier = 0.04f, isSmith = true },
         };
         config.killQuests = new[]
         {

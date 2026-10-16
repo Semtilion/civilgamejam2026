@@ -41,7 +41,7 @@ public class Campaign
 
     public readonly TownConfig config;
     public readonly NpcState[] npcs;
-    public readonly int[] weaponLevels = new int[Weapon.Names.Length]; // by WeaponId, 0 = locked
+    public readonly bool[] weaponUnlocked = new bool[Weapon.Names.Length]; // by WeaponId
     public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
@@ -74,7 +74,7 @@ public class Campaign
         config = townConfig;
         population = config.startPopulation;
         quakeMeter = config.quakeStart;
-        weaponLevels[(int)WeaponId.Sword] = 1;
+        weaponUnlocked[(int)WeaponId.Sword] = true;
         npcs = new NpcState[config.npcs.Length];
         for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState();
         news.Add("Day 1: the townsfolk ask for your help before the earthquake comes.");
@@ -225,44 +225,11 @@ public class Campaign
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
-        if (definition.unlocksWeapon && weaponLevels[(int)definition.weapon] == 0)
+        if (definition.unlocksWeapon && !weaponUnlocked[(int)definition.weapon])
         {
-            weaponLevels[(int)definition.weapon] = 1;
-            news.Add($"{definition.name} gives you the {Weapon.Names[(int)definition.weapon]}!");
+            weaponUnlocked[(int)definition.weapon] = true;
+            news.Add($"{definition.name} gives you the {Weapon.Names[(int)definition.weapon]}! It can now show up on level-up cards in the dungeon.");
         }
-    }
-
-    // ---------- Weapon upgrades (smith) ----------
-
-    public bool SmithAlive
-    {
-        get
-        {
-            for (int i = 0; i < npcs.Length; i++)
-                if (config.npcs[i].isSmith && npcs[i].alive) return true;
-            return false;
-        }
-    }
-
-    // Materials for the next level, or -1 if the weapon is locked or maxed.
-    public int UpgradeCost(WeaponId weapon)
-    {
-        int level = weaponLevels[(int)weapon];
-        return level >= 1 && level < Weapon.MaxLevel ? config.upgradeCosts[level - 1] : -1;
-    }
-
-    public bool CanUpgrade(WeaponId weapon)
-    {
-        int cost = UpgradeCost(weapon);
-        return SmithAlive && cost >= 0 && materials >= cost;
-    }
-
-    public void Upgrade(WeaponId weapon)
-    {
-        if (!CanUpgrade(weapon)) return;
-        materials -= UpgradeCost(weapon);
-        weaponLevels[(int)weapon]++;
-        news.Add($"{Weapon.Names[(int)weapon]} upgraded to level {weaponLevels[(int)weapon]}.");
     }
 
     // ---------- Buildings ----------
@@ -294,15 +261,14 @@ public class Campaign
 
     // ---------- Dive setup ----------
 
-    // Gives the hero the town's weapons (with their levels) and the buff of every living NPC whose home is standing,
-    // on top of base stats. Call right after Player.ResetForNewRun.
+    // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive),
+    // plus the help of every living NPC whose home is standing, on top of base stats. Call after Player.ResetForNewRun.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
         foreach (Weapon weapon in weapons)
         {
-            int level = weaponLevels[(int)weapon.id];
-            weapon.level = Mathf.Max(1, level);
-            weapon.enabled = level > 0;
+            weapon.level = 1;
+            weapon.enabled = weapon.id == WeaponId.Sword;
         }
 
         for (int i = 0; i < npcs.Length; i++)

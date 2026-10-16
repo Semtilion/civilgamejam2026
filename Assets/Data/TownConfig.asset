@@ -18,25 +18,16 @@ MonoBehaviour:
     amountPerTier: 10
     unlocksWeapon: 1
     weapon: 2
-    isSmith: 0
   - name: Shaman
     stat: 4
     amountPerTier: 0.08
     unlocksWeapon: 1
     weapon: 3
-    isSmith: 0
   - name: NPC 3
     stat: 3
     amountPerTier: 0.05
     unlocksWeapon: 1
     weapon: 1
-    isSmith: 0
-  - name: NPC 4 (Smith)
-    stat: 1
-    amountPerTier: 0.04
-    unlocksWeapon: 0
-    weapon: 0
-    isSmith: 1
   questInterval: 3
   maxTier: 5
   killQuests:
@@ -48,7 +39,6 @@ MonoBehaviour:
     count: 8
   materialQuestChance: 0.25
   materialQuestAmount: 15
-  upgradeCosts: 0a000000140000001e00000028000000i
   startPopulation: 100
   daysLostOnDefeat: 1
   earthquakeDays: 04000000070000000a0000000d000000i
