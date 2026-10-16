@@ -31,18 +31,44 @@ public class Player : MonoBehaviour
     public float attackSpeedMultiplier = 1f;
     public float areaMultiplier = 1f;
 
+    [Header("Look (the art faces right)")]
+    [Tooltip("Shown while standing still. Empty = keep whatever the SpriteRenderer has.")]
+    public Sprite idleSprite;
+    [Tooltip("Looped while moving.")]
+    public Sprite[] walkSprites;
+    public float walkFps = 8f;
+
+    [Header("Motion (moves only the Body child, pivoted at the feet)")]
+    [Tooltip("How high he bounces on each step, in world units.")]
+    public float bobHeight = 0.08f;
+    [Tooltip("Degrees he leans into the direction he walks.")]
+    public float leanAngle = 6f;
+    public float leanSpeed = 10f;
+    [Tooltip("Idle breathing: how much he stretches (0.025 = 2.5%), and seconds per breath.")]
+    public float breathAmount = 0.025f;
+    public float breathTime = 1.6f;
+
     [Header("Scene references")]
     public ArenaManager arena;
     public SpriteRenderer sprite;
+    [Tooltip("The art's own transform (a child of the hero). Bob, lean and breathing are applied here.")]
+    public Transform body;
 
     public int Hp { get; private set; }
     public bool IsDead => Hp <= 0;
 
     InputAction moveAction;
     float invulnerableTimer;
+    float walkTime;
+    float lean;
+    Vector3 bodyRestPosition;
+
+    // Only animate a real child: moving/scaling the hero itself would also move the weapon flashes.
+    bool HasBody => body != null && body != transform;
 
     void Awake()
     {
+        if (HasBody) bodyRestPosition = body.localPosition;
         moveAction = InputSystem.actions != null ? InputSystem.actions.FindAction("Player/Move") : null;
         if (moveAction == null) Debug.LogError("No 'Player/Move' action found in the project-wide Input Actions.");
         else moveAction.Enable();
@@ -58,12 +84,39 @@ public class Player : MonoBehaviour
         position.x = Mathf.Clamp(position.x, bounds.xMin + radius, bounds.xMax - radius);
         position.y = Mathf.Clamp(position.y, bounds.yMin + radius, bounds.yMax - radius);
         transform.position = position;
+        Animate(input);
 
         if (invulnerableTimer > 0f)
         {
             invulnerableTimer -= Time.deltaTime;
             sprite.enabled = invulnerableTimer <= 0f || Mathf.Repeat(invulnerableTimer, 0.1f) > 0.05f; // blink
         }
+    }
+
+    // Faces the way they walk (keeps the last facing when standing or moving straight up/down);
+    // idle pose when still, walk frames while moving. Then the body motion: a bounce on every step and a lean into
+    // the walk while moving, slow breathing while standing.
+    void Animate(Vector2 input)
+    {
+        if (input.x > 0.01f) sprite.flipX = false;
+        else if (input.x < -0.01f) sprite.flipX = true;
+
+        bool moving = input.sqrMagnitude > 0.0001f;
+        walkTime = moving ? walkTime + Time.deltaTime : 0f;
+        if (moving && walkSprites != null && walkSprites.Length > 0)
+            sprite.sprite = walkSprites[(int)(walkTime * walkFps) % walkSprites.Length];
+        else if (idleSprite != null)
+            sprite.sprite = idleSprite;
+
+        if (!HasBody) return;
+
+        float bob = moving ? bobHeight * Mathf.Abs(Mathf.Sin(walkTime * walkFps * Mathf.PI)) : 0f; // one bounce per frame swap
+        lean = Mathf.Lerp(lean, -input.x * leanAngle, 1f - Mathf.Exp(-leanSpeed * Time.deltaTime)); // right = lean clockwise
+        float breath = moving ? 0f : breathAmount * Mathf.Sin(Time.time * 2f * Mathf.PI / breathTime);
+
+        body.localPosition = bodyRestPosition + new Vector3(0f, bob, 0f);
+        body.localRotation = Quaternion.Euler(0f, 0f, lean);
+        body.localScale = new Vector3(1f - breath * 0.5f, 1f + breath, 1f); // stretch up, thin a little
     }
 
     public void TakeDamage(int amount)

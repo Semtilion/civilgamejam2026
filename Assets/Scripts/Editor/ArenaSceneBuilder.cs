@@ -26,11 +26,24 @@ public static class ArenaSceneBuilder
         NewSprite("Wall Right", a.square, new Vector2((size.x + wall) / 2f, 0f), new Vector2(wall, size.y), wallColor, -5);
 
         // Hero with every weapon. Which ones are owned (enabled) and their levels come from the town at dive start.
-        SpriteRenderer heroSprite = NewSprite("Hero", a.circle, Vector2.zero, Vector2.one, new Color(0.30f, 0.55f, 0.95f), 5);
-        GameObject hero = heroSprite.gameObject;
+        // Hero root = Player + weapons (scale 1; its position is the hit center). The art lives in a "Body" child
+        // (the artist's hero if it's in Assets/Art/Hero, otherwise a blue placeholder circle) so the walk bob, lean and
+        // breathing never move the weapon flashes. The art's pivot is at the feet, so the body sits half its height down.
+        // A soft shadow child sits under the feet.
+        bool hasArt = a.heroIdle != null;
+        float feetY = hasArt ? -HeroHeight / 2f : -0.5f;
+        GameObject hero = new GameObject("Hero");
+        SpriteRenderer shadow = NewSprite("Shadow", a.circle, new Vector2(0f, feetY), new Vector2(1.1f, 0.35f), new Color(0f, 0f, 0f, 0.35f), -1);
+        shadow.transform.SetParent(hero.transform, false);
+        SpriteRenderer body = NewSprite("Body", hasArt ? a.heroIdle : a.circle, new Vector2(0f, hasArt ? feetY : 0f), Vector2.one,
+            hasArt ? Color.white : new Color(0.30f, 0.55f, 0.95f), 5);
+        body.transform.SetParent(hero.transform, false);
         Player player = hero.AddComponent<Player>();
         player.arena = arena;
-        player.sprite = heroSprite;
+        player.sprite = body;
+        player.body = body.transform;
+        player.idleSprite = a.heroIdle;
+        player.walkSprites = a.heroWalk;
 
         //                      weapon                                       id                    magic  card text                                                          bonus text             dmg +lvl interval
         SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        false, "Hits every enemy around you.",                                     "+sweep radius",        10, 3, 1.0f);

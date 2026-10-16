@@ -12,6 +12,8 @@ using UnityEngine.UI;
 public class GameAssets
 {
     public Sprite circle, square;
+    public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
+    public Sprite[] heroWalk;
     public EnemyData crawler, brute, spitter, colossus, force, crate;
     public TownConfig townConfig;
 }
@@ -22,6 +24,8 @@ public static class GameBuilder
 {
     const string TemplatePath = "Assets/Settings/Scenes/URP2DSceneTemplate.unity";
     const string ArtFolder = "Assets/Art/Placeholder";
+    const string HeroFolder = "Assets/Art/Hero";
+    public const float HeroHeight = 2.2f; // world units
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
 
@@ -63,6 +67,8 @@ public static class GameBuilder
         GameAssets a = new GameAssets();
         a.circle = PlaceholderSprite("Circle", 64, true);
         a.square = PlaceholderSprite("Square", 4, false);
+        a.heroIdle = HeroSprite("Hero_Idle");
+        a.heroWalk = new[] { HeroSprite("Hero_Walk1"), HeroSprite("Hero_Walk2") }.Where(s => s != null).ToArray();
 
         //                         name               behavior                color                          radius  hp  speed touch  xp  mat% mat
         a.crawler  = EnemyAsset("Crystal Crawler",  EnemyBehavior.Chaser,  new Color(0.60f, 0.30f, 0.70f), 0.3f,   10, 3.2f,  5,   1, 0.05f,  1, a.circle);
@@ -103,6 +109,38 @@ public static class GameBuilder
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.spritePixelsPerUnit = size;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // One of the artist's hero frames (Assets/Art/Hero), imported as a sprite exactly HeroHeight units tall with the
+    // pivot at the feet (bottom center), so leaning and breathing keep the feet planted.
+    // Returns null if the file isn't there (the builder then uses the placeholder circle).
+    static Sprite HeroSprite(string name)
+    {
+        string path = $"{HeroFolder}/{name}.png";
+        if (!File.Exists(path)) return null;
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+
+        importer.GetSourceTextureWidthAndHeight(out int width, out int height);
+        float pixelsPerUnit = height / HeroHeight;
+        TextureImporterSettings settings = new TextureImporterSettings();
+        importer.ReadTextureSettings(settings);
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+            Mathf.Abs(importer.spritePixelsPerUnit - pixelsPerUnit) > 0.01f || importer.mipmapEnabled ||
+            settings.spriteAlignment != (int)SpriteAlignment.BottomCenter)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = pixelsPerUnit;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.ReadTextureSettings(settings); // re-read: the lines above changed the importer
+            settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
+            importer.SetTextureSettings(settings);
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
