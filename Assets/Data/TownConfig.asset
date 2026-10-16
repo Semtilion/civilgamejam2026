@@ -27,6 +27,7 @@ MonoBehaviour:
     amountPerTier: 0.08
     unlocksWeapon: 1
     weapon: 3
+    hasShop: 1
   - name: Elder
     faction: Peasants
     startPopulation: 200

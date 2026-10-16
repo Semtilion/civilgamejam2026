@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Supply Crate
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Supply Crate
-  sprite: {fileID: 21300000, guid: 3376b6e4f1f04b344ad5f2675978c710, type: 3}
-  color: {r: 0.55, g: 0.38, b: 0.2, a: 1}
+  sprite: {fileID: 21300000, guid: 801219e5e0a1e5145a0013758c7e1bd3, type: 3}
+  color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.5
   maxHp: 20
   moveSpeed: 0

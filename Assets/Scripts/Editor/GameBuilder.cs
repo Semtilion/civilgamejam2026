@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 // The data assets both scenes use.
@@ -14,7 +15,7 @@ public class GameAssets
     public Sprite circle, square;
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
     public Sprite[] heroWalk;
-    public EnemyData crawler, brute, spitter, colossus, force, crate;
+    public EnemyData crawler, brute, spitter, colossus, force, crate, crystalCluster;
     public TownConfig townConfig;
 }
 
@@ -26,6 +27,9 @@ public static class GameBuilder
     const string ArtFolder = "Assets/Art/Placeholder";
     const string HeroFolder = "Assets/Art/Hero";
     public const float HeroHeight = 2.2f; // world units
+    const string TilesFolder = "Assets/Art/Tiles";
+    const string PropsFolder = "Assets/Art/Props";
+    const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
 
@@ -77,6 +81,16 @@ public static class GameBuilder
         a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle);
         a.force    = EnemyAsset("The Force",        EnemyBehavior.Boss,    new Color(0.45f, 0.10f, 0.55f), 2.2f,  800, 1.8f, 30,   0, 0f,     0, a.circle);
         a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square);
+        a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
+
+        // Real crate art (from the tileset) replaces the brown placeholder square on the existing asset.
+        Sprite crateArt = PropSprite("Prop_Crate");
+        if (crateArt != null && a.crate.sprite != crateArt)
+        {
+            a.crate.sprite = crateArt;
+            a.crate.color = Color.white;
+            EditorUtility.SetDirty(a.crate);
+        }
         a.townConfig = TownConfigAsset(a);
         AssetDatabase.SaveAssets();
         return a;
@@ -146,8 +160,50 @@ public static class GameBuilder
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
+    // A piece of the pixel-art tileset (Assets/Art/Tiles or Props), imported crisp: 16 px = 1 world unit,
+    // point filtering, no compression, no mipmaps, center pivot. Returns null if the file isn't there.
+    public static Sprite PixelSprite(string path)
+    {
+        if (!File.Exists(path)) return null;
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+            Mathf.Abs(importer.spritePixelsPerUnit - PixelsPerTile) > 0.01f || importer.filterMode != FilterMode.Point ||
+            importer.textureCompression != TextureImporterCompression.Uncompressed || importer.mipmapEnabled)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = PixelsPerTile;
+            importer.filterMode = FilterMode.Point;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    public static Sprite TileSprite(string name) => PixelSprite($"{TilesFolder}/{name}.png");
+    public static Sprite PropSprite(string name) => PixelSprite($"{PropsFolder}/{name}.png");
+
+    // The Tilemap tile for a sprite (Assets/Art/Tiles/TileAssets/<name>.asset), created once.
+    public static Tile TileAsset(Sprite sprite)
+    {
+        CreateFolder(TilesFolder, "TileAssets");
+        string path = $"{TilesFolder}/TileAssets/{sprite.name}.asset";
+        Tile tile = AssetDatabase.LoadAssetAtPath<Tile>(path);
+        if (tile != null) return tile;
+
+        tile = ScriptableObject.CreateInstance<Tile>();
+        tile.sprite = sprite;
+        AssetDatabase.CreateAsset(tile, path);
+        return tile;
+    }
+
     static EnemyData EnemyAsset(string name, EnemyBehavior behavior, Color color, float radius, int hp, float speed,
-        int contactDamage, int xp, float materialChance, int materialAmount, Sprite sprite)
+        int contactDamage, int xp, float materialChance, int materialAmount, Sprite sprite, int crystals = 0)
     {
         string path = $"{EnemiesFolder}/{name}.asset";
         EnemyData enemy = AssetDatabase.LoadAssetAtPath<EnemyData>(path);
@@ -164,6 +220,7 @@ public static class GameBuilder
         enemy.xp = xp;
         enemy.materialChance = materialChance;
         enemy.materialAmount = materialAmount;
+        enemy.crystalAmount = crystals;
         enemy.sprite = sprite;
         if (name == "The Force")
         {
@@ -185,7 +242,7 @@ public static class GameBuilder
         config.npcs = new[]
         {
             new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, stat = StatType.MaxHp,          amountPerTier = 10f,   unlocksWeapon = true, weapon = WeaponId.Whip },
-            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  stat = StatType.MagicDamage,    amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
+            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  stat = StatType.MagicDamage,    amountPerTier = 0.08f, unlocksWeapon = true, weapon = WeaponId.CrystalOrbit, hasShop = true },
             new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, stat = StatType.PhysicalDamage, amountPerTier = 0.05f, unlocksWeapon = true, weapon = WeaponId.Dagger },
         };
         config.killQuests = new[]

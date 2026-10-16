@@ -19,11 +19,13 @@ public class CameraFollow : MonoBehaviour
         float halfHeight = cam.orthographicSize;
         float halfWidth = halfHeight * cam.aspect;
         Rect area = arena.Bounds;
-        float margin = ArenaManager.WallThickness; // let the walls show at the edge
+        // Let the walls show at the edges: one tile at the sides, wall top + face above and below.
+        float marginX = ArenaManager.WallThickness;
+        float marginY = ArenaManager.WallHeight;
 
         Vector3 goal = target.position;
-        goal.x = ClampAxis(goal.x, area.xMin - margin + halfWidth, area.xMax + margin - halfWidth);
-        goal.y = ClampAxis(goal.y, area.yMin - margin + halfHeight, area.yMax + margin - halfHeight);
+        goal.x = ClampAxis(goal.x, area.xMin - marginX + halfWidth, area.xMax + marginX - halfWidth);
+        goal.y = ClampAxis(goal.y, area.yMin - marginY + halfHeight, area.yMax + marginY - halfHeight);
         goal.z = transform.position.z;
 
         transform.position = Vector3.Lerp(transform.position, goal, 1f - Mathf.Exp(-smoothing * Time.deltaTime));

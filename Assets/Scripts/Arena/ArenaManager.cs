@@ -31,14 +31,15 @@ public class HordeWave
 // Dive: every depth, kill N enemies while the horde builds up. Normal depth: reaching N opens a teleporter. Boss depth
 // (every `bossEvery` depths): reaching N summons the boss while the horde keeps coming; killing it opens the teleporter.
 // The boss on `forceDepth` is the force itself (victory). Once the teleporter is open, spawning stops; stepping in
-// clears the depth: go deeper or return to town. Kills, materials and ores go back to the town.
+// clears the depth: go deeper or return to town. Kills, materials, crystals and ores go back to the town.
 // Horde: the same cave, `hordeWaves` one after another; beat them all to win, die and the town falls.
 // The hero starts with the town's NPC buffs (Campaign).
 public class ArenaManager : MonoBehaviour
 {
     enum HordeState { Break, Spawning, Fighting }
 
-    public const float WallThickness = 1f;
+    public const float WallThickness = 1f; // walls left/right of the arena (how far the camera may show past the bounds)
+    public const float WallHeight = 2f;    // walls above/below the arena (wall top + brick face)
 
     [Header("Game")]
     public TownConfig config;
@@ -70,18 +71,27 @@ public class ArenaManager : MonoBehaviour
     public EnemyData boss;
     public EnemyData forceBoss;
 
-    [Header("Crates and ores (placed at the start of every depth)")]
+    [Header("Crates, crystal clusters and ores (placed at the start of every depth)")]
     public EnemyData crate;
     public int cratesPerDepth = 4;
+    [Tooltip("Broken like a crate; drops crystals for the Shaman's shop.")]
+    public EnemyData crystalCluster;
+    public int clustersPerDepth = 1;
     public int oresPerDepth = 3;
     [Tooltip("Seconds of standing next to an ore to mine it.")]
     public float oreMineTime = 3f;
     [Tooltip("How close (from the ore's center) the hero must stand to mine.")]
     public float oreMineRadius = 1.6f;
     public Sprite oreSprite;
+    [Tooltip("White + 1 for real art; a tint and a bigger scale for the placeholder square.")]
+    public Color oreColor = Color.white;
+    public float oreScale = 1f;
 
     [Header("Teleporter (opens when the depth's goal is done)")]
+    [Tooltip("The pulsing glow (placeholder circle).")]
     public Sprite teleporterSprite;
+    [Tooltip("Optional art drawn on top of the glow (the stairs down).")]
+    public Sprite teleporterStairs;
     public float teleporterRadius = 1.2f;
 
     [Header("Final horde (day 15)")]
@@ -100,6 +110,9 @@ public class ArenaManager : MonoBehaviour
     public LevelUp leveling;
     public Sprite xpSprite;
     public Sprite materialSprite;
+    public Sprite crystalSprite;
+    [Tooltip("Plain white square, used for simple bars (ore mining progress).")]
+    public Sprite whiteSquare;
     public Camera cam;
     public RectTransform hpFill;
     public Text hpText;
@@ -129,12 +142,14 @@ public class ArenaManager : MonoBehaviour
     int kills;      // whole dive
     int depthKills; // this depth, toward the goal
     int diveMaterials;
+    int diveCrystals;
     int diveOres;
     readonly Dictionary<EnemyData, int> diveKills = new Dictionary<EnemyData, int>();
     float spawnTimer;
     bool bossSpawned;
     Enemy currentBoss;
     GameObject teleporter; // null = not open
+    Transform teleporterGlow;
 
     HordeState hordeState;
     int wave;              // current horde wave, 1-based (0 = before the first)
@@ -155,7 +170,7 @@ public class ArenaManager : MonoBehaviour
     void Start()
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
-            hordeWaves == null || hordeWaves.Length == 0)
+            hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -183,6 +198,7 @@ public class ArenaManager : MonoBehaviour
         leveling.ResetForNewRun(campaign.weaponUnlocked);
         kills = 0;
         diveMaterials = 0;
+        diveCrystals = 0;
         diveOres = 0;
         diveKills.Clear();
         depth = 0;
@@ -205,12 +221,13 @@ public class ArenaManager : MonoBehaviour
         leveling.TryShowCards(); // level-ups earned at the end of the last depth are picked now
     }
 
-    // Supply crates (broken by weapons for materials) and ore veins (mined to weaken the quake),
-    // scattered away from the middle where the hero starts.
+    // Supply crates (broken by weapons for materials), crystal clusters (broken for crystals) and ore veins
+    // (mined to weaken the quake), scattered away from the middle where the hero starts.
     void PlaceCratesAndOres()
     {
         for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
-        for (int i = 0; i < oresPerDepth; i++) OreVein.Place(oreSprite, RandomFloorPoint(Bounds.center), this);
+        for (int i = 0; i < clustersPerDepth; i++) Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this);
+        for (int i = 0; i < oresPerDepth; i++) OreVein.Place(oreSprite, oreColor, oreScale, whiteSquare, RandomFloorPoint(Bounds.center), this);
     }
 
     // A random spot in the cave at least 6 units from `awayFrom` (the hero's start, or the hero for the teleporter).
@@ -242,7 +259,7 @@ public class ArenaManager : MonoBehaviour
         if (teleporter != null)
         {
             float pulse = 1f + 0.1f * Mathf.Sin(Time.time * 6f);
-            teleporter.transform.localScale = Vector3.one * teleporterRadius * 2f * pulse; // placeholder circle is 1 unit wide
+            teleporterGlow.localScale = Vector3.one * teleporterRadius * 2f * pulse; // placeholder circle is 1 unit wide
             if (((Vector2)(player.transform.position - teleporter.transform.position)).sqrMagnitude <= teleporterRadius * teleporterRadius)
                 DepthCleared();
             return; // no spawns while it's open
@@ -274,9 +291,12 @@ public class ArenaManager : MonoBehaviour
     {
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
 
-        if (enemy.data.behavior == EnemyBehavior.Crate) // broken crate: just its materials, not a kill
+        if (enemy.data.behavior == EnemyBehavior.Crate) // broken crate or crystal cluster: just its loot, not a kill
         {
-            Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount, this);
+            if (enemy.data.materialAmount > 0)
+                Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount, this);
+            if (enemy.data.crystalAmount > 0)
+                Pickup.Drop(PickupKind.Crystal, crystalSprite, enemy.transform.position, enemy.data.crystalAmount, this);
             return;
         }
 
@@ -327,13 +347,25 @@ public class ArenaManager : MonoBehaviour
         foreach (Enemy enemy in Enemy.All)
             if (enemy.data.behavior == EnemyBehavior.Shooter && !OnScreen(enemy.transform.position)) Destroy(enemy.gameObject);
 
-        SpriteRenderer portal = new GameObject("Teleporter").AddComponent<SpriteRenderer>();
-        portal.sprite = teleporterSprite;
-        portal.color = TeleporterColor;
-        portal.sortingOrder = -1; // under pickups and enemies
-        portal.transform.position = RandomFloorPoint(player.transform.position);
-        portal.transform.localScale = Vector3.one * teleporterRadius * 2f;
-        teleporter = portal.gameObject;
+        // A pulsing glow, with the stairs down drawn on top of it (if there's art for them).
+        teleporter = new GameObject("Teleporter");
+        teleporter.transform.position = RandomFloorPoint(player.transform.position);
+
+        SpriteRenderer glow = new GameObject("Glow").AddComponent<SpriteRenderer>();
+        glow.transform.SetParent(teleporter.transform, false);
+        glow.transform.localScale = Vector3.one * teleporterRadius * 2f;
+        glow.sprite = teleporterSprite;
+        glow.color = TeleporterColor;
+        glow.sortingOrder = -2; // under the stairs, pickups and enemies
+        teleporterGlow = glow.transform;
+
+        if (teleporterStairs != null)
+        {
+            SpriteRenderer stairs = new GameObject("Stairs").AddComponent<SpriteRenderer>();
+            stairs.transform.SetParent(teleporter.transform, false);
+            stairs.sprite = teleporterStairs;
+            stairs.sortingOrder = -1;
+        }
     }
 
     bool OnScreen(Vector2 worldPosition)
@@ -346,16 +378,20 @@ public class ArenaManager : MonoBehaviour
     void DepthCleared()
     {
         int foundMaterials = 0;
+        int foundCrystals = 0;
         int xp = 0;
         foreach (Pickup pickup in Pickup.All)
         {
             if (pickup.kind == PickupKind.Materials) foundMaterials += pickup.amount;
+            else if (pickup.kind == PickupKind.Crystal) foundCrystals += pickup.amount;
             else xp += pickup.amount;
         }
         diveMaterials += foundMaterials;
+        diveCrystals += foundCrystals;
 
         ShowPanel($"Depth {depth} cleared!",
-            $"+{foundMaterials} materials collected.\nGo deeper, or return to town with {diveMaterials} materials?",
+            $"+{foundMaterials} materials and +{foundCrystals} crystals collected from the floor.\n" +
+            $"Go deeper, or return to town with {diveMaterials} materials and {diveCrystals} crystals?",
             "Go deeper", NextDepth, "Return to town", () => EndDive(true));
         leveling.AddXp(xp); // the cards wait until "Go deeper"
     }
@@ -371,6 +407,7 @@ public class ArenaManager : MonoBehaviour
     public void Collect(PickupKind kind, int amount)
     {
         if (kind == PickupKind.Materials) diveMaterials += amount;
+        else if (kind == PickupKind.Crystal) diveCrystals += amount;
         else leveling.AddXp(amount);
     }
 
@@ -383,7 +420,7 @@ public class ArenaManager : MonoBehaviour
     void EndDive(bool survived)
     {
         campaign.RecordDive(kills, depth, diveOres);
-        campaign.EndDive(survived, diveKills, diveMaterials, diveOres);
+        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveOres);
         Time.timeScale = 1f;
         SceneManager.LoadScene(townScene);
     }
@@ -573,7 +610,7 @@ public class ArenaManager : MonoBehaviour
         else
         {
             string depthLabel = depth >= forceDepth ? $"Depth {depth} (the force)" : IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}";
-            depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}     Materials {diveMaterials}";
+            depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}     Materials {diveMaterials}     Crystals {diveCrystals}";
 
             float oreDrop = diveOres * config.orePercent;
             string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";

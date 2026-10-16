@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the detail panel (Give button), the Dive button and the epilogue screen.
+// news, one button per faction leader, the detail panel (Give button, crystal shop), the Dive button and the epilogue screen.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -20,7 +20,7 @@ public static class TownSceneBuilder
         Stretch(background.rectTransform);
 
         // Top: status bar and news
-        Text status = NewText("Status", canvas, new Vector2(0, -30), new Vector2(1860, 50), 26, TextAnchor.MiddleCenter);
+        Text status = NewText("Status", canvas, new Vector2(0, -30), new Vector2(1860, 50), 24, TextAnchor.MiddleCenter);
         Pin(status.rectTransform, new Vector2(0.5f, 1f));
         Image newsPanel = NewImage("News Panel", canvas, new Vector2(0, 330), new Vector2(1700, 190), new Color(0f, 0f, 0f, 0.5f));
         Text news = NewText("News", newsPanel.transform, Vector2.zero, new Vector2(1660, 170), 22, TextAnchor.UpperLeft);
@@ -36,12 +36,15 @@ public static class TownSceneBuilder
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
         }
 
-        // Bottom: detail panel for the selected leader
+        // Bottom: detail panel for the selected leader (the shop row only shows for the Shaman)
         Image detail = NewImage("Detail Panel", canvas, new Vector2(-100, -230), new Vector2(1200, 400), new Color(0f, 0f, 0f, 0.6f));
         Text detailTitle = NewText("Title", detail.transform, new Vector2(0, 160), new Vector2(1100, 60), 36, TextAnchor.MiddleCenter);
-        Text detailBody = NewText("Body", detail.transform, new Vector2(0, 15), new Vector2(1100, 230), 22, TextAnchor.UpperLeft);
-        Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 56), 24);
-        ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -158);
+        Text detailBody = NewText("Body", detail.transform, new Vector2(0, 30), new Vector2(1100, 200), 20, TextAnchor.UpperLeft);
+        RectTransform shopRow = NewRow("Crystal Shop", detail.transform, new Vector2(0, -108), new Vector2(1160, 64), 15);
+        Button[] shopButtons = new Button[a.townConfig.shopItems.Length];
+        for (int i = 0; i < shopButtons.Length; i++) shopButtons[i] = NewButton($"Shop {i + 1}", shopRow, new Vector2(265, 64), 18);
+        Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 48), 22);
+        ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -170);
 
         // Bottom-right: dive ("Defend the town" on the horde day)
         Button dive = NewButton("DIVE", canvas, new Vector2(360, 110), 36);
@@ -67,6 +70,7 @@ public static class TownSceneBuilder
         town.detailTitle = detailTitle;
         town.detailBody = detailBody;
         town.giveButton = giveButton;
+        town.shopButtons = shopButtons;
         town.diveButton = dive;
         town.epiloguePanel = epilogue.gameObject;
         town.epilogueTitle = epilogueTitle;

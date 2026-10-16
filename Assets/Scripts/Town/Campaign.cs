@@ -47,7 +47,9 @@ public class Campaign
     public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
+    public int crystals;
     public float quakeMeter; // %
+    public readonly int[] shopRanks; // by TownConfig.shopItems index
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
@@ -127,6 +129,7 @@ public class Campaign
         weaponUnlocked[(int)WeaponId.Sword] = true;
         npcs = new NpcState[config.npcs.Length];
         for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState { population = config.npcs[i].startPopulation };
+        shopRanks = new int[config.shopItems.Length];
         news.Add("Day 1: the faction leaders ask for your help before the earthquake comes.");
         RefreshQuests();
     }
@@ -149,16 +152,17 @@ public class Campaign
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive ends. Survived: keep the materials, kills count for requests, mined ores lower
-    // the quake meter, 1 day passes. Defeated: everything found (ores too) is lost, `daysLostOnDefeat` (1) days pass.
-    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int oresMined)
+    // Called by the arena when a dive ends. Survived: keep the materials and crystals, kills count for requests, mined
+    // ores lower the quake meter, 1 day passes. Defeated: everything found is lost, `daysLostOnDefeat` (1) days pass.
+    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int oresMined)
     {
         if (survived)
         {
             materials += foundMaterials;
+            crystals += foundCrystals;
             float drop = oresMined * config.orePercent;
             quakeMeter = Mathf.Max(0f, quakeMeter - drop);
-            news.Add($"You return with {foundMaterials} materials and {oresMined} ores destroyed (quake meter -{drop:0}%).");
+            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals and {oresMined} ores destroyed (quake meter -{drop:0}%).");
             AddKills(kills);
             AdvanceDays(1);
         }
@@ -213,7 +217,11 @@ public class Campaign
                 int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * lossShare));
                 npc.population -= lost;
                 string line = $"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation}).";
-                if (!npc.Alive) line += $" They are wiped out, and {definition.name} is gone.";
+                if (!npc.Alive)
+                {
+                    line += $" They are wiped out, and {definition.name} is gone.";
+                    if (definition.hasShop) line += " The crystal shop closes, and its upgrades are lost.";
+                }
                 else if (wasFullHelp && HelpMultiplier(i) < 1f) line += $" Under half left: {definition.name}'s help is halved.";
                 news.Add(line);
             }
@@ -292,10 +300,48 @@ public class Campaign
         }
     }
 
+    // ---------- Crystal shop (the Shaman) ----------
+
+    // The NPC who runs the shop (TownConfig "Has Shop"), or -1.
+    int ShopOwner
+    {
+        get
+        {
+            for (int i = 0; i < config.npcs.Length; i++)
+                if (config.npcs[i].hasShop) return i;
+            return -1;
+        }
+    }
+
+    // Open while the shop owner's faction is alive. Once they're wiped out, the shop and its upgrades are gone.
+    public bool ShopOpen => ShopOwner >= 0 && npcs[ShopOwner].Alive;
+
+    // Rank N of an upgrade costs N crystals plus N x `materialsPerCrystal` materials.
+    public int ShopCrystalCost(int item) => shopRanks[item] + 1;
+    public int ShopMaterialCost(int item) => (shopRanks[item] + 1) * config.materialsPerCrystal;
+
+    public bool CanBuy(int item)
+    {
+        return ShopOpen && shopRanks[item] < config.maxShopRank &&
+               crystals >= ShopCrystalCost(item) && materials >= ShopMaterialCost(item);
+    }
+
+    public void Buy(int item)
+    {
+        if (!CanBuy(item)) return;
+        crystals -= ShopCrystalCost(item);
+        materials -= ShopMaterialCost(item);
+        shopRanks[item]++;
+        ShopItem shopItem = config.shopItems[item];
+        news.Add($"{config.npcs[ShopOwner].name} empowers you: {shopItem.name} rank {shopRanks[item]} " +
+                 $"({Player.StatText(shopItem.stat, shopItem.amountPerRank * shopRanks[item])} in total).");
+    }
+
     // ---------- Dive setup ----------
 
     // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive),
-    // plus each NPC's help (halved if their faction is below half, none if wiped out). Call after Player.ResetForNewRun.
+    // plus each NPC's help (halved if their faction is below half, none if wiped out) and the crystal shop upgrades
+    // (only while the shop is open). Call after Player.ResetForNewRun.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
         foreach (Weapon weapon in weapons)
@@ -310,5 +356,10 @@ public class Campaign
             if (help > 0f && npcs[i].tier > 0)
                 player.AddStat(config.npcs[i].stat, config.npcs[i].amountPerTier * npcs[i].tier * help);
         }
+
+        if (!ShopOpen) return;
+        for (int i = 0; i < shopRanks.Length; i++)
+            if (shopRanks[i] > 0)
+                player.AddStat(config.shopItems[i].stat, config.shopItems[i].amountPerRank * shopRanks[i]);
     }
 }

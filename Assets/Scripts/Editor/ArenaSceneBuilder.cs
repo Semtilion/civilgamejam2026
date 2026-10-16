@@ -1,10 +1,13 @@
+using System.Linq;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 using static GameBuilder;
 
-// Builds Assets/Scenes/Arena.unity (called from Jam > Build Game Scenes): cave, hero with every weapon, camera, HUD,
-// teleporter arrow, pause panel, leveling UI and the ArenaManager, all wired up.
+// Builds Assets/Scenes/Arena.unity (called from Jam > Build Game Scenes): cave (tileset room + decorations, or the
+// placeholder floor/walls), hero with every weapon, camera, HUD, teleporter arrow, pause panel, leveling UI and the
+// ArenaManager, all wired up.
 public static class ArenaSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Arena.unity";
@@ -15,15 +18,23 @@ public static class ArenaSceneBuilder
 
         ArenaManager arena = new GameObject("Arena Manager").AddComponent<ArenaManager>();
         Vector2 size = arena.arenaSize;
-        float wall = ArenaManager.WallThickness;
 
-        // Floor and walls (visual only: the hero and enemies are kept inside the cave in code)
-        NewSprite("Floor", a.square, Vector2.zero, size, new Color(0.16f, 0.13f, 0.12f), -10);
-        Color wallColor = new Color(0.35f, 0.30f, 0.28f);
-        NewSprite("Wall Top", a.square, new Vector2(0f, (size.y + wall) / 2f), new Vector2(size.x + wall * 2f, wall), wallColor, -5);
-        NewSprite("Wall Bottom", a.square, new Vector2(0f, -(size.y + wall) / 2f), new Vector2(size.x + wall * 2f, wall), wallColor, -5);
-        NewSprite("Wall Left", a.square, new Vector2(-(size.x + wall) / 2f, 0f), new Vector2(wall, size.y), wallColor, -5);
-        NewSprite("Wall Right", a.square, new Vector2((size.x + wall) / 2f, 0f), new Vector2(wall, size.y), wallColor, -5);
+        // Cave (visual only: the hero and enemies are kept inside the cave in code).
+        // The test tileset as a walled room if its pieces are in Assets/Art/Tiles, otherwise placeholder floor/walls.
+        if (BuildTiledRoom(size))
+        {
+            PlaceDecorations(size);
+        }
+        else
+        {
+            float wall = ArenaManager.WallThickness;
+            NewSprite("Floor", a.square, Vector2.zero, size, new Color(0.16f, 0.13f, 0.12f), -10);
+            Color wallColor = new Color(0.35f, 0.30f, 0.28f);
+            NewSprite("Wall Top", a.square, new Vector2(0f, (size.y + wall) / 2f), new Vector2(size.x + wall * 2f, wall), wallColor, -5);
+            NewSprite("Wall Bottom", a.square, new Vector2(0f, -(size.y + wall) / 2f), new Vector2(size.x + wall * 2f, wall), wallColor, -5);
+            NewSprite("Wall Left", a.square, new Vector2(-(size.x + wall) / 2f, 0f), new Vector2(wall, size.y), wallColor, -5);
+            NewSprite("Wall Right", a.square, new Vector2((size.x + wall) / 2f, 0f), new Vector2(wall, size.y), wallColor, -5);
+        }
 
         // Hero with every weapon. Which ones are owned (enabled) and their levels come from the town at dive start.
         // Hero root = Player + weapons (scale 1; its position is the hit center). The art lives in a "Body" child
@@ -161,12 +172,19 @@ public static class ArenaSceneBuilder
             Wave((a.crawler, 45), (a.spitter, 9), (a.brute, 9), (a.colossus, 1)),
         };
         arena.crate = a.crate;
-        arena.oreSprite = a.square;
+        arena.crystalCluster = a.crystalCluster;
+        // Ores: the tileset's stone pillar if it's there, otherwise a tinted, slightly bigger placeholder square.
+        Sprite pillar = PropSprite("Prop_Pillar");
+        arena.oreSprite = pillar != null ? pillar : a.square;
+        arena.oreColor = pillar != null ? Color.white : new Color(0.45f, 0.55f, 0.75f);
+        arena.oreScale = pillar != null ? 1f : 1.2f;
+        arena.whiteSquare = a.square;
         arena.quakeText = quakeText;
         arena.player = player;
         arena.leveling = leveling;
         arena.xpSprite = a.circle;
         arena.materialSprite = a.square;
+        arena.crystalSprite = a.circle; // tinted violet by Pickup
         arena.cam = camera;
         arena.hpFill = hpFill;
         arena.hpText = hpText;
@@ -174,6 +192,7 @@ public static class ArenaSceneBuilder
         arena.goalText = goalText;
         arena.teleporterArrow = arrow.rectTransform;
         arena.teleporterSprite = a.circle;
+        arena.teleporterStairs = PropSprite("Prop_Stairs"); // null = glow only
         arena.bossBar = bossBar.gameObject;
         arena.bossFill = bossFill;
         arena.bossName = bossName;
@@ -184,6 +203,90 @@ public static class ArenaSceneBuilder
         arena.secondaryButton = secondaryButton;
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    // Paints the cave as a walled room from the test tileset (16 px tiles, 1 unit each) on two Tilemaps.
+    // Floor: random floor tiles over the whole arena. Walls, all outside the arena bounds:
+    //   north: brick face (just above the floor) + wall top above it,
+    //   south: wall top (just below the floor) + its brick face below it,
+    //   west/east: one column of wall top; corners from the same wall set.
+    // Returns false (and paints nothing) if the tile files aren't in Assets/Art/Tiles.
+    static bool BuildTiledRoom(Vector2 size)
+    {
+        Sprite[] floorSprites = Enumerable.Range(0, 9).Select(i => TileSprite($"Floor_{i}")).Where(s => s != null).ToArray();
+        string[] wallNames = { "Wall_TL", "Wall_T", "Wall_TR", "Wall_L", "Wall_Face", "Wall_R", "Wall_BL", "Wall_B", "Wall_BR", "Wall_FL", "Wall_F", "Wall_FR" };
+        if (floorSprites.Length == 0 || wallNames.Any(n => TileSprite(n) == null)) return false;
+
+        Tile[] floorTiles = floorSprites.Select(TileAsset).ToArray();
+        Tile Wall(string name) => TileAsset(TileSprite(name));
+
+        Grid grid = new GameObject("Cave Grid").AddComponent<Grid>();
+        Tilemap floor = NewTilemap("Floor", grid.transform, -10);
+        Tilemap walls = NewTilemap("Walls", grid.transform, -5);
+
+        int width = Mathf.RoundToInt(size.x), height = Mathf.RoundToInt(size.y);
+        int left = -width / 2, bottom = -height / 2, right = left + width - 1, top = bottom + height - 1; // floor cells
+        System.Random random = new System.Random(7); // the same floor pattern on every build
+
+        for (int y = bottom; y <= top; y++)
+            for (int x = left; x <= right; x++)
+                floor.SetTile(new Vector3Int(x, y, 0), floorTiles[random.Next(floorTiles.Length)]);
+
+        for (int x = left; x <= right; x++)
+        {
+            walls.SetTile(new Vector3Int(x, top + 1, 0), Wall("Wall_Face"));
+            walls.SetTile(new Vector3Int(x, top + 2, 0), Wall("Wall_T"));
+            walls.SetTile(new Vector3Int(x, bottom - 1, 0), Wall("Wall_B"));
+            walls.SetTile(new Vector3Int(x, bottom - 2, 0), Wall("Wall_F"));
+        }
+        for (int y = bottom - 1; y <= top + 1; y++)
+        {
+            walls.SetTile(new Vector3Int(left - 1, y, 0), Wall("Wall_L"));
+            walls.SetTile(new Vector3Int(right + 1, y, 0), Wall("Wall_R"));
+        }
+        walls.SetTile(new Vector3Int(left - 1, top + 2, 0), Wall("Wall_TL"));
+        walls.SetTile(new Vector3Int(right + 1, top + 2, 0), Wall("Wall_TR"));
+        walls.SetTile(new Vector3Int(left - 1, bottom - 1, 0), Wall("Wall_BL"));
+        walls.SetTile(new Vector3Int(right + 1, bottom - 1, 0), Wall("Wall_BR"));
+        walls.SetTile(new Vector3Int(left - 1, bottom - 2, 0), Wall("Wall_FL"));
+        walls.SetTile(new Vector3Int(right + 1, bottom - 2, 0), Wall("Wall_FR"));
+        return true;
+    }
+
+    static Tilemap NewTilemap(string name, Transform grid, int sortingOrder)
+    {
+        GameObject go = new GameObject(name, typeof(Tilemap), typeof(TilemapRenderer));
+        go.transform.SetParent(grid, false);
+        go.GetComponent<TilemapRenderer>().sortingOrder = sortingOrder;
+        return go.GetComponent<Tilemap>();
+    }
+
+    // Looks only (no collision): torches on the north wall's face every 8 tiles, and 8 barrels near the walls.
+    static void PlaceDecorations(Vector2 size)
+    {
+        float halfWidth = size.x / 2f, halfHeight = size.y / 2f;
+
+        Sprite torch = PropSprite("Prop_Torch");
+        if (torch != null)
+            for (float x = -halfWidth + 4f; x < halfWidth; x += 8f)
+                NewSprite("Torch", torch, new Vector2(x, halfHeight + 0.5f), Vector2.one, Color.white, -4);
+
+        Sprite barrel = PropSprite("Prop_Barrel");
+        if (barrel == null) return;
+        System.Random random = new System.Random(11); // the same spots on every build
+        for (int i = 0; i < 8; i++)
+        {
+            float along = (float)random.NextDouble() * 2f - 1f; // -1..1 along the chosen wall
+            Vector2 position;
+            switch (i % 4)
+            {
+                case 0: position = new Vector2(-halfWidth + 0.8f, along * (halfHeight - 2f)); break; // west wall
+                case 1: position = new Vector2(halfWidth - 0.8f, along * (halfHeight - 2f)); break;  // east wall
+                case 2: position = new Vector2(along * (halfWidth - 2f), -halfHeight + 0.8f); break; // south wall
+                default: position = new Vector2(along * (halfWidth - 2f), halfHeight - 1.2f); break;  // under the north wall
+            }
+            NewSprite("Barrel", barrel, position, Vector2.one, Color.white, 0);
+        }
     }
 
     static HordeWave Wave(params (EnemyData enemy, int count)[] groups)

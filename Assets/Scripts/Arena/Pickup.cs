@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum PickupKind { Xp, Materials }
+public enum PickupKind { Xp, Materials, Crystal }
 
-// Something an enemy dropped: an XP gem or materials. Once the hero comes within pickup range
+// Something an enemy dropped: an XP gem, materials or a crystal. Once the hero comes within pickup range
 // it flies to the hero; touching it collects it (ArenaManager.Collect).
 public class Pickup : MonoBehaviour
 {
@@ -12,6 +12,7 @@ public class Pickup : MonoBehaviour
     const float FlySpeed = 14f;
     static readonly Color XpColor = new Color(0.30f, 0.90f, 1f);
     static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f);
+    static readonly Color CrystalColor = new Color(0.85f, 0.55f, 1f);
 
     public PickupKind kind;
     public int amount;
@@ -21,13 +22,13 @@ public class Pickup : MonoBehaviour
 
     public static void Drop(PickupKind kind, Sprite sprite, Vector2 position, int amount, ArenaManager arena)
     {
-        GameObject go = new GameObject(kind == PickupKind.Xp ? "XP Gem" : "Materials");
+        GameObject go = new GameObject(kind.ToString());
         go.transform.position = position;
-        go.transform.localScale = Vector3.one * (amount >= 3 ? 0.35f : 0.25f); // bigger = worth more
+        go.transform.localScale = Vector3.one * (amount >= 3 || kind == PickupKind.Crystal ? 0.35f : 0.25f); // bigger = worth more
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        renderer.color = kind == PickupKind.Xp ? XpColor : MaterialsColor;
+        renderer.color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor : CrystalColor;
         renderer.sortingOrder = 0;
 
         Pickup pickup = go.AddComponent<Pickup>();

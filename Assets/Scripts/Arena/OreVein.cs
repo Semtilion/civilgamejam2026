@@ -8,26 +8,27 @@ public class OreVein : MonoBehaviour
 {
     public static readonly List<OreVein> All = new List<OreVein>();
 
-    const float Size = 1.2f;
     const float BarWidth = 1.4f;
-    static readonly Color OreColor = new Color(0.45f, 0.55f, 0.75f);
 
     ArenaManager arena;
     Transform barFill;
     GameObject bar;
     float progress;
 
-    public static void Place(Sprite sprite, Vector2 position, ArenaManager arena)
+    // `sprite` drawn at `scale` with `color` (art: white, 1; placeholder square: tinted, bigger).
+    // `barSprite` is a plain white square for the progress bar.
+    public static void Place(Sprite sprite, Color color, float scale, Sprite barSprite, Vector2 position, ArenaManager arena)
     {
         GameObject go = new GameObject("Ore Vein");
         go.transform.position = position;
-        NewPart("Rock", go.transform, sprite, Vector2.zero, new Vector2(Size, Size), OreColor, -1);
+        NewPart("Rock", go.transform, sprite, Vector2.zero, Vector2.one * scale, color, -1);
 
-        // Mining progress bar above the rock, only shown while mining
+        // Mining progress bar just above the rock, only shown while mining
+        float barY = sprite.bounds.size.y * scale / 2f + 0.25f;
         GameObject bar = new GameObject("Bar");
         bar.transform.SetParent(go.transform, false);
-        NewPart("Back", bar.transform, sprite, new Vector2(0f, 0.95f), new Vector2(BarWidth, 0.15f), new Color(0f, 0f, 0f, 0.7f), 6);
-        Transform fill = NewPart("Fill", bar.transform, sprite, new Vector2(0f, 0.95f), new Vector2(0f, 0.15f), new Color(1f, 0.85f, 0.2f), 7);
+        NewPart("Back", bar.transform, barSprite, new Vector2(0f, barY), new Vector2(BarWidth, 0.15f), new Color(0f, 0f, 0f, 0.7f), 6);
+        Transform fill = NewPart("Fill", bar.transform, barSprite, new Vector2(0f, barY), new Vector2(0f, 0.15f), new Color(1f, 0.85f, 0.2f), 7);
         bar.SetActive(false);
 
         OreVein ore = go.AddComponent<OreVein>();
@@ -42,7 +43,7 @@ public class OreVein : MonoBehaviour
         SpriteRenderer renderer = new GameObject(name).AddComponent<SpriteRenderer>();
         renderer.transform.SetParent(parent, false);
         renderer.transform.localPosition = position;
-        renderer.transform.localScale = new Vector3(size.x, size.y, 1f); // placeholder sprite is 1 unit wide
+        renderer.transform.localScale = new Vector3(size.x, size.y, 1f);
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = order;

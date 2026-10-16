@@ -5,7 +5,7 @@ public enum EnemyBehavior
     Chaser,  // runs straight at the hero
     Shooter, // never moves; flashes red, then fires at where the hero was when the flash started
     Boss,    // chases, and every few seconds winds up and charges
-    Crate    // a breakable supply crate: never moves, harmless, weapons break it for materials (not a kill)
+    Crate    // a breakable prop (supply crate, crystal cluster): never moves, harmless, weapons break it for its loot (not a kill)
 }
 
 // Stats for one enemy type. Enemies are built from this at spawn time (no prefab needed).
@@ -31,6 +31,8 @@ public class EnemyData : ScriptableObject
     [Tooltip("Chance (0-1) to drop materials on death. Bosses' materials are collected automatically.")]
     [Range(0f, 1f)] public float materialChance;
     public int materialAmount = 1;
+    [Tooltip("Crystals dropped when a Crate-type enemy (e.g. a crystal cluster) is broken.")]
+    public int crystalAmount;
 
     [Header("Shooter only (stands still, ignores moveSpeed)")]
     [Tooltip("Only starts a shot when the hero is this close.")]

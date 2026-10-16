@@ -3,8 +3,9 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
-// selected leader (their faction's people, their help, their request, Give button), and Dive ("Defend the town" on the
-// horde day). State lives in Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen.
+// selected leader (their faction's people, their help, their request, Give button, and the Shaman's crystal shop), and
+// Dive ("Defend the town" on the horde day). State lives in Campaign.Current. When the game has ended (won or lost),
+// the epilogue covers the screen.
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -20,6 +21,8 @@ public class TownManager : MonoBehaviour
     public Text detailTitle;
     public Text detailBody;
     public Button giveButton;
+    [Tooltip("The crystal shop, shown in the shop owner's detail panel: one button per TownConfig shop item.")]
+    public Button[] shopButtons;
     public Button diveButton;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
@@ -45,6 +48,11 @@ public class TownManager : MonoBehaviour
             npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
+        for (int i = 0; i < shopButtons.Length; i++)
+        {
+            int item = i; // copy for the lambda
+            shopButtons[i].onClick.AddListener(() => { campaign.Buy(item); Refresh(); });
+        }
         diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene)); // the arena runs the horde on day 15
         newGameButton.onClick.AddListener(() =>
         {
@@ -57,8 +65,8 @@ public class TownManager : MonoBehaviour
 
     void Refresh()
     {
-        statusText.text = $"Day {campaign.day}      Materials {campaign.materials}      " +
-                          $"Population {campaign.Population}/{campaign.StartPopulation}      {NextThreat()}";
+        statusText.text = $"Day {campaign.day}     Materials {campaign.materials}     Crystals {campaign.crystals}     " +
+                          $"Population {campaign.Population}/{campaign.StartPopulation}     {NextThreat()}";
 
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
@@ -128,6 +136,7 @@ public class TownManager : MonoBehaviour
         if (!npc.Alive)
         {
             body = $"The {definition.faction} were wiped out. {definition.name} is gone, and so is their help.";
+            if (definition.hasShop) body += "\nThe crystal shop is closed, and its upgrades are lost.";
         }
         else
         {
@@ -151,8 +160,28 @@ public class TownManager : MonoBehaviour
             body += npc.quest == null
                 ? $"\nHomes braced: the next quake can't hurt the {definition.faction}."
                 : $"\nHomes at risk: the next quake will cost the {definition.faction} people. Finish the request to brace them.";
+            if (definition.hasShop)
+                body += $"\nCrystal shop: permanent upgrades, rank N costs N crystals + {config.materialsPerCrystal}N materials. " +
+                        $"Lost if the {definition.faction} are wiped out.";
         }
         detailBody.text = body;
+
+        // The crystal shop: only in the shop owner's panel, while their faction is alive.
+        bool shop = definition.hasShop && campaign.ShopOpen;
+        for (int s = 0; s < shopButtons.Length; s++)
+        {
+            bool show = shop && s < config.shopItems.Length;
+            shopButtons[s].gameObject.SetActive(show);
+            if (!show) continue;
+
+            ShopItem item = config.shopItems[s];
+            int rank = campaign.shopRanks[s];
+            SetLabel(shopButtons[s], rank >= config.maxShopRank
+                ? $"{item.name} MAX\n{Player.StatText(item.stat, item.amountPerRank * rank)} in total"
+                : $"{Player.StatText(item.stat, item.amountPerRank)}   {rank}/{config.maxShopRank}\n" +
+                  $"{campaign.ShopCrystalCost(s)} crystals + {campaign.ShopMaterialCost(s)} materials");
+            shopButtons[s].interactable = campaign.CanBuy(s);
+        }
 
         bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
         giveButton.gameObject.SetActive(materialsRequest);
