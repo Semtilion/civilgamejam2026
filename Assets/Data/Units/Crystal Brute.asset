@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c8304d542856074c9ed9747ef812fce, type: 3}
+  m_Name: Crystal Brute
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  displayName: Crystal Brute
+  sprite: {fileID: 0}
+  placeholderColor: {r: 0.7, g: 0.3, b: 0.3, a: 1}
+  maxHp: 25
+  maxMana: 0
+  manaRegen: 0
+  speed: 2
+  accuracyMod: 0
+  critChance: 5
+  dodge: 0
+  skills:
+  - {fileID: 11400000, guid: c0ee4094c82e4f04790ec55548bd8673, type: 2}
