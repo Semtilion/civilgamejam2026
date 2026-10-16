@@ -7,6 +7,15 @@ public enum SkillTarget
     Self    // the user (heal / restore mana)
 }
 
+// Which quick-time event plays when the hero uses a skill in QTE mode (see QteController).
+public enum QteType
+{
+    None,        // no QTE, normal accuracy roll
+    TimingRing,  // press Space when the shrinking circle meets the target circle
+    MovingBar,   // press Space when the sliding cursor is in the middle
+    KeySequence  // type the shown arrow keys in time
+}
+
 // A hero skill, an enemy attack, or a usable item (items are skills with a count, see CombatManager.items).
 [CreateAssetMenu(menuName = "Jam/Skill")]
 public class SkillData : ScriptableObject
@@ -33,4 +42,7 @@ public class SkillData : ScriptableObject
     [Range(0, 100)] public int baseAccuracy = 90;
     [Tooltip("Added to the attacker's crit chance.")]
     [Range(0, 100)] public int critBonus;
+
+    [Header("QTE mode (hero only)")]
+    public QteType qte = QteType.None;
 }

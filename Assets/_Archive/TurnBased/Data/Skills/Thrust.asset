@@ -10,15 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ca2a03075b5e61c49be4f766ae45b300, type: 3}
-  m_Name: Firebolt
+  m_Name: Thrust
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  displayName: Firebolt
+  displayName: Thrust
   target: 0
   minRank: 1
-  maxRank: 4
-  manaCost: 8
-  minAmount: 6
-  maxAmount: 9
+  maxRank: 3
+  manaCost: 0
+  minAmount: 3
+  maxAmount: 5
   manaRestore: 0
   baseAccuracy: 85
-  critBonus: 0
+  critBonus: 10
+  qte: 1

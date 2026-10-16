@@ -22,3 +22,4 @@ MonoBehaviour:
   manaRestore: 0
   baseAccuracy: 90
   critBonus: 0
+  qte: 1

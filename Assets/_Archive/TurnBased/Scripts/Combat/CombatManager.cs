@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -14,6 +15,7 @@ public class ItemStack
 
 // Runs one fight: one hero vs up to 4 enemies standing in ranks 1-4 (Darkest Dungeon layout).
 // Turns use an FF7-style ATB gauge in Wait mode: gauges fill by speed, and time freezes while anyone acts or the hero chooses.
+// Optional QTE mode (backup system): hero skills play a quick-time event, enemy attacks can be dodged or parried.
 public class CombatManager : MonoBehaviour
 {
     [Header("Fight setup")]
@@ -27,6 +29,13 @@ public class CombatManager : MonoBehaviour
     [Min(0.1f)] public float gaugeFillTime = 20f;
     [Tooltip("Pause after each action so the player can follow the fight.")]
     public float actionDelay = 0.8f;
+
+    [Header("QTE mode (backup system)")]
+    [Tooltip("On: hero skills play their QTE (damage multiplier instead of the accuracy roll), enemy attacks can be dodged (Space) or parried (E).")]
+    public bool useQtes;
+    public QteController qte;
+    [Tooltip("The automatic counterattack after a parry.")]
+    public SkillData counterSkill;
 
     [Header("Scene references")]
     public Unit hero;
@@ -45,10 +54,17 @@ public class CombatManager : MonoBehaviour
     readonly Queue<string> logLines = new Queue<string>();
     SkillData selectedSkill;
     ItemStack selectedItem;
+    Unit selectedTarget;
     bool waitingForHero;
 
     void Start()
     {
+        if (useQtes && qte == null)
+        {
+            Debug.LogError("Use Qtes is on but no QteController is assigned. Using normal combat.");
+            useQtes = false;
+        }
+
         resultPanel.SetActive(false);
         hero.Setup(heroData, this);
 
@@ -100,7 +116,7 @@ public class CombatManager : MonoBehaviour
 
             actor.ResetGauge();
             if (actor == hero) yield return HeroTurn();
-            else EnemyTurn(actor);
+            else yield return EnemyTurn(actor);
 
             if (hero.IsDead || LivingEnemies().Count == 0)
             {
@@ -117,6 +133,7 @@ public class CombatManager : MonoBehaviour
 
         selectedSkill = null;
         selectedItem = null;
+        selectedTarget = null;
         waitingForHero = true;
         RefreshButtons(true);
         Log("Your turn.");
@@ -128,14 +145,46 @@ public class CombatManager : MonoBehaviour
         }
 
         yield return new WaitUntil(() => !waitingForHero);
+        if (selectedSkill == null) yield break; // turn was skipped
+
+        float? qteMultiplier = null; // null = normal accuracy roll
+        if (useQtes && selectedSkill.qte != QteType.None)
+        {
+            Unit focus = selectedTarget != null ? selectedTarget : hero;
+            yield return qte.PlayAttack(selectedSkill.qte, focus.body.rectTransform.position);
+            qteMultiplier = qte.AttackMultiplier;
+        }
+        UseSkill(hero, selectedSkill, selectedTarget, qteMultiplier);
     }
 
-    void EnemyTurn(Unit enemy)
+    IEnumerator EnemyTurn(Unit enemy)
     {
         List<SkillData> skills = enemy.data.skills;
-        if (skills.Count == 0) return;
+        if (skills.Count == 0) yield break;
         SkillData skill = skills[Random.Range(0, skills.Count)];
-        if (skill != null) UseSkill(enemy, skill, hero);
+        if (skill == null) yield break;
+
+        if (!useQtes || skill.target == SkillTarget.Self)
+        {
+            UseSkill(enemy, skill, hero, null);
+            yield break;
+        }
+
+        // QTE mode: the hero's dodge/parry replaces the enemy's accuracy roll.
+        yield return qte.PlayDefense(enemy, hero);
+        if (qte.Defense == DefenseResult.Parry)
+        {
+            Log($"{hero.DisplayName} parries {enemy.DisplayName}'s {skill.displayName}!");
+            if (counterSkill != null) Attack(hero, enemy, counterSkill, 1f);
+        }
+        else if (qte.Defense == DefenseResult.Dodge)
+        {
+            Log($"{hero.DisplayName} dodges {enemy.DisplayName}'s {skill.displayName}!");
+        }
+        else
+        {
+            UseSkill(enemy, skill, hero, 1f); // a failed dodge always hits
+        }
     }
 
     void EndBattle()
@@ -188,18 +237,22 @@ public class CombatManager : MonoBehaviour
         HeroAct(unit);
     }
 
+    // Locks in the choice. HeroTurn then plays the QTE (if any) and resolves it.
     void HeroAct(Unit target)
     {
+        selectedTarget = target;
         waitingForHero = false;
         ClearHighlights();
         if (selectedItem != null) selectedItem.count--;
         RefreshButtons(false);
-        UseSkill(hero, selectedSkill, target);
+        // Drop the clicked button's focus so Space/arrow keys during QTEs can't press or move between buttons.
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
     }
 
     // ---------- Resolving skills ----------
 
-    void UseSkill(Unit user, SkillData skill, Unit target)
+    // qteMultiplier: null = roll accuracy as normal. Otherwise the skill always lands and its damage/heal is multiplied.
+    void UseSkill(Unit user, SkillData skill, Unit target, float? qteMultiplier)
     {
         user.ChangeMana(-skill.manaCost);
 
@@ -209,6 +262,7 @@ public class CombatManager : MonoBehaviour
                 int hpBefore = user.hp;
                 int manaBefore = user.mana;
                 int heal = Random.Range(skill.minAmount, skill.maxAmount + 1);
+                if (qteMultiplier != null) heal = Mathf.RoundToInt(heal * qteMultiplier.Value);
                 if (heal > 0) user.Heal(heal);
                 if (skill.manaRestore > 0) user.ChangeMana(skill.manaRestore);
 
@@ -219,27 +273,31 @@ public class CombatManager : MonoBehaviour
                 break;
 
             case SkillTarget.Single:
-                Attack(user, target, skill);
+                Attack(user, target, skill, qteMultiplier);
                 break;
 
             case SkillTarget.All:
-                foreach (Unit t in TargetsInReach(user, skill)) Attack(user, t, skill);
+                foreach (Unit t in TargetsInReach(user, skill)) Attack(user, t, skill, qteMultiplier);
                 break;
         }
     }
 
-    void Attack(Unit attacker, Unit target, SkillData skill)
+    void Attack(Unit attacker, Unit target, SkillData skill, float? qteMultiplier)
     {
         string action = $"{attacker.DisplayName}'s {skill.displayName}";
 
-        int hitChance = skill.baseAccuracy + attacker.accuracyMod - target.dodge;
-        if (Random.Range(0, 100) >= hitChance)
+        if (qteMultiplier == null)
         {
-            Log($"{action} misses {target.DisplayName}.");
-            return;
+            int hitChance = skill.baseAccuracy + attacker.accuracyMod - target.dodge;
+            if (Random.Range(0, 100) >= hitChance)
+            {
+                Log($"{action} misses {target.DisplayName}.");
+                return;
+            }
         }
 
         int damage = Random.Range(skill.minAmount, skill.maxAmount + 1);
+        if (qteMultiplier != null) damage = Mathf.Max(1, Mathf.RoundToInt(damage * qteMultiplier.Value));
         bool crit = Random.Range(0, 100) < attacker.critChance + skill.critBonus;
         if (crit) damage = Mathf.RoundToInt(damage * CritMultiplier);
 

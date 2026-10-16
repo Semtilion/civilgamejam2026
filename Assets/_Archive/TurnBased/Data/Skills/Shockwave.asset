@@ -10,15 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ca2a03075b5e61c49be4f766ae45b300, type: 3}
-  m_Name: Mend
+  m_Name: Shockwave
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  displayName: Mend
-  target: 2
+  displayName: Shockwave
+  target: 1
   minRank: 1
   maxRank: 4
-  manaCost: 10
-  minAmount: 8
-  maxAmount: 12
+  manaCost: 15
+  minAmount: 3
+  maxAmount: 5
   manaRestore: 0
-  baseAccuracy: 100
+  baseAccuracy: 80
   critBonus: 0
+  qte: 3

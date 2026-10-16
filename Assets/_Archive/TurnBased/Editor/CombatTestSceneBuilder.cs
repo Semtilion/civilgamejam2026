@@ -8,18 +8,18 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
-// Menu: Jam > Build Combat Test Scene.
+// ARCHIVED (turn-based combat, replaced by the arena). Menu: Jam > Archive > Build Turn-Based Combat Test.
 // Creates the placeholder data assets (skipped if they already exist, so tuned values are kept)
 // and builds Assets/Scenes/CombatTest.unity with a ready-to-play fight.
 public static class CombatTestSceneBuilder
 {
-    const string SkillsFolder = "Assets/Data/Skills";
-    const string UnitsFolder = "Assets/Data/Units";
-    const string ScenePath = "Assets/Scenes/CombatTest.unity";
+    const string SkillsFolder = "Assets/_Archive/TurnBased/Data/Skills";
+    const string UnitsFolder = "Assets/_Archive/TurnBased/Data/Units";
+    const string ScenePath = "Assets/_Archive/TurnBased/CombatTest.unity";
 
     static Font font;
 
-    [MenuItem("Jam/Build Combat Test Scene")]
+    [MenuItem("Jam/Archive/Build Turn-Based Combat Test")]
     static void Build()
     {
         if (File.Exists(ScenePath) &&
@@ -29,16 +29,16 @@ public static class CombatTestSceneBuilder
             return;
 
         // ---------- Data (placeholder numbers, tune them in the Inspector) ----------
-        CreateFolder("Assets", "Data");
-        CreateFolder("Assets/Data", "Skills");
-        CreateFolder("Assets/Data", "Units");
+        CreateFolder("Assets/_Archive/TurnBased", "Data");
+        CreateFolder("Assets/_Archive/TurnBased/Data", "Skills");
+        CreateFolder("Assets/_Archive/TurnBased/Data", "Units");
 
         //                     name             target             reach  mana  dmg/heal  acc
-        SkillData slash      = Skill("Slash",         SkillTarget.Single, 1, 2,  0,  4, 7,   90);
-        SkillData thrust     = Skill("Thrust",        SkillTarget.Single, 1, 3,  0,  3, 5,   85, critBonus: 10);
-        SkillData firebolt   = Skill("Firebolt",      SkillTarget.Single, 1, 4,  8,  6, 9,   85);
-        SkillData shockwave  = Skill("Shockwave",     SkillTarget.All,    1, 4, 15,  3, 5,   80);
-        SkillData mend       = Skill("Mend",          SkillTarget.Self,   1, 4, 10,  8, 12, 100);
+        SkillData slash      = Skill("Slash",         SkillTarget.Single, 1, 2,  0,  4, 7,   90, qte: QteType.TimingRing);
+        SkillData thrust     = Skill("Thrust",        SkillTarget.Single, 1, 3,  0,  3, 5,   85, critBonus: 10, qte: QteType.TimingRing);
+        SkillData firebolt   = Skill("Firebolt",      SkillTarget.Single, 1, 4,  8,  6, 9,   85, qte: QteType.KeySequence);
+        SkillData shockwave  = Skill("Shockwave",     SkillTarget.All,    1, 4, 15,  3, 5,   80, qte: QteType.KeySequence);
+        SkillData mend       = Skill("Mend",          SkillTarget.Self,   1, 4, 10,  8, 12, 100, qte: QteType.MovingBar);
         SkillData firebomb   = Skill("Firebomb",      SkillTarget.All,    3, 4,  0,  5, 8,   95);
         SkillData hpPotion   = Skill("Health Potion", SkillTarget.Self,   1, 4,  0, 15, 15, 100);
         SkillData mpPotion   = Skill("Mana Potion",   SkillTarget.Self,   1, 4,  0,  0, 0,  100, manaRestore: 15);
@@ -98,6 +98,9 @@ public static class CombatTestSceneBuilder
         for (int i = 0; i < itemButtons.Length; i++)
             itemButtons[i] = NewButton($"Item {i + 1}", itemRow, new Vector2(220, 70));
 
+        // QTE layer (backup system, only used when Combat Manager > Use Qtes is ticked)
+        QteController qte = NewQteLayer(canvas);
+
         // Result overlay (last child so it draws on top and blocks clicks)
         Image resultPanel = NewImage("Result Panel", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.75f));
         Stretch(resultPanel.rectTransform);
@@ -123,6 +126,8 @@ public static class CombatTestSceneBuilder
         manager.resultPanel = resultPanel.gameObject;
         manager.resultText = resultText;
         manager.restartButton = restartButton;
+        manager.qte = qte;
+        manager.counterSkill = slash;
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AddSceneToBuildList();
@@ -137,7 +142,7 @@ public static class CombatTestSceneBuilder
     }
 
     static SkillData Skill(string name, SkillTarget target, int minRank, int maxRank, int manaCost,
-        int minAmount, int maxAmount, int accuracy, int critBonus = 0, int manaRestore = 0)
+        int minAmount, int maxAmount, int accuracy, int critBonus = 0, int manaRestore = 0, QteType qte = QteType.None)
     {
         string path = $"{SkillsFolder}/{name}.asset";
         SkillData skill = AssetDatabase.LoadAssetAtPath<SkillData>(path);
@@ -154,6 +159,7 @@ public static class CombatTestSceneBuilder
         skill.baseAccuracy = accuracy;
         skill.critBonus = critBonus;
         skill.manaRestore = manaRestore;
+        skill.qte = qte;
         AssetDatabase.CreateAsset(skill, path);
         return skill;
     }
@@ -252,6 +258,44 @@ public static class CombatTestSceneBuilder
         unit.statusText = NewText("Status", root, new Vector2(0, -138), new Vector2(260, 26), 18, TextAnchor.MiddleCenter);
         unit.atbFill = NewBar("ATB Bar", root, new Vector2(0, -160), new Vector2(150, 8), new Color(0.90f, 0.90f, 0.90f));
         return unit;
+    }
+
+    // Full-screen layer holding the QTE widgets: prompt, feedback, timing ring, moving bar, key sequence.
+    static QteController NewQteLayer(Transform canvas)
+    {
+        RectTransform root = NewUI("QTE", canvas, Vector2.zero, Vector2.zero);
+        Stretch(root);
+        QteController qte = root.gameObject.AddComponent<QteController>();
+        Sprite circle = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+
+        qte.promptText = NewText("Prompt", root, new Vector2(0, -150), new Vector2(900, 40), 26, TextAnchor.MiddleCenter);
+        qte.feedbackText = NewText("Feedback", root, new Vector2(-240, 120), new Vector2(500, 70), 56, TextAnchor.MiddleCenter);
+        qte.feedbackText.color = new Color(1f, 0.85f, 0.2f);
+
+        // Timing ring: a translucent circle shrinks onto the solid target circle (placed over a unit at runtime)
+        qte.ring = NewUI("Ring", root, Vector2.zero, new Vector2(90, 90));
+        Image target = NewImage("Target", qte.ring, Vector2.zero, new Vector2(90, 90), new Color(1f, 1f, 1f, 0.6f));
+        Image approach = NewImage("Approach", qte.ring, Vector2.zero, new Vector2(90, 90), new Color(1f, 0.85f, 0.2f, 0.35f));
+        target.sprite = circle;
+        approach.sprite = circle;
+        target.raycastTarget = false;
+        approach.raycastTarget = false;
+        qte.ringApproach = approach.rectTransform;
+
+        // Moving bar: zone widths are set from the timing windows at runtime
+        Image bar = NewImage("Bar", root, new Vector2(0, -210), new Vector2(600, 36), new Color(0.15f, 0.15f, 0.15f, 0.9f));
+        qte.bar = bar.rectTransform;
+        qte.barGoodZone = NewImage("Good Zone", bar.transform, Vector2.zero, new Vector2(150, 36), new Color(0.90f, 0.75f, 0.20f)).rectTransform;
+        qte.barPerfectZone = NewImage("Perfect Zone", bar.transform, Vector2.zero, new Vector2(60, 36), new Color(0.30f, 0.85f, 0.30f)).rectTransform;
+        qte.barCursor = NewImage("Cursor", bar.transform, Vector2.zero, new Vector2(8, 56), Color.white).rectTransform;
+
+        // Key sequence: arrows to type + a timer bar
+        RectTransform sequence = NewUI("Sequence", root, new Vector2(0, -205), new Vector2(600, 80));
+        qte.sequence = sequence.gameObject;
+        qte.sequenceText = NewText("Keys", sequence, new Vector2(0, 10), new Vector2(600, 64), 56, TextAnchor.MiddleCenter);
+        qte.sequenceTimerFill = NewBar("Timer", sequence, new Vector2(0, -32), new Vector2(400, 8), Color.white);
+
+        return qte;
     }
 
     // Dark background with a fill stretched over it. Unit moves the fill's right anchor.
