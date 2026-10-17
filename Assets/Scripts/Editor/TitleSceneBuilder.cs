@@ -16,7 +16,7 @@ public static class TitleSceneBuilder
         camera.backgroundColor = Color.black;
 
         Transform canvas = NewCanvas("Title UI");
-        Sprite sky = TitleArt("TitleBackground");
+        Sprite sky = MenuArt("TitleBackground");
         Image background = NewImage("Background", canvas, Vector2.zero, Vector2.zero, sky != null ? Color.white : BackgroundColor);
         background.sprite = sky;
         Stretch(background.rectTransform);
@@ -30,7 +30,7 @@ public static class TitleSceneBuilder
         crystals.glow = a.glow;
 
         // The game's name: the baked art (drawn at 2x, shown at half size), else the name as text.
-        Sprite titleArt = TitleArt("Title");
+        Sprite titleArt = MenuArt("Title");
         Text titleText = null;
         RectTransform title;
         if (titleArt != null)

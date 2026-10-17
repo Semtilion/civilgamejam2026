@@ -4,9 +4,10 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The town hub (Darkest Dungeon hamlet style): status bar, one button per faction leader, the relics you own,
-// a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
-// Clicking a leader opens their window: portrait on the left; on the right their situation in three boxes (people,
+// The town hub (Darkest Dungeon hamlet style): status bar, one button per faction leader (their banner hangs behind it,
+// grey once the faction is wiped out; the night village behind them all: TownScenery), the relics you own, a "?" button
+// (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
+// Clicking a leader opens their window (slides down from above: SlideIn): portrait on the left; on the right their situation in three boxes (people,
 // preparedness, request; their thanks typed out above them after a purchase or turn-in), their daily order, their
 // district's buildings and the turn-in button below (closes with X, Esc or a click outside).
 // A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive or raid shows the result
@@ -35,9 +36,14 @@ public class TownManager : MonoBehaviour
     public HowToPlay howToPlay;
     [Tooltip("Shakes and flashes the town once after an earthquake.")]
     public UIShake quakeShake;
+    [Tooltip("The leaders' banners (by NPC; an entry may be empty without the art) and their grey versions.")]
+    public Image[] banners;
+    public Sprite[] goneBanners;
     [Header("Leader window (opens when a leader is clicked)")]
     [Tooltip("Holds the backdrop and the window (siblings, so clicks in the window don't reach the backdrop).")]
     public GameObject leaderWindow;
+    [Tooltip("Slides the window in from above and back out.")]
+    public SlideIn leaderSlide;
     [Tooltip("The dark see-through backdrop over the town: clicking it (outside the window) closes the window.")]
     public Button backdrop;
     public Button closeButton;
@@ -108,6 +114,7 @@ public class TownManager : MonoBehaviour
     Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
+    Sprite[] liveBanners; // the banners as built
 
     // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
     int NpcCount => Mathf.Min(npcButtons.Length, config.npcs.Length);
@@ -116,6 +123,8 @@ public class TownManager : MonoBehaviour
     {
         Time.timeScale = 1f;
         campaign = Campaign.Current ?? Campaign.StartNew(config); // a new game when the game starts here
+        liveBanners = new Sprite[banners.Length];
+        for (int i = 0; i < banners.Length; i++) liveBanners[i] = banners[i] != null ? banners[i].sprite : null;
         materialsShown = new Ticker(campaign.shownMaterials); // from what you saw when you left
         crystalsShown = new Ticker(campaign.shownCrystals);
         goldShown = new Ticker(campaign.shownGold);
@@ -275,7 +284,7 @@ public class TownManager : MonoBehaviour
 
     void CloseLeader()
     {
-        leaderWindow.SetActive(false);
+        leaderSlide.Close(); // hides it once it's slid away
     }
 
     // Remembers the counters (so they roll from here next time), then loads the scene.
@@ -303,6 +312,7 @@ public class TownManager : MonoBehaviour
         {
             npcLabels[i].text = NpcSummary(i);
             npcMarks[i].gameObject.SetActive(campaign.QuestReady(i));
+            if (i < banners.Length && banners[i] != null) banners[i].sprite = campaign.npcs[i].Alive ? liveBanners[i] : goneBanners[i];
         }
         if (LeaderOpen) ShowLeader(false); // e.g. after building: new prices, no retyping
         relicsText.text = RelicsSummary();

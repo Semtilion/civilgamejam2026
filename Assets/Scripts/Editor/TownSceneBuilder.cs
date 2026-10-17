@@ -12,6 +12,7 @@ public static class TownSceneBuilder
     public const string ScenePath = "Assets/Scenes/Town.unity";
     static readonly Color OrderMarkColor = new Color(1f, 0.80f, 0.30f); // gold: the faction's current order
     static readonly Color ReadyMarkColor = new Color(1f, 0.85f, 0.15f); // yellow "!": a request to turn in
+    const float NpcWidth = 520f, NpcStep = 560f; // the leader buttons' width, and from one's middle to the next (their banners too)
 
     public static void Build(GameAssets a)
     {
@@ -24,22 +25,63 @@ public static class TownSceneBuilder
         RectTransform shakeRoot = NewUI("Shake Root", canvasRoot, Vector2.zero, Vector2.zero);
         Stretch(shakeRoot);
         Transform canvas = shakeRoot;
-        Image background = NewImage("Background (placeholder town)", canvas, Vector2.zero, Vector2.zero, BackgroundColor);
+        // The night village (Assets/Art/UI/Town, baked by Tools/bake_town.py; else a flat color): covering the screen at
+        // its own shape, a little bigger so a quake's shake doesn't show its edges, with the window lights and the cracks'
+        // light over it (TownScenery moves them and adds twinkling stars).
+        Sprite village = MenuArt("Town/TownBackground");
+        Image background = NewImage("Town Backdrop", canvas, Vector2.zero, Vector2.zero, village != null ? Color.white : BackgroundColor);
         Stretch(background.rectTransform);
+        TownScenery scenery = null;
+        if (village != null)
+        {
+            background.sprite = village;
+            AspectRatioFitter fitter = background.gameObject.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fitter.aspectRatio = village.rect.width / village.rect.height;
+            background.rectTransform.localScale = Vector3.one * 1.06f;
+            scenery = background.gameObject.AddComponent<TownScenery>();
+            scenery.windows = Overlay("Window Lights", background.transform, MenuArt("Town/TownWindows"));
+            scenery.cracks = Overlay("Crack Light", background.transform, MenuArt("Town/TownCracks"));
+            scenery.star = a.glow;
+        }
+
+        // A banner behind each leader's button (their color, their portrait faintly on it), hanging from the top; grey
+        // once the faction is wiped out.
+        int npcCount = a.townConfig.npcs.Length;
+        Image[] banners = new Image[npcCount];
+        Sprite[] goneBanners = new Sprite[npcCount];
+        for (int i = 0; i < npcCount; i++)
+        {
+            string name = a.townConfig.npcs[i].name;
+            Sprite banner = MenuArt($"Town/Banner_{name}");
+            if (banner == null) continue;
+            banners[i] = NewImage($"Banner {name}", canvas, new Vector2((i - (npcCount - 1) / 2f) * NpcStep, 0), banner.rect.size, Color.white);
+            banners[i].sprite = banner;
+            banners[i].raycastTarget = false;
+            Pin(banners[i].rectTransform, new Vector2(0.5f, 1f)); // hangs (and sways) from its top
+            goneBanners[i] = MenuArt($"Town/Banner_{name}_Gone");
+        }
+        if (scenery != null)
+        {
+            scenery.banners = banners.Where(b => b != null).Select(b => b.rectTransform).ToArray();
+            Image beam = NewImage("Beam", canvas, Vector2.zero, new Vector2(0, 14), new Color(0.16f, 0.11f, 0.09f)); // they hang from it
+            Pin(beam.rectTransform, new Vector2(0.5f, 1f));
+            beam.rectTransform.anchorMin = new Vector2(0f, 1f); // across the top
+            beam.rectTransform.anchorMax = new Vector2(1f, 1f);
+        }
 
         // Top: status bar
         Text status = NewText("Status", canvas, new Vector2(0, -30), new Vector2(1860, 50), 24, TextAnchor.MiddleCenter);
         Pin(status.rectTransform, new Vector2(0.5f, 1f));
 
         // Middle: one button per faction leader
-        int npcCount = a.townConfig.npcs.Length;
-        RectTransform npcRow = NewRow("NPCs", canvas, new Vector2(0, 110), new Vector2(1760, 220), 40);
+        RectTransform npcRow = NewRow("NPCs", canvas, new Vector2(0, 110), new Vector2(1760, 220), NpcStep - NpcWidth);
         Button[] npcButtons = new Button[npcCount];
         Text[] npcLabels = new Text[npcCount];
         Text[] npcMarks = new Text[npcCount];
         for (int i = 0; i < npcCount; i++)
         {
-            npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(520, 210), 24, useTitleFont: false);
+            npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(NpcWidth, 210), 24, useTitleFont: false);
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
             npcMarks[i] = ReadyMark(npcButtons[i].transform, new Vector2(225, 65), 72); // top-right corner
             npcButtons[i].GetComponent<ButtonLabelDim>().frameColor = a.townConfig.npcs[i].color; // framed in their color
@@ -68,6 +110,7 @@ public static class TownSceneBuilder
         Stretch(leaderWindow);
         Image backdropImage = NewImage("Backdrop", leaderWindow, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
         Stretch(backdropImage.rectTransform);
+        CanvasGroup backdropGroup = backdropImage.gameObject.AddComponent<CanvasGroup>(); // fades in and out (SlideIn)
         Button backdrop = backdropImage.gameObject.AddComponent<Button>();
         backdrop.transition = Selectable.Transition.None;
         backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -145,7 +188,10 @@ public static class TownSceneBuilder
         Place(turnInButton, new Vector2(280, -295));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
         Place(close, new Vector2(762, 312));
-        AddPopIn(window);
+        SlideIn slide = leaderWindow.gameObject.AddComponent<SlideIn>(); // in from above, and back up
+        slide.window = window.rectTransform;
+        slide.windowGroup = window.gameObject.AddComponent<CanvasGroup>();
+        slide.backdrop = backdropGroup;
         leaderWindow.gameObject.SetActive(false);
 
         // The report: what happened to the people while you were away (a quake, the injured). A dark backdrop blocks
@@ -245,6 +291,9 @@ public static class TownSceneBuilder
         town.howToPlay = howToPlay;
         town.quakeShake = quakeShake;
         town.leaderWindow = leaderWindow.gameObject;
+        town.leaderSlide = slide;
+        town.banners = banners;
+        town.goneBanners = goneBanners;
         town.backdrop = backdrop;
         town.closeButton = close;
         town.portrait = portrait;
@@ -301,6 +350,17 @@ public static class TownSceneBuilder
     }
 
     // A yellow "!" (a request is finished: turn it in), hidden at first; TownManager shows it and makes it bob.
+    // An image over the whole of `parent` (a layer of the backdrop), or null without the art.
+    static Image Overlay(string name, Transform parent, Sprite sprite)
+    {
+        if (sprite == null) return null;
+        Image image = NewImage(name, parent, Vector2.zero, Vector2.zero, Color.white);
+        image.sprite = sprite;
+        image.raycastTarget = false;
+        Stretch(image.rectTransform);
+        return image;
+    }
+
     static Text ReadyMark(Transform parent, Vector2 position, int size)
     {
         Text mark = InTitleFont(NewText("Ready Mark", parent, position, new Vector2(90, 120), size, TextAnchor.MiddleCenter));
