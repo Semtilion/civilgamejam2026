@@ -138,24 +138,24 @@ public class Relics : MonoBehaviour
     public string Describe(RelicId id)
     {
         Weapon weapon = WeaponFor(id);
-        if (weapon != null) return $"A new weapon, equipped at the start of every dive: {weapon.description}";
+        if (weapon != null) return $"New weapon: {weapon.description}";
 
         switch (id)
         {
             case RelicId.GlassCannon:
-                return $"+{glassCannonDamage * 100f:0}% damage, but -{glassCannonHpLoss * 100f:0}% max HP.";
+                return $"+{glassCannonDamage * 100f:0}% damage, -{glassCannonHpLoss * 100f:0}% max HP";
             case RelicId.SecondWind:
-                return $"Once per dive, when you would die, you get back up with {secondWindHp * 100f:0}% HP and nearby enemies are knocked away.";
+                return $"Once per dive: revive with {secondWindHp * 100f:0}% HP";
             case RelicId.Bloodstone:
-                return $"Every kill heals {healPerKill} HP.";
+                return $"Kills heal {healPerKill} HP";
             case RelicId.BerserkerMask:
-                return $"The lower your HP, the more damage you deal: up to +{berserkerMaxDamage * 100f:0}% near 0 HP.";
+                return $"Up to +{berserkerMaxDamage * 100f:0}% damage at low HP";
             case RelicId.VolatileCore:
-                return $"{procChance * 100f:0}% chance on hit to explode, hitting enemies nearby for {explosionShare * 100f:0}% of the hit's damage.";
+                return $"Hits: {procChance * 100f:0}% chance to explode";
             case RelicId.StormOrb:
-                return $"{procChance * 100f:0}% chance on hit to chain lightning to {chainTargets} nearby enemies for {chainShare * 100f:0}% of the hit's damage.";
+                return $"Hits: {procChance * 100f:0}% chance to chain lightning";
             default: // FrostShard
-                return $"{procChance * 100f:0}% chance on hit to chill the enemy: {slowAmount * 100f:0}% slower for {slowTime:0}s (bosses {bossSlowAmount * 100f:0}%).";
+                return $"Hits: {procChance * 100f:0}% chance to slow";
         }
     }
 

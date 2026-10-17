@@ -41,7 +41,17 @@ public static class GameBuilder
     const string DungeonArtFolder = "Assets/Art/Dungeon";
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
-    const string FramePath = "Assets/Art/UI/Frame.png";  // the artist's ornate frame, as white lines (tinted per use)
+    const string FrameFolder = "Assets/Art/UI/Frame";    // the artist's ornate frame in 12 pieces, white lines (tinted)
+    // The frame art's sizes in px: the top / bottom bands and the side columns, and the bands' fixed pieces (the end
+    // pieces with the corners, and the centered ornament); the strips between them stretch.
+    const float FrameTop = 100f, FrameBottom = 150f, FrameSide = 80f;
+    const float FrameTopLeft = 200f, FrameTopMiddle = 140f, FrameTopRight = 192f;
+    const float FrameBottomLeft = 200f, FrameBottomMiddle = 215f, FrameBottomRight = 202f;
+    static readonly string[] FramePieceNames =
+    {
+        "TopLeft", "TopStretchLeft", "TopMiddle", "TopStretchRight", "TopRight",
+        "BottomLeft", "BottomStretchLeft", "BottomMiddle", "BottomStretchRight", "BottomRight", "SideLeft", "SideRight",
+    };
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
@@ -66,7 +76,7 @@ public static class GameBuilder
     const string FontsFolder = "Assets/Fonts";
     const float AlegreyaLineSpacing = 0.88f; // its lines are ~20% taller than the built-in font's: keeps them about the same
     static Font font, titleFont;
-    static Sprite frameSprite; // the 9-sliced frame (loaded when building starts; null = thin outlines instead)
+    static Sprite[] framePieces; // the frame's 12 pieces, in FramePieceNames order (loaded when building starts; null = thin outlines instead)
     static float lineSpacing = 1f;
     public static Font TitleFont => titleFont;
 
@@ -88,7 +98,7 @@ public static class GameBuilder
 
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single); // so neither target scene is open
         LoadFonts();
-        frameSprite = FrameSprite();
+        framePieces = FramePieces();
         GameAssets assets = EnsureAssets();
         ArenaSceneBuilder.Build(assets);
         TownSceneBuilder.Build(assets);
@@ -697,7 +707,6 @@ public static class GameBuilder
     static readonly Color ButtonPressed = new Color(0.15f, 0.10f, 0.22f);
     static readonly Color ButtonDisabled = new Color(0.14f, 0.13f, 0.16f);
 
-    // A dark panel with a thin violet border.
     // A dark panel in the artist's frame (steel blue; a thin violet outline if the frame art is missing). The frame is
     // its first child, named "Frame" (PanelFrame(panel) finds it, e.g. to tint the leader window).
     public static Image NewPanel(string name, Transform parent, Vector2 position, Vector2 size)
@@ -713,52 +722,78 @@ public static class GameBuilder
         return panel;
     }
 
-    public static Image PanelFrame(Image panel)
+    public static OrnateFrame PanelFrame(Image panel)
     {
         Transform frame = panel.transform.Find("Frame");
-        return frame != null ? frame.GetComponent<Image>() : null;
+        return frame != null ? frame.GetComponent<OrnateFrame>() : null;
     }
 
-    // The artist's frame stretched over `parent`, tinted `color`. `thickness`: how much thinner than the art its
-    // edges are drawn (PanelFrameThickness ...). Behind the parent's other children, or over them (`onTop`: call it
-    // after they're made, e.g. around the portrait). Null (nothing added) without the frame art.
-    public static Image AddFrame(Transform parent, float thickness, Color color, bool onTop = false)
+    // The artist's frame over `parent` (an OrnateFrame of 12 anchored pieces: the corners and the top / bottom
+    // ornaments keep their shape, the ornaments stay centered, the plain line between them and the sides stretch),
+    // tinted `color`. `thickness`: how much smaller than the art it's drawn (PanelFrameThickness ...), and smaller still
+    // if its fixed pieces wouldn't fit the parent's size. Behind the parent's other children, or over them (`onTop`:
+    // call it after they're made, e.g. around the portrait). Null (nothing added) without the frame art.
+    public static OrnateFrame AddFrame(Transform parent, float thickness, Color color, bool onTop = false)
     {
-        if (frameSprite == null) return null;
-        Image frame = NewImage("Frame", parent, Vector2.zero, Vector2.zero, color);
-        Stretch(frame.rectTransform);
-        frame.sprite = frameSprite;
-        frame.type = Image.Type.Sliced;
-        frame.fillCenter = false;
-        frame.pixelsPerUnitMultiplier = thickness;
-        frame.raycastTarget = false;
-        if (!onTop) frame.transform.SetAsFirstSibling();
+        if (framePieces == null) return null;
+        RectTransform parentRect = (RectTransform)parent;
+        Vector2 size = parentRect.rect.size;
+        if (size.x <= 0f || size.y <= 0f) size = parentRect.sizeDelta;
+        float k = Mathf.Min(1f / thickness, size.x / (FrameTopLeft + FrameTopMiddle + FrameTopRight),
+            size.x / (FrameBottomLeft + FrameBottomMiddle + FrameBottomRight), size.y / (FrameTop + FrameBottom));
+
+        RectTransform root = NewUI("Frame", parent, Vector2.zero, Vector2.zero);
+        Stretch(root);
+        if (!onTop) root.SetAsFirstSibling();
+        float top = FrameTop * k, bottom = FrameBottom * k, side = FrameSide * k;
+        float topLeft = FrameTopLeft * k, topMiddle = FrameTopMiddle * k / 2f, topRight = FrameTopRight * k;
+        float bottomLeft = FrameBottomLeft * k, bottomMiddle = FrameBottomMiddle * k / 2f, bottomRight = FrameBottomRight * k;
+        const float Overlap = 0.5f; // the stretching strips reach a little under their neighbours: no hairline gaps
+
+        Image[] pieces = new Image[FramePieceNames.Length];
+        Image Piece(int i, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            Image piece = NewImage(FramePieceNames[i], root, Vector2.zero, Vector2.zero, color);
+            piece.sprite = framePieces[i];
+            piece.raycastTarget = false;
+            RectTransform rect = piece.rectTransform;
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+            return pieces[i] = piece;
+        }
+        // Top band (anchored to the top edge)
+        Piece(0, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -top), new Vector2(topLeft, 0f));
+        Piece(1, new Vector2(0f, 1f), new Vector2(0.5f, 1f), new Vector2(topLeft - Overlap, -top), new Vector2(-topMiddle + Overlap, 0f));
+        Piece(2, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-topMiddle, -top), new Vector2(topMiddle, 0f));
+        Piece(3, new Vector2(0.5f, 1f), new Vector2(1f, 1f), new Vector2(topMiddle - Overlap, -top), new Vector2(-topRight + Overlap, 0f));
+        Piece(4, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-topRight, -top), new Vector2(0f, 0f));
+        // Bottom band (anchored to the bottom edge)
+        Piece(5, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(bottomLeft, bottom));
+        Piece(6, new Vector2(0f, 0f), new Vector2(0.5f, 0f), new Vector2(bottomLeft - Overlap, 0f), new Vector2(-bottomMiddle + Overlap, bottom));
+        Piece(7, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-bottomMiddle, 0f), new Vector2(bottomMiddle, bottom));
+        Piece(8, new Vector2(0.5f, 0f), new Vector2(1f, 0f), new Vector2(bottomMiddle - Overlap, 0f), new Vector2(-bottomRight + Overlap, bottom));
+        Piece(9, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-bottomRight, 0f), new Vector2(0f, bottom));
+        // Sides (between the bands)
+        Piece(10, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, bottom - Overlap), new Vector2(side, -top + Overlap));
+        Piece(11, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-side, bottom - Overlap), new Vector2(0f, -top + Overlap));
+
+        OrnateFrame frame = root.gameObject.AddComponent<OrnateFrame>();
+        frame.pieces = pieces;
         return frame;
     }
 
-    // The frame art (Assets/Art/UI/Frame.png), 9-sliced: its corners (80 px at the sides, 100 at the top, 150 at the
-    // bottom) stay as drawn and its edges stretch. 100 px per unit, so on a canvas a thickness of 2 draws them at half.
-    // Null if the file isn't there.
-    static Sprite FrameSprite()
+    // The frame's 12 pieces (Assets/Art/UI/Frame/Frame_<name>.png), smooth, no mipmaps; null if any is missing.
+    static Sprite[] FramePieces()
     {
-        if (!File.Exists(FramePath)) return null;
-        AssetDatabase.ImportAsset(FramePath); // in case Unity hasn't picked up a freshly dropped file yet
-        TextureImporter importer = AssetImporter.GetAtPath(FramePath) as TextureImporter;
-        if (importer == null) return null;
-        Vector4 border = new Vector4(80f, 150f, 80f, 100f); // left, bottom, right, top
-        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
-            importer.spriteBorder != border || importer.mipmapEnabled || Mathf.Abs(importer.spritePixelsPerUnit - 100f) > 0.01f)
+        Sprite[] pieces = new Sprite[FramePieceNames.Length];
+        for (int i = 0; i < pieces.Length; i++)
         {
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spriteBorder = border;
-            importer.spritePixelsPerUnit = 100f;
-            importer.mipmapEnabled = false;
-            importer.alphaIsTransparency = true;
-            importer.wrapMode = TextureWrapMode.Clamp;
-            importer.SaveAndReimport();
+            pieces[i] = PaintedSprite($"{FrameFolder}/Frame_{FramePieceNames[i]}.png", 100f);
+            if (pieces[i] == null) return null;
         }
-        return AssetDatabase.LoadAssetAtPath<Sprite>(FramePath);
+        return pieces;
     }
 
     // Violet button states (lighter on hover, darker when pressed, grey when it can't be used; the image is white so

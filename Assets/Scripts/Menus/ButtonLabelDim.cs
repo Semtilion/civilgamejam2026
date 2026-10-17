@@ -11,13 +11,13 @@ public class ButtonLabelDim : MonoBehaviour
     public Text label;
     public Color labelColor = Color.white;
     [Tooltip("The button's frame (optional), shown in frameColor, faded while the button can't be used.")]
-    public Image frame;
+    public OrnateFrame frame;
     public Color frameColor = Color.white;
 
     void Update()
     {
         bool usable = button.IsInteractable();
         label.color = usable ? labelColor : DimColor; // only redraws when it changes
-        if (frame != null) frame.color = usable ? frameColor : new Color(frameColor.r, frameColor.g, frameColor.b, 0.35f);
+        if (frame != null) frame.Color = usable ? frameColor : new Color(frameColor.r, frameColor.g, frameColor.b, 0.35f);
     }
 }

@@ -26,7 +26,7 @@ public class TitleManager : MonoBehaviour
     {
         Time.timeScale = 1f;
         titleText.text = gameTitle;
-        bestText.text = Campaign.BestDay > 0 ? $"Best run: the town held out until day {Campaign.BestDay} ({Campaign.BestRaids} raids held)" : "";
+        bestText.text = Campaign.BestDay > 0 ? $"Best: day {Campaign.BestDay} · {Campaign.BestRaids} raids held" : "";
         playButton.GetComponentInChildren<Text>().text = GameRunning ? "Continue" : "Play";
         playButton.onClick.AddListener(Play);
         settingsButton.onClick.AddListener(settings.Open);

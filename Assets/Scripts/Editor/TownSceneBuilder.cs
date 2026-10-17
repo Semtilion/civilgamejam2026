@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the relics box, the Dive button, the "?" button, the leader window (portrait,
+// one button per faction leader, the relics box, the Dive button, the "?" button, the leader window (portrait,
 // dialogue, daily order, district buildings, Give button), the report, the epilogue screen and the How to play popup.
 public static class TownSceneBuilder
 {
@@ -27,11 +27,9 @@ public static class TownSceneBuilder
         Image background = NewImage("Background (placeholder town)", canvas, Vector2.zero, Vector2.zero, BackgroundColor);
         Stretch(background.rectTransform);
 
-        // Top: status bar and news
+        // Top: status bar
         Text status = NewText("Status", canvas, new Vector2(0, -30), new Vector2(1860, 50), 24, TextAnchor.MiddleCenter);
         Pin(status.rectTransform, new Vector2(0.5f, 1f));
-        Image newsPanel = NewPanel("News Panel", canvas, new Vector2(0, 330), new Vector2(1700, 190));
-        Text news = NewText("News", newsPanel.transform, Vector2.zero, new Vector2(1660, 170), 22, TextAnchor.UpperLeft);
 
         // Middle: one button per faction leader
         int npcCount = a.townConfig.npcs.Length;
@@ -102,7 +100,7 @@ public static class TownSceneBuilder
         Title(nameplate);
         // The ornate frame over the portrait and nameplate (the leader's color, set by TownManager); a thick outline
         // without the frame art.
-        Image portraitBorder = AddFrame(frame.transform, PanelFrameThickness, BorderColor, onTop: true);
+        OrnateFrame portraitBorder = AddFrame(frame.transform, PanelFrameThickness, BorderColor, onTop: true);
         if (portraitBorder == null)
         {
             Outline frameBorder = frame.gameObject.AddComponent<Outline>();
@@ -123,7 +121,7 @@ public static class TownSceneBuilder
         dialogueText.raycastTarget = true; // click to show it all at once
         Typewriter dialogue = dialogueText.gameObject.AddComponent<Typewriter>();
         Text ordersCaption = Title(NewText("Orders Caption", window.transform, new Vector2(280, 5), new Vector2(940, 30), 20, TextAnchor.MiddleLeft));
-        ordersCaption.text = "DAILY ORDER (every day until changed)";
+        ordersCaption.text = "DAILY ORDER";
         RectTransform orderRow = NewRow("Orders", window.transform, new Vector2(280, -50), new Vector2(940, 70), 12);
         int orderCount = System.Enum.GetValues(typeof(TownOrder)).Length;
         Button[] orderButtons = new Button[orderCount];
@@ -135,11 +133,11 @@ public static class TownSceneBuilder
             orderMarks[i].raycastTarget = false;
         }
         Text districtCaption = Title(NewText("District Caption", window.transform, new Vector2(280, -105), new Vector2(940, 30), 20, TextAnchor.MiddleLeft));
-        districtCaption.text = "DISTRICT BUILDINGS (permanent)";
+        districtCaption.text = "BUILDINGS";
         RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -175), new Vector2(940, 100), 12);
         Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
         for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17, useTitleFont: false);
-        Button turnInButton = NewButton("Complete request", window.transform, new Vector2(380, 56), 22);
+        Button turnInButton = NewButton("Turn in", window.transform, new Vector2(380, 56), 22);
         Place(turnInButton, new Vector2(280, -295));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
         Place(close, new Vector2(762, 312));
@@ -206,7 +204,6 @@ public static class TownSceneBuilder
         TownManager town = new GameObject("Town Manager").AddComponent<TownManager>();
         town.config = a.townConfig;
         town.statusText = status;
-        town.newsText = news;
         town.npcButtons = npcButtons;
         town.npcLabels = npcLabels;
         town.npcMarks = npcMarks;

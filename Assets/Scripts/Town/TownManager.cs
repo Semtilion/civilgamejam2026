@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, the relics you own,
+// The town hub (Darkest Dungeon hamlet style): status bar, one button per faction leader, the relics you own,
 // a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
 // Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
 // their daily order, their district's buildings and the turn-in button below (closes with X, Esc or a click outside).
@@ -14,7 +14,6 @@ using UnityEngine.UI;
 // Title screen).
 public class TownManager : MonoBehaviour
 {
-    const int NewsLines = 6;
     static readonly Color GoneTint = new Color(0.55f, 0.55f, 0.55f); // a wiped-out leader's portrait: grey and dark
 
     public TownConfig config;
@@ -23,7 +22,6 @@ public class TownManager : MonoBehaviour
 
     [Header("Scene references")]
     public Text statusText;
-    public Text newsText;
     public Button[] npcButtons;
     public Text[] npcLabels;
     [Tooltip("The yellow \"!\" on each leader button: their request is finished, turn it in.")]
@@ -50,8 +48,8 @@ public class TownManager : MonoBehaviour
     [Tooltip("The name on the bar across the bottom of the portrait.")]
     public Text nameplate;
     [Tooltip("Take the open leader's color (NpcDefinition.color; grey once wiped out). The frames may be empty.")]
-    public Image windowFrame;
-    public Image portraitBorder;
+    public OrnateFrame windowFrame;
+    public OrnateFrame portraitBorder;
     public Image portraitGlow;
     public Image nameplateLine;
     public Text leaderTitle;
@@ -85,6 +83,7 @@ public class TownManager : MonoBehaviour
     Campaign campaign;
     int selected;       // whose window is open
     string spokenLine;  // what they say on top of the dialogue: their greeting, or their thanks after a purchase
+    string reward;      // under it after a turn-in: what the request paid (null otherwise)
     Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
@@ -108,7 +107,7 @@ public class TownManager : MonoBehaviour
         }
         backdrop.onClick.AddListener(CloseLeader);
         closeButton.onClick.AddListener(CloseLeader);
-        turnInButton.onClick.AddListener(() => { if (campaign.TurnIn(selected)) Thank(); });
+        turnInButton.onClick.AddListener(TurnIn);
         for (int i = 0; i < orderButtons.Length; i++)
         {
             TownOrder order = (TownOrder)i; // copy for the lambda
@@ -156,7 +155,7 @@ public class TownManager : MonoBehaviour
     {
         if (campaign.report.Count > 0 && !campaign.Ended)
         {
-            reportHeading.text = campaign.reportTitle;
+            reportHeading.text = campaign.reportTitle ?? $"DAY {campaign.day}";
             reportText.text = string.Join("\n", campaign.report);
             reportPanel.SetActive(true);
         }
@@ -186,15 +185,26 @@ public class TownManager : MonoBehaviour
     {
         selected = i;
         spokenLine = config.npcs[i].greeting;
+        reward = null;
         leaderWindow.SetActive(true);
         ShowLeader(true);
     }
 
-    // After buying a building level or finishing a materials request: the leader hops in a burst of sparkles, and the
-    // dialogue retypes with their thanks line.
-    void Thank()
+    // Turns in the open leader's finished request: they thank you, and the dialogue shows what it paid.
+    void TurnIn()
+    {
+        NpcDefinition definition = config.npcs[selected];
+        bool teaches = definition.unlocksEvolution && !campaign.npcs[selected].everCompleted;
+        if (!campaign.TurnIn(selected)) return;
+        Thank($"+{config.questGold} gold{(teaches ? $" · learned {Weapon.EvolutionNames[(int)definition.weapon]}" : "")}");
+    }
+
+    // After buying a building level or turning in a request: the leader hops in a burst of sparkles, and the dialogue
+    // retypes with their thanks line (and `rewardLine` under it).
+    void Thank(string rewardLine = null)
     {
         spokenLine = config.npcs[selected].thanks;
+        reward = rewardLine;
         Refresh();
         dialogue.Play(Dialogue(selected));
         portraitMotion.Hop();
@@ -219,16 +229,13 @@ public class TownManager : MonoBehaviour
     {
         return $"Day {campaign.day}    Materials {materialsShown.Next(campaign.materials, deltaTime)}    " +
                $"Crystals {crystalsShown.Next(campaign.crystals, deltaTime)}    Gold {goldShown.Next(campaign.gold, deltaTime)}    " +
-               $"Supplies {campaign.supplies}    Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
+               $"Supplies {campaign.supplies}    People {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
     }
 
     // Redraws everything from Campaign.Current (also called by the debug keys).
     public void Refresh()
     {
         statusText.text = StatusLine(0f);
-
-        int first = Mathf.Max(0, campaign.news.Count - NewsLines);
-        newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
 
         for (int i = 0; i < NpcCount; i++)
         {
@@ -250,9 +257,9 @@ public class TownManager : MonoBehaviour
 
         epilogueTitle.text = "THE TOWN HAS FALLEN";
         string body = campaign.endingReason;
-        body += $"\n\nThe town held out until day {campaign.day}.\nRaids held: {campaign.raidsHeld}     Raids lost: {campaign.raidsLost}";
-        body += $"\nDeepest depth: {campaign.deepestDepth}     Enemies killed: {campaign.totalKills}     Ores destroyed: {campaign.totalOres}";
-        body += campaign.newBest ? "\n\nA new record!" : $"\n\nBest run: day {Campaign.BestDay} ({Campaign.BestRaids} raids held)";
+        body += $"\n\nHeld out until day {campaign.day}\nRaids: {campaign.raidsHeld} held, {campaign.raidsLost} lost";
+        body += $"\nDeepest depth {campaign.deepestDepth} · Kills {campaign.totalKills} · Ores {campaign.totalOres}";
+        body += campaign.newBest ? "\n\nNEW RECORD!" : $"\n\nBest: day {Campaign.BestDay}";
         epilogueBody.text = body;
     }
 
@@ -262,7 +269,7 @@ public class TownManager : MonoBehaviour
         int quakeDay = campaign.NextQuakeDay;
         string today = campaign.IsRaidDay ? "RAID TODAY!    " : "";
         string raid = campaign.IsRaidOn(quakeDay) ? " + raid" : "";
-        return $"{today}Next quake: day {quakeDay}{raid} at {campaign.QuakeForecast:0}% (harmful from {config.quakeHarmAt:0}%)";
+        return $"{today}Quake day {quakeDay}{raid}: {campaign.QuakeForecast:0}%";
     }
 
     string RelicsSummary()
@@ -275,13 +282,13 @@ public class TownManager : MonoBehaviour
             owned++;
             list += "\n" + Relics.Names[i];
         }
-        if (owned == 0) list = "\nNone yet. Bosses in the dungeon guard them.";
+        if (owned == 0) list = "\nNone yet";
         return $"RELICS {owned}/{campaign.relicOwned.Length}{list}";
     }
 
     string QuestProgress(Quest quest)
     {
-        return quest.IsKill ? $"{quest.progress}/{quest.needed}" : $"you have {campaign.materials}/{quest.needed}";
+        return quest.IsKill ? $"{quest.progress}/{quest.needed}" : $"{campaign.materials}/{quest.needed}";
     }
 
     string NpcSummary(int i)
@@ -290,9 +297,9 @@ public class TownManager : MonoBehaviour
         NpcState npc = campaign.npcs[i];
         if (!npc.Alive) return $"{definition.name}\n{definition.faction}: WIPED OUT";
 
-        string half = campaign.DistrictStrength(i) < 1f ? "  (half strength)" : "";
-        string injured = npc.injured > 0 ? $"  ({npc.injured} injured)" : "";
-        string request = npc.quest == null ? "Request done" : $"{npc.quest.Describe()} ({QuestProgress(npc.quest)})";
+        string half = campaign.DistrictStrength(i) < 1f ? " · half" : "";
+        string injured = npc.injured > 0 ? $" · {npc.injured} hurt" : "";
+        string request = npc.quest == null ? "Request done" : $"{npc.quest.Describe()} {QuestProgress(npc.quest)}";
         return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}{injured}\n" +
                $"{npc.order} · Homes {npc.reinforced:0}% · Ready {npc.readiness:0}%\n{request}";
     }
@@ -305,16 +312,21 @@ public class TownManager : MonoBehaviour
         NpcDefinition definition = config.npcs[i];
         NpcState npc = campaign.npcs[i];
 
-        leaderTitle.text = $"{definition.name}, leader of the {definition.faction}";
+        leaderTitle.text = $"{definition.name} · {definition.faction}";
         portrait.enabled = definition.portrait != null;
         portrait.sprite = npc.Alive ? definition.portrait : GreyPortrait(definition.portrait);
         portrait.color = npc.Alive ? Color.white : GoneTint;
         nameplate.text = definition.name.ToUpper();
         Color color = npc.Alive ? definition.color : GoneTint;
-        if (windowFrame != null) windowFrame.color = color;
-        if (portraitBorder != null) portraitBorder.color = color;
+        if (windowFrame != null) windowFrame.Color = color;
+        if (portraitBorder != null) portraitBorder.Color = color;
         portraitGlow.color = new Color(color.r, color.g, color.b, portraitGlow.color.a);
         nameplateLine.color = color;
+        // The window's buttons wear the leader's color too
+        foreach (Button button in orderButtons) FrameIn(button, color);
+        foreach (Button button in buildingButtons) FrameIn(button, color);
+        FrameIn(turnInButton, color);
+        FrameIn(closeButton, color);
 
         string text = Dialogue(i);
         if (retype) dialogue.Play(text);
@@ -329,13 +341,14 @@ public class TownManager : MonoBehaviour
         turnInButton.gameObject.SetActive(hasRequest);
         if (hasRequest)
         {
-            SetLabel(turnInButton, npc.quest.IsKill ? "Complete request" : $"Give {npc.quest.needed} materials");
+            SetLabel(turnInButton, npc.quest.IsKill ? "Turn in" : $"Give {npc.quest.needed} materials");
             turnInButton.interactable = campaign.QuestReady(i);
         }
         leaderMark.gameObject.SetActive(campaign.QuestReady(i));
     }
 
-    // What the leader says (spokenLine, in quotes), then their people (and injured), preparedness and request.
+    // What the leader says (spokenLine, in quotes; the reward under it after a turn-in), then three short lines: their
+    // people (and injured), preparedness, and the request.
     string Dialogue(int i)
     {
         NpcDefinition definition = config.npcs[i];
@@ -344,25 +357,22 @@ public class TownManager : MonoBehaviour
         string body;
         if (!npc.Alive)
         {
-            body = $"The {definition.faction} were wiped out. {definition.name} is gone, and their district stands empty: " +
-                   "its buildings no longer work.";
+            body = $"The {definition.faction} are gone.";
         }
         else
         {
-            int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
-            body = string.IsNullOrEmpty(spokenLine) ? "" : $"\"{spokenLine}\"\n\n";
-            body += $"{definition.faction}: {npc.population}/{definition.startPopulation} people (half strength under {halfLine}).";
-            if (npc.injured > 0)
-                body += $" Injured: {npc.injured}. They can't work, and die on day {npc.injuredDeadline} unless treated.";
-            body += $"\nHomes reinforced {npc.reinforced:0}% · Readiness {npc.readiness:0}% (fades {config.readinessFade:0}% a day) · " +
-                    $"Town supplies {campaign.supplies}";
-            int w = (int)definition.weapon;
-            string weapon = definition.unlocksEvolution && !npc.everCompleted
-                ? $" and teaches you {Weapon.EvolutionNames[w]}, the {Weapon.Names[w]}'s evolution" : "";
+            body = string.IsNullOrEmpty(spokenLine) ? "" : $"\"{spokenLine}\"\n";
+            if (reward != null) body += reward + "\n";
+            body += $"\n{definition.faction} {npc.population}/{definition.startPopulation}";
+            if (campaign.DistrictStrength(i) < 1f) body += " · half strength";
+            if (npc.injured > 0) body += $" · {npc.injured} hurt (die day {npc.injuredDeadline})";
+            body += $"\nHomes {npc.reinforced:0}% · Ready {npc.readiness:0}% · Supplies {campaign.supplies}";
+            string evolution = definition.unlocksEvolution && !npc.everCompleted
+                ? $" + {Weapon.EvolutionNames[(int)definition.weapon]}" : "";
             body += npc.quest != null
-                ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}), due before day {campaign.NextQuestDay}. " +
-                  $"Pays {config.questGold} gold{weapon}.{(campaign.QuestReady(i) ? " Done: turn it in!" : "")}"
-                : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
+                ? $"\n{npc.quest.Describe()}: {QuestProgress(npc.quest)} · by day {campaign.NextQuestDay} · " +
+                  $"{config.questGold} gold{evolution}{(campaign.QuestReady(i) ? " · DONE" : "")}"
+                : $"\nNext request: day {campaign.NextQuestDay}";
         }
         return body;
     }
@@ -382,37 +392,41 @@ public class TownManager : MonoBehaviour
         List<ResultLine> lines = new List<ResultLine>();
         if (run.raid)
         {
-            lines.Add(new ResultLine($"Held out {{0}} of {Mathf.RoundToInt(run.raidLength)} seconds", Mathf.RoundToInt(run.secondsHeld)));
-            if (!run.survived) lines.Add(new ResultLine($"The raiders broke in: every faction lost {run.lossPercent:0.#}% of its people."));
+            lines.Add(new ResultLine($"Held {{0}} / {Mathf.RoundToInt(run.raidLength)} s", Mathf.RoundToInt(run.secondsHeld)));
+            if (!run.survived) lines.Add(new ResultLine($"Every faction lost {run.lossPercent:0.#}%"));
         }
         else
         {
-            lines.Add(new ResultLine("Depths cleared: {0}", run.depthsCleared));
-            lines.Add(new ResultLine("Deepest depth: {0}", run.depth));
+            lines.Add(new ResultLine("Depths cleared {0}", run.depthsCleared));
+            lines.Add(new ResultLine("Deepest {0}", run.depth));
         }
-        lines.Add(new ResultLine("Enemies killed: {0}", run.totalKills));
+        lines.Add(new ResultLine("Kills {0}", run.totalKills));
         foreach (KeyValuePair<EnemyData, int> pair in run.kills)
-            lines.Add(new ResultLine($"      {pair.Key.displayName}: {{0}}", pair.Value));
-        lines.Add(new ResultLine("Level reached: {0}", run.level));
+            lines.Add(new ResultLine($"      {pair.Key.displayName} {{0}}", pair.Value));
+        lines.Add(new ResultLine("Level {0}", run.level));
         if (run.evolutions.Count > 0) lines.Add(new ResultLine("Evolved: " + string.Join(", ", run.evolutions)));
 
+        // The loot (only what there was)
         lines.Add(new ResultLine(""));
-        lines.Add(new ResultLine(run.survived ? "Brought home:" : "Lost (you fell):"));
-        lines.Add(new ResultLine("      Materials {0}", run.materials));
-        lines.Add(new ResultLine("      Crystals {0}", run.crystals));
-        lines.Add(new ResultLine("      Gold {0}", run.gold));
-        lines.Add(new ResultLine("      Supplies {0}", run.supplies));
-        foreach (RelicId relic in run.relics)
-            lines.Add(new ResultLine($"      Relic: {Relics.Names[(int)relic]}{(run.survived ? " (yours for good)" : "")}"));
-        if (!run.raid)
+        lines.Add(new ResultLine(run.survived ? "Loot" : "Lost"));
+        void Loot(string name, int amount)
+        {
+            if (amount > 0) lines.Add(new ResultLine($"      {name} {{0}}", amount));
+        }
+        Loot("Materials", run.materials);
+        Loot("Crystals", run.crystals);
+        Loot("Gold", run.gold);
+        Loot("Supplies", run.supplies);
+        foreach (RelicId relic in run.relics) lines.Add(new ResultLine($"      Relic: {Relics.Names[(int)relic]}"));
+        if (run.ores > 0)
             lines.Add(run.survived
-                ? new ResultLine($"Ores destroyed: {{0}} (quake meter -{run.quakeDrop:0}%)", run.ores)
-                : new ResultLine("Ores destroyed: {0} (no effect: you didn't make it home)", run.ores));
+                ? new ResultLine($"Ores {{0}} (quake -{run.quakeDrop:0}%)", run.ores)
+                : new ResultLine("Ores {0} (no effect)", run.ores));
 
         if (run.requestLines.Count > 0)
         {
             lines.Add(new ResultLine(""));
-            lines.Add(new ResultLine("Requests:"));
+            lines.Add(new ResultLine("Requests"));
             foreach (string request in run.requestLines) lines.Add(new ResultLine("      " + request));
         }
         return lines;
@@ -488,13 +502,20 @@ public class TownManager : MonoBehaviour
             }
             else
             {
-                string crystals = building.costsCrystals ? $" + {campaign.BuildingCrystalCost(b)} crystals" : "";
-                label = $"{building.name}  {level}/{config.maxBuildingLevel}\nPer level: {building.EffectText(building.amountPerLevel)}\n" +
-                        $"{campaign.BuildingMaterialCost(b)} materials + {campaign.BuildingGoldCost(b)} gold{crystals}";
+                string crystals = building.costsCrystals ? $" · {campaign.BuildingCrystalCost(b)} crystals" : "";
+                label = $"{building.name}  {level}/{config.maxBuildingLevel}\n{building.EffectText(building.amountPerLevel)}\n" +
+                        $"{campaign.BuildingMaterialCost(b)} materials · {campaign.BuildingGoldCost(b)} gold{crystals}";
             }
             SetLabel(buildingButtons[slot], label);
             buildingButtons[slot].interactable = campaign.CanBuild(b);
         }
+    }
+
+    // A button's frame color (its ButtonLabelDim fades it while the button can't be used).
+    static void FrameIn(Button button, Color color)
+    {
+        ButtonLabelDim dim = button.GetComponent<ButtonLabelDim>();
+        if (dim != null) dim.frameColor = color;
     }
 
     static void SetLabel(Button button, string text)

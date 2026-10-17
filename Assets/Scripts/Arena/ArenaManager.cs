@@ -533,13 +533,11 @@ public class ArenaManager : MonoBehaviour
         {
             List<string> names = new List<string>();
             foreach (RelicId relic in relics.FoundThisDive) names.Add(Relics.Names[(int)relic]);
-            relicLine = $"\nRelics found: {string.Join(", ", names)} (yours if you get home).";
+            relicLine = $"\nRelics: {string.Join(", ", names)}";
         }
 
-        ShowPanel($"Depth {depth} cleared!",
-            $"From the floor: +{foundMaterials} materials, +{foundCrystals} crystals, +{foundGold} gold, +{foundSupplies} supplies.\n" +
-            $"Go deeper, or return to town with {diveMaterials} materials, {diveCrystals} crystals, {diveGold} gold and " +
-            $"{diveSupplies} supplies?" + relicLine,
+        ShowPanel($"Depth {depth} cleared",
+            $"Carrying {diveMaterials} materials · {diveCrystals} crystals · {diveGold} gold · {diveSupplies} supplies" + relicLine,
             "Go deeper", NextDepth, "Return to town", () => EndDive(true));
         leveling.AddXp(xp); // the cards wait until "Go deeper"
     }
@@ -548,8 +546,7 @@ public class ArenaManager : MonoBehaviour
     void FindRelic()
     {
         if (!relics.TryFind(out RelicId relic)) return; // you have them all
-        ShowNotice($"RELIC: {Relics.Names[(int)relic]}",
-            relics.Describe(relic) + "\nIt works right away, and it's yours for good if you get home safely.");
+        ShowNotice($"RELIC: {Relics.Names[(int)relic]}", relics.Describe(relic));
     }
 
     public void OnPlayerDied()
@@ -559,13 +556,11 @@ public class ArenaManager : MonoBehaviour
         if (raid)
         {
             float loss = campaign.day * config.raidLossPerDay * raidLeft / raidLength;
-            ShowPanel("THE RAIDERS BREAK THROUGH",
-                $"You fell with {Mathf.CeilToInt(raidLeft)} seconds left. Every faction loses {loss:0.#}% of its people\n" +
-                "(the later the day and the more of the raid left, the worse). Everything found is lost.",
+            ShowPanel("THE RAIDERS BREAK THROUGH", $"Every faction loses {loss:0.#}%. The loot is lost.",
                 "Return to town", () => EndRaid(false));
         }
         else
-            ShowPanel("DEFEATED", "Everything found on this dive is lost.", "Return to town", () => EndDive(false));
+            ShowPanel("DEFEATED", "The loot is lost.", "Return to town", () => EndDive(false));
     }
 
     public void Collect(PickupKind kind, int amount)
@@ -780,9 +775,7 @@ public class ArenaManager : MonoBehaviour
     {
         foreach (Pickup pickup in Pickup.All)
             if (pickup.kind != PickupKind.Xp) Collect(pickup.kind, pickup.amount);
-        ShowPanel("THE TOWN HOLDS", $"The crystal monsters fall back into the cracks. Raid {campaign.RaidNumber} held!\n" +
-            $"You bring home {diveMaterials} materials, {diveCrystals} crystals, {diveGold} gold and {diveSupplies} supplies.",
-            "Return to town", () => EndRaid(true));
+        ShowPanel("THE TOWN HOLDS", $"Raid {campaign.RaidNumber} held.", "Return to town", () => EndRaid(true));
     }
 
     // The campaign records the raid (a lost one hurts the town, more the more of the timer was left), then it ends
@@ -888,8 +881,8 @@ public class ArenaManager : MonoBehaviour
         {
             int seconds = Mathf.CeilToInt(Mathf.Max(0f, raidLeft));
             depthText.text = $"Day {campaign.day}     RAID {campaign.RaidNumber}     Kills {kills}";
-            quakeText.text = "Defend the town: hold out until the timer runs out";
-            goalText.text = $"Hold out: {seconds / 60}:{seconds % 60:00}";
+            quakeText.text = "Survive until the timer runs out";
+            goalText.text = $"{seconds / 60}:{seconds % 60:00}";
             goal = 1f - raidLeft / raidLength;
         }
         else
@@ -897,10 +890,9 @@ public class ArenaManager : MonoBehaviour
             depthText.text = $"Day {campaign.day}     {(IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}")}     Kills {kills}";
             float oreDrop = diveOres * config.orePercent;
             string raidToo = campaign.IsRaidOn(campaign.NextQuakeDay) ? " + raid" : "";
-            quakeText.text = $"Next quake (day {campaign.NextQuakeDay}{raidToo}): {campaign.QuakeForecast:0}%     " +
-                             $"Ores mined {diveOres} (-{oreDrop:0}% if you get home)";
+            quakeText.text = $"Quake day {campaign.NextQuakeDay}{raidToo}: {campaign.QuakeForecast:0}%     Ores {diveOres} (-{oreDrop:0}%)";
 
-            goalText.text = teleporter != null ? "Teleporter open: step in!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
+            goalText.text = teleporter != null ? "Teleporter open!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
             if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;
         }
 

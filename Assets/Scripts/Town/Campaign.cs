@@ -28,8 +28,8 @@ public class Quest
 
 // The whole playthrough (endless: it ends when every faction is wiped out): day, materials / crystals / gold /
 // supplies, NPCs (faction leaders) with their requests, people, preparedness (daily orders) and district buildings,
-// unlocked evolutions, relics, the quake meter, raids, a news log and the report of what happened to the people while
-// you were away. Kept in a static so it survives switching between the Town and Arena scenes. Rules come from
+// unlocked evolutions, relics, the quake meter, raids and the report of what happened to the people while you were
+// away. Kept in a static so it survives switching between the Town and Arena scenes. Rules come from
 // TownConfig. The best run (the day the town fell) is kept in PlayerPrefs.
 public class Campaign
 {
@@ -53,7 +53,6 @@ public class Campaign
     public readonly bool[] evolutionUnlocked = new bool[Weapon.Names.Length]; // by WeaponId (leaders teach them)
     public readonly bool[] relicOwned = new bool[Relics.Names.Length];     // by RelicId
     public readonly int[] buildingLevels;                                  // by TownConfig.buildings index
-    public readonly List<string> news = new List<string>();
     public int day = 1;
     public int materials;
     public int crystals;
@@ -177,57 +176,37 @@ public class Campaign
         return parts.Count > 0 ? string.Join(", ", parts) : "nothing";
     }
 
-    // The day that's ending: readiness fades a little, then every faction does its order. One news line.
+    // The day that's ending: readiness fades a little, then every faction does its order (Reinforce needs materials:
+    // without them, or once fully reinforced, that faction idles).
     void DoOrders()
     {
-        List<string> done = new List<string>();
         for (int i = 0; i < npcs.Length; i++)
         {
             NpcState npc = npcs[i];
-            string faction = config.npcs[i].faction;
             if (!npc.Alive) continue;
 
             npc.readiness = Mathf.Max(0f, npc.readiness - config.readinessFade);
             switch (npc.order)
             {
                 case TownOrder.Reinforce:
-                    if (npc.reinforced >= 100f)
-                    {
-                        done.Add($"{faction}' homes all reinforced");
-                    }
-                    else if (materials < config.reinforceMaterials)
-                    {
-                        done.Add($"{faction} idle (no materials to reinforce with)");
-                    }
-                    else
-                    {
-                        materials -= config.reinforceMaterials;
-                        npc.reinforced = Mathf.Min(100f, npc.reinforced + ReinforceGain(i));
-                        done.Add($"{faction} reinforced homes ({npc.reinforced:0}%)");
-                    }
+                    if (npc.reinforced >= 100f || materials < config.reinforceMaterials) break;
+                    materials -= config.reinforceMaterials;
+                    npc.reinforced = Mathf.Min(100f, npc.reinforced + ReinforceGain(i));
                     break;
                 case TownOrder.Stockpile:
-                    int stockpiled = StockpileGain(i);
-                    supplies += stockpiled;
-                    done.Add($"{faction} stockpiled {stockpiled} supplies");
+                    supplies += StockpileGain(i);
                     break;
                 case TownOrder.Drill:
                     npc.readiness = Mathf.Min(100f, npc.readiness + DrillGain(i));
-                    done.Add($"{faction} drilled (readiness {npc.readiness:0}%)");
                     break;
                 default: // Work
                     NpcDefinition definition = config.npcs[i];
-                    int workGold = WorkGain(definition.workGold, i);
-                    int workMaterials = WorkGain(definition.workMaterials, i);
-                    int workCrystals = WorkGain(definition.workCrystals, i);
-                    gold += workGold;
-                    materials += workMaterials;
-                    crystals += workCrystals;
-                    done.Add($"{faction} worked ({Gains(workGold, workMaterials, workCrystals)})");
+                    gold += WorkGain(definition.workGold, i);
+                    materials += WorkGain(definition.workMaterials, i);
+                    crystals += WorkGain(definition.workCrystals, i);
                     break;
             }
         }
-        if (done.Count > 0) news.Add($"Day {day} orders: {string.Join(" · ", done)}.");
     }
 
     Campaign(TownConfig townConfig)
@@ -238,7 +217,6 @@ public class Campaign
         npcs = new NpcState[config.npcs.Length];
         for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState { population = config.npcs[i].startPopulation };
         buildingLevels = new int[config.buildings.Length];
-        news.Add("Day 1: the faction leaders ask for your help before the earthquake comes.");
         RefreshQuests();
     }
 
@@ -265,12 +243,12 @@ public class Campaign
 
     // ---------- Raids ----------
 
-    // The raid was held: news + report (then the arena ends it like a dive: the loot is kept, a day passes).
+    // The raid was held: a report line (then the arena ends it like a dive: the loot is kept, a day passes).
     public void RaidHeld()
     {
         raidsHeld++;
         reportTitle = $"RAID HELD: DAY {day}";
-        Report($"Day {day}: you held the town against raid {RaidNumber}. The crystal monsters fall back into the cracks.");
+        Report($"Raid {RaidNumber} held.");
     }
 
     // The raid was lost with `timeLeftShare` (0-1) of its timer left: every faction loses (day x raidLossPerDay)% of
@@ -280,7 +258,7 @@ public class Campaign
         raidsLost++;
         reportTitle = $"RAID LOST: DAY {day}";
         float share = day * config.raidLossPerDay / 100f * timeLeftShare;
-        Report($"Day {day}: the raiders broke into the town with {timeLeftShare * 100f:0}% of the raid left.");
+        Report($"Raid {RaidNumber} lost ({timeLeftShare * 100f:0}% of it left).");
         for (int i = 0; i < npcs.Length; i++)
         {
             NpcState npc = npcs[i];
@@ -290,7 +268,7 @@ public class Campaign
             int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * share));
             npc.population -= lost;
             npc.injured = Mathf.Min(npc.injured, npc.population);
-            Report($"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation} left)." + LossNote(i, wasFull));
+            Report($"{definition.faction}: -{lost} ({npc.population}/{definition.startPopulation}){LossNote(i, wasFull)}");
         }
         CheckGameOver();
     }
@@ -311,20 +289,13 @@ public class Campaign
             supplies += run.supplies;
             run.quakeDrop = run.ores * config.orePercent;
             quakeMeter = Mathf.Max(0f, quakeMeter - run.quakeDrop);
-            news.Add($"You return with {run.materials} materials, {run.crystals} crystals, {run.gold} gold, " +
-                     $"{run.supplies} supplies and {run.ores} ores destroyed (quake meter -{run.quakeDrop:0}%).");
-            foreach (RelicId relic in run.relics)
-            {
-                relicOwned[(int)relic] = true;
-                news.Add($"You bring home a relic: {Relics.Names[(int)relic]}! It's yours for every dive from now on.");
-            }
+            foreach (RelicId relic in run.relics) relicOwned[(int)relic] = true;
             AddKills(run);
             AdvanceDays(1);
         }
         else
         {
-            news.Add("You were defeated. Everything found on the dive is lost.");
-            run.requestLines.Add("Kills on a lost run don't count for requests.");
+            run.requestLines.Add("Kills don't count (you fell).");
             AdvanceDays(config.daysLostOnDefeat);
         }
     }
@@ -343,14 +314,13 @@ public class Campaign
             if (IsQuakeDay(day)) Earthquake();
             CareForInjured();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
-            if (IsRaidDay) Report($"Day {day}: crystal monsters pour out of the cracks! Today, defend the town.");
+            if (IsRaidDay) Report("RAID TODAY: defend the town!");
         }
     }
 
-    // A line for both the news log and the report.
+    // A line for the report (shown when you're back in town).
     void Report(string line)
     {
-        news.Add(line);
         report.Add(line);
     }
 
@@ -360,11 +330,11 @@ public class Campaign
     {
         float strength = quakeMeter;
         reportTitle = $"EARTHQUAKE: DAY {day}";
-        Report($"Day {day}: EARTHQUAKE! Strength {strength:0}%.");
+        Report($"Strength {strength:0}%.");
         quakeSinceTown = true;
 
         if (strength < config.quakeHarmAt)
-            Report("The town held. No one was hurt.");
+            Report("No one was hurt.");
         else
             for (int i = 0; i < npcs.Length; i++)
                 if (npcs[i].Alive) HitFaction(i, strength);
@@ -394,9 +364,9 @@ public class Campaign
         npc.injured += injured;
         if (injured > 0) npc.injuredDeadline = day + config.injuredDays;
 
-        string line = $"The {definition.faction}: {killed} killed, {injured} injured ({npc.population}/{definition.startPopulation} left).";
-        if (sparedByHomes > 0) line += $" Reinforced homes ({npc.reinforced:0}%) spared {sparedByHomes}.";
-        if (sparedByDrills > 0) line += $" Drills turned {sparedByDrills} deaths into injuries.";
+        string line = $"{definition.faction}: {killed} dead, {injured} hurt ({npc.population}/{definition.startPopulation})";
+        if (sparedByHomes > 0) line += $" · homes saved {sparedByHomes}";
+        if (sparedByDrills > 0) line += $" · drills saved {sparedByDrills}";
         Report(line + LossNote(i, wasFull));
 
         float damageChance = 1f - npc.reinforced / 100f;
@@ -421,12 +391,7 @@ public class Campaign
             int bySupplies = Mathf.Min(npc.injured - byInfirmary, supplies);
             supplies -= bySupplies;
             npc.injured -= byInfirmary + bySupplies;
-            if (byInfirmary + bySupplies > 0)
-            {
-                string how = byInfirmary == 0 ? $"{bySupplies} supplies used" :
-                    bySupplies == 0 ? "by the Infirmary" : $"{byInfirmary} by the Infirmary, {bySupplies} with supplies";
-                Report($"{byInfirmary + bySupplies} injured {definition.faction} were treated ({how}).");
-            }
+            if (byInfirmary + bySupplies > 0) Report($"{definition.faction}: {byInfirmary + bySupplies} hurt treated");
 
             if (npc.injured == 0) continue;
             if (day >= npc.injuredDeadline)
@@ -435,12 +400,11 @@ public class Campaign
                 int died = npc.injured;
                 npc.population -= died;
                 npc.injured = 0;
-                Report($"{died} injured {definition.faction} died without treatment ({npc.population}/{definition.startPopulation} left)." +
-                       LossNote(i, wasFull));
+                Report($"{definition.faction}: {died} hurt died untreated ({npc.population}/{definition.startPopulation}){LossNote(i, wasFull)}");
             }
             else
             {
-                Report($"{npc.injured} injured {definition.faction} still need supplies: without them they die on day {npc.injuredDeadline}.");
+                Report($"{definition.faction}: {npc.injured} hurt need supplies by day {npc.injuredDeadline}");
             }
         }
         CheckGameOver();
@@ -449,15 +413,14 @@ public class Campaign
     // After a faction lost people: wiped out, or newly under half.
     string LossNote(int i, bool wasFull)
     {
-        if (!npcs[i].Alive) return $" They are wiped out, and {config.npcs[i].name} is gone. Their district stands empty.";
-        return wasFull && DistrictStrength(i) < 1f ? " Under half left: their district works at half strength." : "";
+        if (!npcs[i].Alive) return " · WIPED OUT";
+        return wasFull && DistrictStrength(i) < 1f ? " · half strength" : "";
     }
 
     void CheckGameOver()
     {
         if (!GameOver || Ended) return;
-        news.Add("Every faction is gone. The town has fallen.");
-        EndGame("The earthquakes and the raids wiped out every faction.");
+        EndGame("Every faction is gone.");
     }
 
     // A random built building in this leader's district loses a level.
@@ -470,7 +433,7 @@ public class Campaign
 
         int hit = built[Random.Range(0, built.Count)];
         buildingLevels[hit]--;
-        news.Add($"The quake damaged the {config.buildings[hit].name} (level {buildingLevels[hit]}).");
+        Report($"{config.buildings[hit].name} damaged (now Lv {buildingLevels[hit]})");
     }
 
     // Request day: finished requests nobody turned in are turned in now, unfinished ones fail (no gold), then every
@@ -487,19 +450,11 @@ public class Campaign
             }
             if (npc.quest != null && day > 1)
             {
-                if (QuestReady(i))
-                {
-                    news.Add($"{config.npcs[i].name} took your finished request at the deadline.");
-                    TurnIn(i);
-                }
-                else
-                {
-                    news.Add($"{config.npcs[i].name}'s request wasn't met.");
-                }
+                bool done = TurnIn(i); // a finished one is turned in for you
+                Report($"{config.npcs[i].name}: request {(done ? "turned in" : "missed")}");
             }
             npc.quest = config.NewQuest();
         }
-        if (day > 1 && !GameOver) news.Add($"Day {day}: new requests from the faction leaders.");
     }
 
     // ---------- Requests ----------
@@ -515,18 +470,14 @@ public class Campaign
             string name = config.npcs[i].name;
             if (!npc.Alive || quest == null) continue;
 
-            string ready = QuestReady(i) ? " - ready to turn in!" : "";
             if (!quest.IsKill)
             {
-                run.requestLines.Add($"{name}: {quest.Describe()} (you have {materials}/{quest.needed}){ready}");
+                run.requestLines.Add($"{name}: {quest.Describe()} {materials}/{quest.needed}{(QuestReady(i) ? " · done!" : "")}");
                 continue;
             }
-            bool wasReady = QuestReady(i);
             int gained = run.kills.TryGetValue(quest.target, out int count) ? Mathf.Min(count, quest.needed - quest.progress) : 0;
             quest.progress += gained;
-            ready = QuestReady(i) ? " - ready to turn in!" : "";
-            if (!wasReady && QuestReady(i)) news.Add($"{name}'s request is done: turn it in!");
-            run.requestLines.Add($"{name}: {quest.Describe()} {quest.progress}/{quest.needed}{(gained > 0 ? $" (+{gained})" : "")}{ready}");
+            run.requestLines.Add($"{name}: {quest.Describe()} {quest.progress}/{quest.needed}{(gained > 0 ? $" (+{gained})" : "")}{(QuestReady(i) ? " · done!" : "")}");
         }
     }
 
@@ -555,17 +506,10 @@ public class Campaign
         NpcDefinition definition = config.npcs[npcIndex];
         npc.quest = null;
         gold += config.questGold;
-        news.Add($"{definition.name}'s request is done! They pay you {config.questGold} gold.");
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
-        if (definition.unlocksEvolution && !evolutionUnlocked[(int)definition.weapon])
-        {
-            evolutionUnlocked[(int)definition.weapon] = true;
-            int w = (int)definition.weapon;
-            news.Add($"{definition.name} teaches you {Weapon.EvolutionNames[w]}! Once your {Weapon.Names[w]} reaches " +
-                     $"Lv {Weapon.MaxLevel} in a dive, it can evolve.");
-        }
+        if (definition.unlocksEvolution) evolutionUnlocked[(int)definition.weapon] = true;
     }
 
     // ---------- District buildings ----------
@@ -590,8 +534,6 @@ public class Campaign
         gold -= BuildingGoldCost(b);
         crystals -= BuildingCrystalCost(b);
         buildingLevels[b]++;
-        Building building = config.buildings[b];
-        news.Add($"Built: {building.name} level {buildingLevels[b]} ({building.EffectText(building.amountPerLevel * buildingLevels[b])} in total).");
         return true;
     }
 

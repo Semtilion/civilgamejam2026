@@ -59,15 +59,15 @@ public static class ArenaSceneBuilder
         player.walkSprites = a.heroWalk;
 
         //                      weapon                                       id                    card text                                                          bonus text             dmg +lvl interval
-        SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        "Hits every enemy around you.",                                     "+sweep radius",        10, 3, 1.0f);
-        DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       "Throws a dagger at the nearest enemy.",                            "+1 dagger per throw",   8, 2, 1.2f);
-        SpearThrust spear   = SetWeapon(hero.AddComponent<SpearThrust>(),  WeaponId.Spear,        "Thrusts a spear toward the nearest enemy, reaching past the sword.", "+longer reach",      12, 3, 1.3f);
-        CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, "Crystals circle you and hit whatever they touch.",                  "+1 crystal",            8, 2, 0.5f);
+        SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        "Hits all around you.",                                             "+radius",        10, 3, 1.0f);
+        DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       "Throws at the nearest enemy.",                                     "+1 dagger",   8, 2, 1.2f);
+        SpearThrust spear   = SetWeapon(hero.AddComponent<SpearThrust>(),  WeaponId.Spear,        "Long thrust at the nearest enemy.",                                  "+reach",      12, 3, 1.3f);
+        CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, "Crystals circle you.",                                              "+1 crystal",            8, 2, 0.5f);
         // Relic weapons (equipped only once you own the relic)
-        SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    "Slams the ground every few seconds, hitting every enemy around you hard.", "+slam radius", 20, 4, 2.5f);
-        LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, "A lightning bolt strikes a random enemy on screen.",                     "+1 bolt",     15, 3, 1.2f);
-        FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       "Lobs a fire bomb that leaves a burning patch.",                           "+bigger fire", 6, 2, 2.0f);
-        AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
+        SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    "Heavy slam all around you.",                                              "+radius", 20, 4, 2.5f);
+        LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, "Bolts strike random enemies.",                                           "+1 bolt",     15, 3, 1.2f);
+        FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       "Leaves a burning patch.",                                                 "+bigger fire", 6, 2, 2.0f);
+        AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Spins out and back.",                                                     "+1 axe",      18, 4, 2.0f);
         // Weapon looks: Kenney Particle Pack textures (Assets/Art/Effects, white, tinted here or by the weapon); the old
         // placeholder shapes if a file is missing.
         Sprite Fx(string name, Sprite fallback) => EffectSprite(name) ?? fallback;
@@ -79,12 +79,10 @@ public static class ArenaSceneBuilder
         orbit.burstSprite = Fx("FX_Burst", a.circle);
         orbit.burstRingSprite = Fx("FX_Ring", a.ring);
         // Evolution cards (after Lv 5; the names are Weapon.EvolutionNames)
-        sword.evolutionText = "every swing is followed by a quick back-swing that hits everything again.";
-        dagger.evolutionText = $"after every hit, a {dagger.bounceChance * 100f:0}% chance to bounce to a nearby enemy " +
-                               $"(up to {dagger.maxBounces} times).";
-        spear.evolutionText = $"enemies it hits are pinned in place for {spear.pinTime:0.#} s (not bosses).";
-        orbit.evolutionText = $"every crystal hit has a {orbit.shatterChance * 100f:0}% chance to burst, hitting " +
-                              "every enemy around it.";
+        sword.evolutionText = "a back-swing after every swing";
+        dagger.evolutionText = $"{dagger.bounceChance * 100f:0}% chance to bounce (up to {dagger.maxBounces}x)";
+        spear.evolutionText = $"pins enemies for {spear.pinTime:0.#} s";
+        orbit.evolutionText = $"{orbit.shatterChance * 100f:0}% chance to burst on hit";
         hammer.radius = 3.5f;
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;
