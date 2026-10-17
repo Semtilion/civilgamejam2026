@@ -437,9 +437,10 @@ public class Campaign
     }
 
     // Request day: finished requests nobody turned in are turned in now, unfinished ones fail (no gold), then every
-    // leader left asks for something new.
+    // leader left asks for something new, never the same as another leader's (same enemy, or both materials).
     void RefreshQuests()
     {
+        HashSet<EnemyData> taken = new HashSet<EnemyData>(); // this round's request targets (null = materials)
         for (int i = 0; i < npcs.Length; i++)
         {
             NpcState npc = npcs[i];
@@ -453,7 +454,10 @@ public class Campaign
                 bool done = TurnIn(i); // a finished one is turned in for you
                 Report($"{config.npcs[i].name}: request {(done ? "turned in" : "missed")}");
             }
-            npc.quest = config.NewQuest();
+            Quest quest = config.NewQuest();
+            for (int tries = 0; taken.Contains(quest.target) && tries < 20; tries++) quest = config.NewQuest();
+            taken.Add(quest.target);
+            npc.quest = quest;
         }
     }
 

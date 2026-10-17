@@ -113,13 +113,17 @@ public static class TownSceneBuilder
         purchaseBurst.sprite = a.circle;
         Text leaderMark = ReadyMark(window.transform, framePosition + new Vector2(235, 270), 96); // the frame's top-right
 
-        // Right side, top to bottom: title, dialogue, the daily order (4 buttons, the current one with a gold bar along
-        // its bottom), the district's buildings, Give.
-        Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
+        // Right side, top to bottom: title, their thanks (typed out, only after a purchase), three info boxes (people,
+        // preparedness, request), the daily order (4 buttons, the current one with a gold bar along its bottom), the
+        // district's buildings, Turn in.
+        Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 295), new Vector2(940, 60), 40, TextAnchor.MiddleLeft);
         Title(leaderTitle);
-        Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 135), new Vector2(940, 230), 22, TextAnchor.UpperLeft);
+        Text dialogueText = NewText("Thanks", window.transform, new Vector2(280, 245), new Vector2(940, 40), 24, TextAnchor.MiddleLeft);
         dialogueText.raycastTarget = true; // click to show it all at once
         Typewriter dialogue = dialogueText.gameObject.AddComponent<Typewriter>();
+        Text peopleText = InfoBox(window.transform, "PEOPLE", new Vector2(-65, 125), 250, out OrnateFrame peopleFrame);
+        Text preparedText = InfoBox(window.transform, "PREPARED", new Vector2(210, 125), 260, out OrnateFrame preparedFrame);
+        Text requestText = InfoBox(window.transform, "REQUEST", new Vector2(555, 125), 390, out OrnateFrame requestFrame);
         Text ordersCaption = Title(NewText("Orders Caption", window.transform, new Vector2(280, 5), new Vector2(940, 30), 20, TextAnchor.MiddleLeft));
         ordersCaption.text = "DAILY ORDER";
         RectTransform orderRow = NewRow("Orders", window.transform, new Vector2(280, -50), new Vector2(940, 70), 12);
@@ -128,7 +132,7 @@ public static class TownSceneBuilder
         Image[] orderMarks = new Image[orderCount];
         for (int i = 0; i < orderCount; i++)
         {
-            orderButtons[i] = NewButton(((TownOrder)i).ToString(), orderRow, new Vector2(226, 70), 17, useTitleFont: false);
+            orderButtons[i] = NewButton(((TownOrder)i).ToString(), orderRow, new Vector2(226, 70), 18, useTitleFont: false); // 18: "+20% homes, 15 materials" just fits
             orderMarks[i] = NewImage("Current", orderButtons[i].transform, new Vector2(0, -31), new Vector2(206, 5), OrderMarkColor);
             orderMarks[i].raycastTarget = false;
         }
@@ -136,8 +140,8 @@ public static class TownSceneBuilder
         districtCaption.text = "BUILDINGS";
         RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -175), new Vector2(940, 100), 12);
         Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
-        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17, useTitleFont: false);
-        Button turnInButton = NewButton("Turn in", window.transform, new Vector2(380, 56), 22);
+        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 19, useTitleFont: false);
+        Button turnInButton = NewButton("Turn in", window.transform, new Vector2(380, 56), 26);
         Place(turnInButton, new Vector2(280, -295));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
         Place(close, new Vector2(762, 312));
@@ -230,13 +234,21 @@ public static class TownSceneBuilder
         town.nameplate = nameplate;
         town.leaderTitle = leaderTitle;
         town.dialogue = dialogue;
+        town.peopleText = peopleText;
+        town.preparedText = preparedText;
+        town.requestText = requestText;
+        town.infoFrames = new[] { peopleFrame, preparedFrame, requestFrame };
         town.orderButtons = orderButtons;
         town.orderMarks = orderMarks;
         town.buildingButtons = buildingButtons;
         town.turnInButton = turnInButton;
         town.leaderMark = leaderMark;
         town.results = results;
-        town.aliveOnly = new[] { ordersCaption.gameObject, districtCaption.gameObject };
+        town.aliveOnly = new[]
+        {
+            ordersCaption.gameObject, districtCaption.gameObject,
+            peopleText.transform.parent.gameObject, preparedText.transform.parent.gameObject, requestText.transform.parent.gameObject,
+        };
         town.reportPanel = report.gameObject;
         town.reportHeading = reportHeading;
         town.reportText = reportText;
@@ -244,6 +256,17 @@ public static class TownSceneBuilder
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    // One of the leader window's info boxes (190 tall): a dark panel in a thin frame (the leader's color, set by
+    // TownManager), its title on top and up to 3 lines under it. Returns the body text.
+    static Text InfoBox(Transform window, string title, Vector2 position, float width, out OrnateFrame frame)
+    {
+        Image box = NewImage(title + " Box", window, position, new Vector2(width, 190), PanelColor);
+        frame = AddFrame(box.transform, ButtonFrameThickness, FrameColor); // thin: the box is small
+        Text header = Title(NewText("Header", box.transform, new Vector2(0, 58), new Vector2(width - 40, 34), 22, TextAnchor.MiddleCenter));
+        header.text = title;
+        return NewText("Body", box.transform, new Vector2(0, -22), new Vector2(width - 40, 110), 24, TextAnchor.UpperCenter);
     }
 
     // A yellow "!" (a request is finished: turn it in), hidden at first; TownManager shows it and makes it bob.

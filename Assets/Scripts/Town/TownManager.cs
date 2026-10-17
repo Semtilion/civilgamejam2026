@@ -6,8 +6,9 @@ using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, one button per faction leader, the relics you own,
 // a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
-// Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
-// their daily order, their district's buildings and the turn-in button below (closes with X, Esc or a click outside).
+// Clicking a leader opens their window: portrait on the left; on the right their situation in three boxes (people,
+// preparedness, request; their thanks typed out above them after a purchase or turn-in), their daily order, their
+// district's buildings and the turn-in button below (closes with X, Esc or a click outside).
 // A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive or raid shows the result
 // screen, then the report (after a quake, or while the injured wait for care). State lives in
 // Campaign.Current. When the run has ended (every faction wiped out), the end screen covers the town (New game /
@@ -53,7 +54,12 @@ public class TownManager : MonoBehaviour
     public Image portraitGlow;
     public Image nameplateLine;
     public Text leaderTitle;
+    [Tooltip("Their thanks (and what a turn-in paid), typed out above the info boxes; empty until you buy or turn in.")]
     public Typewriter dialogue;
+    [Tooltip("The three info boxes' texts: people, preparedness, request.")]
+    public Text peopleText, preparedText, requestText;
+    [Tooltip("The three info boxes' frames (take the leader's color).")]
+    public OrnateFrame[] infoFrames;
     [Tooltip("One button per order, in TownOrder order (Work, Reinforce, Stockpile, Drill).")]
     public Button[] orderButtons;
     [Tooltip("The gold bar on each order button (same order): shown on the faction's current order.")]
@@ -82,8 +88,8 @@ public class TownManager : MonoBehaviour
 
     Campaign campaign;
     int selected;       // whose window is open
-    string spokenLine;  // what they say on top of the dialogue: their greeting, or their thanks after a purchase
-    string reward;      // under it after a turn-in: what the request paid (null otherwise)
+    string spokenLine;  // what they say above the info: their thanks after a purchase or turn-in (null: nothing)
+    string reward;      // after it on a turn-in: what the request paid (null otherwise)
     Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
@@ -184,7 +190,7 @@ public class TownManager : MonoBehaviour
     void OpenLeader(int i)
     {
         selected = i;
-        spokenLine = config.npcs[i].greeting;
+        spokenLine = null; // leaders only speak to thank you
         reward = null;
         leaderWindow.SetActive(true);
         ShowLeader(true);
@@ -199,14 +205,14 @@ public class TownManager : MonoBehaviour
         Thank($"+{config.questGold} gold{(teaches ? $" · learned {Weapon.EvolutionNames[(int)definition.weapon]}" : "")}");
     }
 
-    // After buying a building level or turning in a request: the leader hops in a burst of sparkles, and the dialogue
-    // retypes with their thanks line (and `rewardLine` under it).
+    // After buying a building level or turning in a request: the leader hops in a burst of sparkles, and their thanks
+    // line types out (`rewardLine` after it).
     void Thank(string rewardLine = null)
     {
         spokenLine = config.npcs[selected].thanks;
         reward = rewardLine;
         Refresh();
-        dialogue.Play(Dialogue(selected));
+        dialogue.Play(Spoken(selected));
         portraitMotion.Hop();
         purchaseBurst.Burst();
     }
@@ -327,10 +333,13 @@ public class TownManager : MonoBehaviour
         foreach (Button button in buildingButtons) FrameIn(button, color);
         FrameIn(turnInButton, color);
         FrameIn(closeButton, color);
+        foreach (OrnateFrame frame in infoFrames)
+            if (frame != null) frame.Color = color;
 
-        string text = Dialogue(i);
+        string text = Spoken(i);
         if (retype) dialogue.Play(text);
         else dialogue.Set(text);
+        ShowInfo(i);
 
         ShowOrders(i);
         ShowBuildings(i);
@@ -347,34 +356,37 @@ public class TownManager : MonoBehaviour
         leaderMark.gameObject.SetActive(campaign.QuestReady(i));
     }
 
-    // What the leader says (spokenLine, in quotes; the reward under it after a turn-in), then three short lines: their
-    // people (and injured), preparedness, and the request.
-    string Dialogue(int i)
+    // What the leader says: their thanks in quotes (and what a turn-in paid) after a purchase, nothing otherwise; a
+    // wiped-out leader's line says they're gone.
+    string Spoken(int i)
+    {
+        if (!campaign.npcs[i].Alive) return $"The {config.npcs[i].faction} are gone.";
+        if (string.IsNullOrEmpty(spokenLine)) return "";
+        return reward != null ? $"\"{spokenLine}\"   {reward}" : $"\"{spokenLine}\"";
+    }
+
+    // The three info boxes (hidden with the rest once the faction is wiped out): people, preparedness, request.
+    void ShowInfo(int i)
     {
         NpcDefinition definition = config.npcs[i];
         NpcState npc = campaign.npcs[i];
 
-        string body;
-        if (!npc.Alive)
+        string people = $"{npc.population} / {definition.startPopulation}";
+        if (campaign.DistrictStrength(i) < 1f) people += "\nhalf strength";
+        if (npc.injured > 0) people += $"\n{npc.injured} hurt · die day {npc.injuredDeadline}";
+        peopleText.text = people;
+
+        preparedText.text = $"Homes {npc.reinforced:0}%\nReady {npc.readiness:0}%\nSupplies {campaign.supplies}";
+
+        if (npc.quest == null)
         {
-            body = $"The {definition.faction} are gone.";
+            requestText.text = $"Done\nNext: day {campaign.NextQuestDay}";
+            return;
         }
-        else
-        {
-            body = string.IsNullOrEmpty(spokenLine) ? "" : $"\"{spokenLine}\"\n";
-            if (reward != null) body += reward + "\n";
-            body += $"\n{definition.faction} {npc.population}/{definition.startPopulation}";
-            if (campaign.DistrictStrength(i) < 1f) body += " · half strength";
-            if (npc.injured > 0) body += $" · {npc.injured} hurt (die day {npc.injuredDeadline})";
-            body += $"\nHomes {npc.reinforced:0}% · Ready {npc.readiness:0}% · Supplies {campaign.supplies}";
-            string evolution = definition.unlocksEvolution && !npc.everCompleted
-                ? $" + {Weapon.EvolutionNames[(int)definition.weapon]}" : "";
-            body += npc.quest != null
-                ? $"\n{npc.quest.Describe()}: {QuestProgress(npc.quest)} · by day {campaign.NextQuestDay} · " +
-                  $"{config.questGold} gold{evolution}{(campaign.QuestReady(i) ? " · DONE" : "")}"
-                : $"\nNext request: day {campaign.NextQuestDay}";
-        }
-        return body;
+        string evolution = definition.unlocksEvolution && !npc.everCompleted
+            ? $" + {Weapon.EvolutionNames[(int)definition.weapon]}" : "";
+        requestText.text = $"{npc.quest.Describe()}\n{QuestProgress(npc.quest).Replace("/", " / ")}{(campaign.QuestReady(i) ? " · DONE" : "")}\n" +
+                           $"by day {campaign.NextQuestDay} · {config.questGold} gold{evolution}";
     }
 
     // ---------- Result screen ----------

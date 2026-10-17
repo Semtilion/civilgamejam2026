@@ -15,9 +15,7 @@ public class NpcDefinition
     public WeaponId weapon;
     [Tooltip("Their bust in the leader window. Jam > Build Game Scenes fills in Assets/Art/NPCs/Portrait_<name>.png when empty.")]
     public Sprite portrait;
-    [Tooltip("What they say first in the leader window (shown in quotes).")]
-    public string greeting;
-    [Tooltip("What they say after you buy a building level in their district or finish their materials request.")]
+    [Tooltip("What they say after you buy a building level in their district or turn in their request.")]
     public string thanks;
     [Tooltip("Their color: the frame of their button in town, of their window and of their portrait.")]
     public Color color = Color.white;

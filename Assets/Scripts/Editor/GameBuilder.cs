@@ -543,13 +543,10 @@ public static class GameBuilder
         config.npcs = new[]
         {
             new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksEvolution = true, weapon = WeaponId.Spear,
-                                greeting = "Steel holds. Stone doesn't.",
                                 thanks = "Good. My soldiers will put it to use.", workGold = 20, color = new Color(1f, 0.80f, 0.30f) },
             new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksEvolution = true, weapon = WeaponId.CrystalOrbit,
-                                greeting = "The crystals sing louder every day. Every vein you break, the island hears it.",
                                 thanks = "The crystals approve. So do I.", workGold = 10, workCrystals = 1, color = new Color(0.65f, 0.45f, 0.95f) },
             new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksEvolution = true, weapon = WeaponId.Dagger,
-                                greeting = "My old bones feel the quakes before the ground does. Build us something that stands.",
                                 thanks = "Bless you. That will hold a while longer.", workMaterials = 8, color = new Color(0.85f, 0.65f, 0.35f) },
         }; // their district buildings are TownConfig.buildings (code defaults); portraits are filled in by EnsureAssets
         config.killQuests = new[]
