@@ -23,6 +23,7 @@ MonoBehaviour:
   xp: 0
   materialChance: 1
   materialAmount: 3
+  supplyAmount: 1
   fireRange: 10
   fireWarning: 0.5
   fireInterval: 2.5

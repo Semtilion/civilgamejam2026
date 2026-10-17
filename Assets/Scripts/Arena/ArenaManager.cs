@@ -92,7 +92,8 @@ public class ArenaManager : MonoBehaviour
     public float oreScale = 1f;
 
     [Header("Shrines (the ore art tinted by type; used like an ore)")]
-    public int shrinesPerDepth = 1;
+    [Tooltip("0 = no shrines (switched off for now, until they get their own art; they'd use the ore art tinted).")]
+    public int shrinesPerDepth = 0;
     [Tooltip("Seconds of standing next to a shrine to use it.")]
     public float shrineTime = 5f;
     [Tooltip("XP shrine: this share of the XP needed for the current level (0.25 = a quarter of the bar).")]
@@ -199,10 +200,11 @@ public class ArenaManager : MonoBehaviour
     int diveMaterials;
     int diveCrystals;
     int diveGold;
+    int diveSupplies;
     int diveOres;
-    readonly Ticker materialsShown = new Ticker(), crystalsShown = new Ticker(), goldShown = new Ticker(); // HUD counters
+    readonly Ticker materialsShown = new Ticker(), crystalsShown = new Ticker(), goldShown = new Ticker(),
+        suppliesShown = new Ticker(); // HUD counters
     int materialBonus; // Workshop: added to every materials drop
-    float depthHeal;   // Infirmary: share of max HP healed after each cleared depth
     readonly Dictionary<EnemyData, int> diveKills = new Dictionary<EnemyData, int>();
     float spawnTimer;
     bool bossSpawned;
@@ -270,14 +272,14 @@ public class ArenaManager : MonoBehaviour
         player.ResetForNewRun();
         campaign.ApplyLoadout(player, leveling.weapons);
         relics.ResetForNewRun(campaign.relicOwned); // after the loadout: Glass Cannon cuts the final max HP
-        leveling.ResetForNewRun(campaign.weaponUnlocked);
+        leveling.ResetForNewRun(campaign.evolutionUnlocked);
         leveling.XpGain = 1f + campaign.BuildingBonus(BuildingEffect.XpGain);
         materialBonus = Mathf.FloorToInt(campaign.BuildingBonus(BuildingEffect.MaterialBonus) + 0.5f); // half strength rounds up
-        depthHeal = campaign.BuildingBonus(BuildingEffect.DepthHeal);
         kills = 0;
         diveMaterials = 0;
         diveCrystals = 0;
         diveGold = 0;
+        diveSupplies = 0;
         diveOres = 0;
         diveKills.Clear();
         depth = 0;
@@ -286,7 +288,6 @@ public class ArenaManager : MonoBehaviour
     // HP, levels and loot carry over between depths; the hero starts each depth in the middle of a fresh cave.
     void NextDepth()
     {
-        if (depth > 0) player.Heal(Mathf.RoundToInt(player.maxHp * depthHeal)); // Infirmary, after a cleared depth
         depth++;
         ClearField();
         player.transform.position = Bounds.center;
@@ -404,10 +405,13 @@ public class ArenaManager : MonoBehaviour
 
         if (enemy.data.behavior == EnemyBehavior.Crate) // broken crate or crystal cluster: just its loot, not a kill
         {
+            Vector2 at = enemy.transform.position;
             if (enemy.data.materialAmount > 0)
-                Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount + materialBonus, this);
+                Pickup.Drop(PickupKind.Materials, materialSprite, at, enemy.data.materialAmount + materialBonus, this);
             if (enemy.data.crystalAmount > 0)
-                Pickup.Drop(PickupKind.Crystal, crystalSprite, enemy.transform.position, enemy.data.crystalAmount, this);
+                Pickup.Drop(PickupKind.Crystal, crystalSprite, at, enemy.data.crystalAmount, this);
+            if (enemy.data.supplyAmount > 0)
+                Pickup.Drop(PickupKind.Supplies, materialSprite, at + Random.insideUnitCircle * 0.3f, enemy.data.supplyAmount, this);
             return;
         }
 
@@ -502,6 +506,7 @@ public class ArenaManager : MonoBehaviour
             stairs.transform.SetParent(teleporter.transform, false);
             stairs.sprite = teleporterStairs;
             stairs.sortingOrder = -1;
+            stairs.gameObject.AddComponent<SpriteOutline>();
         }
     }
 
@@ -517,17 +522,20 @@ public class ArenaManager : MonoBehaviour
         int foundMaterials = 0;
         int foundCrystals = 0;
         int foundGold = 0;
+        int foundSupplies = 0;
         int xp = 0;
         foreach (Pickup pickup in Pickup.All)
         {
             if (pickup.kind == PickupKind.Materials) foundMaterials += pickup.amount;
             else if (pickup.kind == PickupKind.Crystal) foundCrystals += pickup.amount;
             else if (pickup.kind == PickupKind.Gold) foundGold += pickup.amount;
+            else if (pickup.kind == PickupKind.Supplies) foundSupplies += pickup.amount;
             else xp += pickup.amount;
         }
         diveMaterials += foundMaterials;
         diveCrystals += foundCrystals;
         diveGold += foundGold;
+        diveSupplies += foundSupplies;
 
         string relicLine = "";
         if (relics.FoundThisDive.Count > 0)
@@ -538,8 +546,9 @@ public class ArenaManager : MonoBehaviour
         }
 
         ShowPanel($"Depth {depth} cleared!",
-            $"From the floor: +{foundMaterials} materials, +{foundCrystals} crystals, +{foundGold} gold.\n" +
-            $"Go deeper, or return to town with {diveMaterials} materials, {diveCrystals} crystals and {diveGold} gold?" + relicLine,
+            $"From the floor: +{foundMaterials} materials, +{foundCrystals} crystals, +{foundGold} gold, +{foundSupplies} supplies.\n" +
+            $"Go deeper, or return to town with {diveMaterials} materials, {diveCrystals} crystals, {diveGold} gold and " +
+            $"{diveSupplies} supplies?" + relicLine,
             "Go deeper", NextDepth, "Return to town", () => EndDive(true));
         leveling.AddXp(xp); // the cards wait until "Go deeper"
     }
@@ -567,6 +576,7 @@ public class ArenaManager : MonoBehaviour
         if (kind == PickupKind.Materials) diveMaterials += amount;
         else if (kind == PickupKind.Crystal) diveCrystals += amount;
         else if (kind == PickupKind.Gold) diveGold += amount;
+        else if (kind == PickupKind.Supplies) diveSupplies += amount;
         else leveling.AddXp(amount);
     }
 
@@ -685,7 +695,7 @@ public class ArenaManager : MonoBehaviour
     void EndDive(bool survived, string nextScene = null)
     {
         campaign.RecordDive(kills, depth, diveOres);
-        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveGold, diveOres, relics.FoundThisDive);
+        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveGold, diveSupplies, diveOres, relics.FoundThisDive);
         Time.timeScale = 1f;
         SceneManager.LoadScene(nextScene ?? townScene);
     }
@@ -709,12 +719,13 @@ public class ArenaManager : MonoBehaviour
 
     // ---------- Final horde ----------
 
-    // Every unlocked weapon at Lv 1 plus some free level-up picks, then wave 1 after a short calm.
+    // Every base weapon (Sword, Dagger, Spear, Crystal Orbit) at Lv 1 plus some free level-up picks, then wave 1 after
+    // a short calm.
     void StartHorde()
     {
         ResetRun();
         foreach (Weapon weapon in leveling.weapons)
-            if (campaign.weaponUnlocked[(int)weapon.id]) weapon.enabled = true;
+            if (!Weapon.IsRelicWeapon(weapon.id)) weapon.enabled = true;
 
         ClearField();
         player.transform.position = Bounds.center;
@@ -901,7 +912,7 @@ public class ArenaManager : MonoBehaviour
             depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}";
             float dt = Time.unscaledDeltaTime; // the counters roll up toward the real numbers
             lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
-                            $"Gold {goldShown.Next(diveGold, dt)}";
+                            $"Gold {goldShown.Next(diveGold, dt)}     Supplies {suppliesShown.Next(diveSupplies, dt)}";
 
             float oreDrop = diveOres * config.orePercent;
             string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";

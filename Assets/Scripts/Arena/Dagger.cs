@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // A thrown dagger: flies straight, damages the first enemy it touches and disappears (or vanishes at max range).
+// Ricochet (the evolved Dagger): after each hit, `bounceChance` to fly on to the nearest other enemy within
+// `bounceRange`, up to `bounces` times.
 public class Dagger : MonoBehaviour
 {
     public static readonly List<Dagger> All = new List<Dagger>();
@@ -13,13 +15,15 @@ public class Dagger : MonoBehaviour
     float knockback;
     float lifeLeft;
     Player player;
+    int bouncesLeft;
+    float bounceChance, bounceRange;
+    Enemy lastHit; // not hit again right after bouncing off it
 
     public static void Throw(Sprite sprite, Color color, Vector2 from, Vector2 direction, float speed, float range,
-        int damage, float knockback, Player player)
+        int damage, float knockback, Player player, int bounces = 0, float bounceChance = 0f, float bounceRange = 0f)
     {
         GameObject go = new GameObject("Dagger");
         go.transform.position = from;
-        go.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
         go.transform.localScale = new Vector3(0.6f, 0.15f, 1f); // placeholder: thin bar pointing where it flies
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
@@ -29,12 +33,22 @@ public class Dagger : MonoBehaviour
         Fx.Unlit(renderer);
 
         Dagger dagger = go.AddComponent<Dagger>();
-        dagger.velocity = direction * speed;
+        dagger.Fly(direction * speed, range / speed);
         dagger.damage = damage;
         dagger.knockback = knockback;
-        dagger.lifeLeft = range / speed;
         dagger.player = player;
+        dagger.bouncesLeft = bounces;
+        dagger.bounceChance = bounceChance;
+        dagger.bounceRange = bounceRange;
         All.Add(dagger);
+    }
+
+    // Sets off in a new direction (turned to face it) for `seconds`.
+    void Fly(Vector2 newVelocity, float seconds)
+    {
+        velocity = newVelocity;
+        lifeLeft = seconds;
+        transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg);
     }
 
     void OnDestroy()
@@ -51,16 +65,42 @@ public class Dagger : MonoBehaviour
 
         foreach (Enemy enemy in Enemy.All)
         {
-            if (enemy.IsDead) continue;
+            if (enemy.IsDead || enemy == lastHit) continue;
             float reach = Radius + enemy.data.radius;
             if (((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude <= reach * reach)
             {
                 enemy.TakeDamage(damage, (Vector2)transform.position - velocity, knockback); // pushed along the flight
-                Destroy(gameObject);
+                if (bouncesLeft <= 0 || Random.value >= bounceChance || !BounceFrom(enemy)) Destroy(gameObject);
                 return;
             }
         }
 
         if (lifeLeft <= 0f) Destroy(gameObject);
+    }
+
+    // Ricochet: turns toward the nearest other living enemy within bounceRange. False if there's none.
+    bool BounceFrom(Enemy hit)
+    {
+        Enemy next = null;
+        float best = bounceRange * bounceRange;
+        foreach (Enemy enemy in Enemy.All)
+        {
+            if (enemy.IsDead || enemy == hit) continue;
+            float distance = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude;
+            if (distance <= best)
+            {
+                best = distance;
+                next = enemy;
+            }
+        }
+        if (next == null) return false;
+
+        float speed = velocity.magnitude;
+        Vector2 offset = next.transform.position - transform.position;
+        Vector2 direction = offset.sqrMagnitude > 0.0001f ? offset.normalized : velocity / speed;
+        Fly(direction * speed, (bounceRange + 1f) / speed); // enough to reach it
+        bouncesLeft--;
+        lastHit = hit;
+        return true;
     }
 }

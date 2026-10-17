@@ -3,11 +3,17 @@ using UnityEngine;
 
 public class NpcState
 {
-    public int population;     // the faction's people; lost people never come back
+    public int population;     // the faction's people (the injured included); lost people never come back
+    public int injured;        // hurt by a quake: can't work, and die on injuredDeadline unless treated
+    public int injuredDeadline;
+    public float reinforced;   // % of homes reinforced: a quake's casualties x (1 - reinforced)
+    public float readiness;    // % drilled: more of a quake's casualties are injured instead of killed; fades daily
+    public TownOrder order;    // the faction's job every day until changed (Work at the start)
     public bool everCompleted; // their first completed request unlocks their weapon
-    public Quest quest;        // null = request done (also braces their faction's homes for a quake)
+    public Quest quest;        // null = request done
 
     public bool Alive => population > 0; // 0 = faction wiped out, the leader is gone
+    public int Healthy => population - injured;
 }
 
 public class Quest
@@ -20,9 +26,10 @@ public class Quest
     public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} materials";
 }
 
-// The whole playthrough: day, materials / crystals / gold, NPCs (faction leaders) with their requests, people and
-// district buildings, unlocked weapons, relics, the quake meter, and a news log. Kept in a static so it survives
-// switching between the Town and Arena scenes. Rules come from TownConfig.
+// The whole playthrough: day, materials / crystals / gold / supplies, NPCs (faction leaders) with their requests,
+// people, preparedness (daily orders) and district buildings, unlocked weapons, relics, the quake meter, a news log
+// and the report of what happened to the people while you were away. Kept in a static so it survives switching
+// between the Town and Arena scenes. Rules come from TownConfig.
 public class Campaign
 {
     public static Campaign Current { get; private set; }
@@ -42,7 +49,7 @@ public class Campaign
 
     public readonly TownConfig config;
     public readonly NpcState[] npcs;
-    public readonly bool[] weaponUnlocked = new bool[Weapon.Names.Length]; // by WeaponId
+    public readonly bool[] evolutionUnlocked = new bool[Weapon.Names.Length]; // by WeaponId (leaders teach them)
     public readonly bool[] relicOwned = new bool[Relics.Names.Length];     // by RelicId
     public readonly int[] buildingLevels;                                  // by TownConfig.buildings index
     public readonly List<string> news = new List<string>();
@@ -50,12 +57,17 @@ public class Campaign
     public int materials;
     public int crystals;
     public int gold;
+    public int supplies;     // emergency supplies: each treats one injured person
     public float quakeMeter; // %
     float passiveRise;       // all the passive quake rise so far (never undone by quakes)
     public bool howToPlayShown; // the town pops up How to play once per new game
     public bool quakeSinceTown; // a quake hit while you were away: the town screen shakes once when you get back
     // What the town's counters showed when you left, so they roll up (or down) to the new amounts when you return.
     public int shownMaterials, shownCrystals, shownGold;
+    // What happened to the town's people while you were away (a quake, the injured): the town shows it as a report
+    // when you get back, then clears it.
+    public readonly List<string> report = new List<string>();
+    public string reportTitle;
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
@@ -84,10 +96,10 @@ public class Campaign
         }
     }
 
-    // Ley Stones lower the passive rise, Stone Foundations the value the meter goes back to after a quake.
+    // Ley Stones lower the passive rise.
     float PassivePerDay => Mathf.Max(0f, config.quakePassivePerDay - BuildingBonus(BuildingEffect.QuakePassive));
     float DailyQuakeRise => config.quakePerDay + PassivePerDay;
-    float QuakeBaseline => Mathf.Max(0f, config.quakeStart - BuildingBonus(BuildingEffect.QuakeStart)) + passiveRise;
+    float QuakeBaseline => config.quakeStart + passiveRise;
 
     // How strong the next quake will be if no more ores are mined.
     public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
@@ -131,11 +143,90 @@ public class Campaign
         return npc.population < config.npcs[npcIndex].startPopulation * config.halfHelpBelow ? 0.5f : 1f;
     }
 
+    // ---------- Orders (what each faction does every day) ----------
+
+    // How strongly a faction's order works: its healthy people / its starting people.
+    public float WorkShare(int npcIndex) => (float)npcs[npcIndex].Healthy / config.npcs[npcIndex].startPopulation;
+
+    // What one day of each order gives this faction now (Stone Foundations add to Reinforce).
+    public float ReinforceGain(int i) => (config.reinforcePerDay + BuildingBonus(BuildingEffect.ReinforceBonus)) * WorkShare(i);
+    public int StockpileGain(int i) => Mathf.CeilToInt(config.npcs[i].startPopulation * config.stockpileShare * WorkShare(i));
+    public float DrillGain(int i) => config.drillPerDay * WorkShare(i);
+    int WorkGain(int amount, int i) => Mathf.CeilToInt(amount * WorkShare(i));
+    public string WorkGains(int i)
+    {
+        NpcDefinition definition = config.npcs[i];
+        return Gains(WorkGain(definition.workGold, i), WorkGain(definition.workMaterials, i), WorkGain(definition.workCrystals, i));
+    }
+
+    // "+20 gold, +8 materials, +1 crystal" (only the ones above 0).
+    static string Gains(int gold, int materials, int crystals)
+    {
+        List<string> parts = new List<string>();
+        if (gold > 0) parts.Add($"+{gold} gold");
+        if (materials > 0) parts.Add($"+{materials} materials");
+        if (crystals > 0) parts.Add($"+{crystals} crystal{(crystals == 1 ? "" : "s")}");
+        return parts.Count > 0 ? string.Join(", ", parts) : "nothing";
+    }
+
+    // The day that's ending: readiness fades a little, then every faction does its order. One news line.
+    void DoOrders()
+    {
+        List<string> done = new List<string>();
+        for (int i = 0; i < npcs.Length; i++)
+        {
+            NpcState npc = npcs[i];
+            string faction = config.npcs[i].faction;
+            if (!npc.Alive) continue;
+
+            npc.readiness = Mathf.Max(0f, npc.readiness - config.readinessFade);
+            switch (npc.order)
+            {
+                case TownOrder.Reinforce:
+                    if (npc.reinforced >= 100f)
+                    {
+                        done.Add($"{faction}' homes all reinforced");
+                    }
+                    else if (materials < config.reinforceMaterials)
+                    {
+                        done.Add($"{faction} idle (no materials to reinforce with)");
+                    }
+                    else
+                    {
+                        materials -= config.reinforceMaterials;
+                        npc.reinforced = Mathf.Min(100f, npc.reinforced + ReinforceGain(i));
+                        done.Add($"{faction} reinforced homes ({npc.reinforced:0}%)");
+                    }
+                    break;
+                case TownOrder.Stockpile:
+                    int stockpiled = StockpileGain(i);
+                    supplies += stockpiled;
+                    done.Add($"{faction} stockpiled {stockpiled} supplies");
+                    break;
+                case TownOrder.Drill:
+                    npc.readiness = Mathf.Min(100f, npc.readiness + DrillGain(i));
+                    done.Add($"{faction} drilled (readiness {npc.readiness:0}%)");
+                    break;
+                default: // Work
+                    NpcDefinition definition = config.npcs[i];
+                    int workGold = WorkGain(definition.workGold, i);
+                    int workMaterials = WorkGain(definition.workMaterials, i);
+                    int workCrystals = WorkGain(definition.workCrystals, i);
+                    gold += workGold;
+                    materials += workMaterials;
+                    crystals += workCrystals;
+                    done.Add($"{faction} worked ({Gains(workGold, workMaterials, workCrystals)})");
+                    break;
+            }
+        }
+        if (done.Count > 0) news.Add($"Day {day} orders: {string.Join(" · ", done)}.");
+    }
+
     Campaign(TownConfig townConfig)
     {
         config = townConfig;
         quakeMeter = config.quakeStart;
-        weaponUnlocked[(int)WeaponId.Sword] = true;
+        evolutionUnlocked[(int)WeaponId.Sword] = true; // Twin Strike: no leader needed
         npcs = new NpcState[config.npcs.Length];
         for (int i = 0; i < npcs.Length; i++) npcs[i] = new NpcState { population = config.npcs[i].startPopulation };
         buildingLevels = new int[config.buildings.Length];
@@ -161,21 +252,22 @@ public class Campaign
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive ends. Survived: keep the materials, crystals, gold and relics, kills count for
-    // requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
+    // Called by the arena when a dive ends. Survived: keep the materials, crystals, gold, supplies and relics, kills
+    // count for requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
     // `daysLostOnDefeat` (1) days pass.
     public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int foundGold,
-        int oresMined, IReadOnlyList<RelicId> foundRelics)
+        int foundSupplies, int oresMined, IReadOnlyList<RelicId> foundRelics)
     {
         if (survived)
         {
             materials += foundMaterials;
             crystals += foundCrystals;
             gold += foundGold;
+            supplies += foundSupplies;
             float drop = oresMined * config.orePercent;
             quakeMeter = Mathf.Max(0f, quakeMeter - drop);
-            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals, {foundGold} gold and " +
-                     $"{oresMined} ores destroyed (quake meter -{drop:0}%).");
+            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals, {foundGold} gold, " +
+                     $"{foundSupplies} supplies and {oresMined} ores destroyed (quake meter -{drop:0}%).");
             foreach (RelicId relic in foundRelics)
             {
                 relicOwned[(int)relic] = true;
@@ -191,65 +283,136 @@ public class Campaign
         }
     }
 
-    // Each day: the quake meter rises (cycle + passive); on a quake day the quake hits (before new requests, so
-    // finished ones still protect their faction); on a request day the requests are refreshed.
+    // Each day: the factions do their orders (so today's preparation counts for tomorrow's quake), the quake meter
+    // rises (cycle + passive), on a quake day the quake hits, the injured are cared for, and on a request day the
+    // requests are refreshed.
     void AdvanceDays(int count)
     {
         for (int i = 0; i < count; i++)
         {
+            DoOrders();
             day++;
             passiveRise += PassivePerDay;
             quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);
             if (System.Array.IndexOf(config.earthquakeDays, day) >= 0) Earthquake();
+            CareForInjured();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
             if (day == config.hordeDay && !Ended)
                 news.Add($"Day {day}: the horde is coming! Defend the town.");
         }
     }
 
-    // A quake at `quakeHarmAt`% or more hits every faction whose leader's request isn't finished (finished = braced,
-    // safe): it loses strength x `lossPerQuakePercent` % of its starting people (they never come back), and one of its
-    // district's buildings loses a level. Then the meter goes back to the start value plus all the passive rise so far.
+    // A line for both the news log and the report.
+    void Report(string line)
+    {
+        news.Add(line);
+        report.Add(line);
+    }
+
+    // A quake at `quakeHarmAt`% or more hurts every faction (HitFaction). Then the meter goes back to the start value
+    // plus all the passive rise so far.
     void Earthquake()
     {
-        news.Add($"Day {day}: EARTHQUAKE! Strength {quakeMeter:0}%.");
+        float strength = quakeMeter;
+        reportTitle = $"EARTHQUAKE: DAY {day}";
+        Report($"Day {day}: EARTHQUAKE! Strength {strength:0}%.");
         quakeSinceTown = true;
 
-        if (quakeMeter < config.quakeHarmAt)
-        {
-            news.Add("The town held. No one was lost.");
-        }
+        if (strength < config.quakeHarmAt)
+            Report("The town held. No one was hurt.");
         else
-        {
-            float lossShare = quakeMeter * config.lossPerQuakePercent / 100f;
             for (int i = 0; i < npcs.Length; i++)
-            {
-                NpcState npc = npcs[i];
-                NpcDefinition definition = config.npcs[i];
-                if (!npc.Alive) continue;
-                if (npc.quest == null)
-                {
-                    news.Add($"The {definition.faction}' homes were braced: no one lost.");
-                    continue;
-                }
-
-                bool wasFull = DistrictStrength(i) == 1f;
-                int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * lossShare));
-                npc.population -= lost;
-                string line = $"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation}).";
-                if (!npc.Alive) line += $" They are wiped out, and {definition.name} is gone. Their district stands empty.";
-                else if (wasFull && DistrictStrength(i) < 1f) line += $" Under half left: their district works at half strength.";
-                news.Add(line);
-                DamageDistrict(i);
-            }
-        }
+                if (npcs[i].Alive) HitFaction(i, strength);
 
         quakeMeter = Mathf.Min(100f, QuakeBaseline);
-        if (GameOver && !Ended)
+        CheckGameOver();
+    }
+
+    // strength x `lossPerQuakePercent` % of the faction's starting people would be hurt; reinforced homes spare their
+    // share of them. Of the hurt (healthy people only), readiness decides how many are killed and how many injured.
+    // Then the quake cracks the reinforcement, and the district loses a building level with a chance of the
+    // unreinforced share.
+    void HitFaction(int i, float strength)
+    {
+        NpcState npc = npcs[i];
+        NpcDefinition definition = config.npcs[i];
+        bool wasFull = DistrictStrength(i) == 1f;
+
+        int unprepared = Mathf.RoundToInt(definition.startPopulation * strength * config.lossPerQuakePercent / 100f);
+        int sparedByHomes = Mathf.RoundToInt(unprepared * npc.reinforced / 100f);
+        int hurt = Mathf.Min(npc.Healthy, unprepared - sparedByHomes);
+        int killed = Mathf.RoundToInt(hurt * Mathf.Lerp(config.killedUnready, config.killedReady, npc.readiness / 100f));
+        int injured = hurt - killed;
+        int sparedByDrills = Mathf.RoundToInt(hurt * config.killedUnready) - killed; // deaths turned into injuries
+
+        npc.population -= killed;
+        npc.injured += injured;
+        if (injured > 0) npc.injuredDeadline = day + config.injuredDays;
+
+        string line = $"The {definition.faction}: {killed} killed, {injured} injured ({npc.population}/{definition.startPopulation} left).";
+        if (sparedByHomes > 0) line += $" Reinforced homes ({npc.reinforced:0}%) spared {sparedByHomes}.";
+        if (sparedByDrills > 0) line += $" Drills turned {sparedByDrills} deaths into injuries.";
+        Report(line + LossNote(i, wasFull));
+
+        float damageChance = 1f - npc.reinforced / 100f;
+        npc.reinforced = Mathf.Max(0f, npc.reinforced - strength * config.reinforceCrack);
+        if (npc.Alive && Random.value < damageChance) DamageDistrict(i);
+    }
+
+    // Every day after a quake: the Infirmary treats some of the injured for free, then the supplies treat the rest
+    // (1 each), faction by faction. Treated people are healthy again; those still untreated on their deadline die.
+    void CareForInjured()
+    {
+        int infirmary = Mathf.RoundToInt(BuildingBonus(BuildingEffect.TreatInjured));
+        for (int i = 0; i < npcs.Length; i++)
         {
-            news.Add("Every faction is gone. The town has fallen.");
-            EndGame(false, "The earthquakes wiped out every faction.");
+            NpcState npc = npcs[i];
+            NpcDefinition definition = config.npcs[i];
+            if (!npc.Alive || npc.injured == 0) continue;
+            if (reportTitle == null) reportTitle = $"AFTERMATH: DAY {day}";
+
+            int byInfirmary = Mathf.Min(npc.injured, infirmary);
+            infirmary -= byInfirmary;
+            int bySupplies = Mathf.Min(npc.injured - byInfirmary, supplies);
+            supplies -= bySupplies;
+            npc.injured -= byInfirmary + bySupplies;
+            if (byInfirmary + bySupplies > 0)
+            {
+                string how = byInfirmary == 0 ? $"{bySupplies} supplies used" :
+                    bySupplies == 0 ? "by the Infirmary" : $"{byInfirmary} by the Infirmary, {bySupplies} with supplies";
+                Report($"{byInfirmary + bySupplies} injured {definition.faction} were treated ({how}).");
+            }
+
+            if (npc.injured == 0) continue;
+            if (day >= npc.injuredDeadline)
+            {
+                bool wasFull = DistrictStrength(i) == 1f;
+                int died = npc.injured;
+                npc.population -= died;
+                npc.injured = 0;
+                Report($"{died} injured {definition.faction} died without treatment ({npc.population}/{definition.startPopulation} left)." +
+                       LossNote(i, wasFull));
+            }
+            else
+            {
+                Report($"{npc.injured} injured {definition.faction} still need supplies: without them they die on day {npc.injuredDeadline}.");
+            }
         }
+        CheckGameOver();
+    }
+
+    // After a faction lost people: wiped out, or newly under half.
+    string LossNote(int i, bool wasFull)
+    {
+        if (!npcs[i].Alive) return $" They are wiped out, and {config.npcs[i].name} is gone. Their district stands empty.";
+        return wasFull && DistrictStrength(i) < 1f ? " Under half left: their district works at half strength." : "";
+    }
+
+    void CheckGameOver()
+    {
+        if (!GameOver || Ended) return;
+        news.Add("Every faction is gone. The town has fallen.");
+        EndGame(false, "The earthquakes wiped out every faction.");
     }
 
     // A random built building in this leader's district loses a level.
@@ -265,7 +428,7 @@ public class Campaign
         news.Add($"The quake damaged the {config.buildings[hit].name} (level {buildingLevels[hit]}).");
     }
 
-    // Request day: unfinished requests fail (no gold, homes unbraced), then every leader left asks for something new.
+    // Request day: unfinished requests fail (no gold), then every leader left asks for something new.
     void RefreshQuests()
     {
         for (int i = 0; i < npcs.Length; i++)
@@ -311,21 +474,23 @@ public class Campaign
         return true;
     }
 
-    // A finished request pays gold and braces the faction's homes; the first one also unlocks the leader's weapon.
+    // A finished request pays gold; the first one also unlocks the leader's weapon evolution.
     void CompleteQuest(int npcIndex)
     {
         NpcState npc = npcs[npcIndex];
         NpcDefinition definition = config.npcs[npcIndex];
         npc.quest = null;
         gold += config.questGold;
-        news.Add($"{definition.name}'s request is done! They pay you {config.questGold} gold, and the {definition.faction}' homes are braced.");
+        news.Add($"{definition.name}'s request is done! They pay you {config.questGold} gold.");
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
-        if (definition.unlocksWeapon && !weaponUnlocked[(int)definition.weapon])
+        if (definition.unlocksEvolution && !evolutionUnlocked[(int)definition.weapon])
         {
-            weaponUnlocked[(int)definition.weapon] = true;
-            news.Add($"{definition.name} gives you the {Weapon.Names[(int)definition.weapon]}! It can now show up on level-up cards in the dungeon.");
+            evolutionUnlocked[(int)definition.weapon] = true;
+            int w = (int)definition.weapon;
+            news.Add($"{definition.name} teaches you {Weapon.EvolutionNames[w]}! Once your {Weapon.Names[w]} reaches " +
+                     $"Lv {Weapon.MaxLevel} in a dive, it can evolve.");
         }
     }
 
@@ -377,12 +542,13 @@ public class Campaign
     // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive,
     // relic weapons are added after this by Relics.ResetForNewRun), plus the stat buildings of every district
     // (half strength under half, none if wiped out). Call after Player.ResetForNewRun.
-    // The other building effects (XP, materials, healing) are read by the arena; the quake ones are used here.
+    // XP and materials are read by the arena; the quake, reinforcing and injured ones are used here.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
         foreach (Weapon weapon in weapons)
         {
             weapon.level = 1;
+            weapon.evolved = false;
             weapon.enabled = weapon.id == WeaponId.Sword;
         }
 

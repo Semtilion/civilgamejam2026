@@ -5,7 +5,7 @@ using UnityEngine.UI;
 // Test keys, only in the editor and in Development builds (never in the build you submit):
 //   F1  dungeon: a list of every relic; click one to get it (works right away, owned for good)
 //   F2  dungeon: level up once
-//   F3  town or dungeon: +200 gold, +100 materials, +10 crystals (the town's stock)
+//   F3  town or dungeon: +200 gold, +100 materials, +10 crystals, +50 supplies (the town's stock)
 //   F4  dungeon: the depth's kill goal is met (teleporter, or the boss on a boss depth)
 // A small hint in the corner lists the keys and the last one used.
 public class DebugKeys : MonoBehaviour
@@ -13,6 +13,7 @@ public class DebugKeys : MonoBehaviour
     const int Gold = 200;
     const int Materials = 100;
     const int Crystals = 10;
+    const int Supplies = 50;
     const string Keys = "DEBUG  F1 relics  F2 level up  F3 resources  F4 clear depth";
 
     [Header("Scene references (one of these)")]
@@ -80,8 +81,9 @@ public class DebugKeys : MonoBehaviour
         campaign.gold += Gold;
         campaign.materials += Materials;
         campaign.crystals += Crystals;
+        campaign.supplies += Supplies;
         if (town != null) town.Refresh();
-        Report($"+{Gold} gold, +{Materials} materials, +{Crystals} crystals (town stock)");
+        Report($"+{Gold} gold, +{Materials} materials, +{Crystals} crystals, +{Supplies} supplies (town stock)");
     }
 
     // Pauses the game while the list is open.

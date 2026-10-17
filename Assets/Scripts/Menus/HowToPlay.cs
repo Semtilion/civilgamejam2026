@@ -12,6 +12,7 @@ public class HowToPlay : MonoBehaviour
         "Loot and dangers",
         "The town",
         "Earthquakes",
+        "Be prepared",
     };
 
     static readonly string[] Pages =
@@ -26,26 +27,35 @@ public class HowToPlay : MonoBehaviour
         "On every depth, kill the number of enemies shown at the top. Then a teleporter opens (follow the arrow): " +
         "step in to go deeper or to return to town.\n\n" +
         "Every 5th depth a boss appears. Bosses drop relics: rare, permanent finds.\n\n" +
-        "Pick up XP gems to level up, then choose a card with the mouse or 1 / 2 / 3. Cards only last for the current " +
-        "dive. Esc pauses.",
+        "Pick up XP gems to level up, then choose a card with the mouse or 1 / 2 / 3: a new weapon, a weapon level or " +
+        "a small boost. Cards only last for the current dive. Esc pauses.\n\n" +
+        "A weapon at Lv 5 can evolve (gold card, up to 3 per dive): the Sword from the start, the others once their " +
+        "leader teaches you.",
 
-        "Break crates for materials and crystal clusters for crystals. Enemies drop materials and gold.\n\n" +
+        "Break crates for materials and supplies, and crystal clusters for crystals. Enemies drop materials and gold.\n\n" +
         "Stand next to an ore vein to destroy it: it weakens the next earthquake, but the cave trembles and it may set " +
         "off a trap (an ambush or falling rocks).\n\n" +
-        "Stand next to a shrine for 5 seconds for XP, materials or crystals.\n\n" +
         "Every dive takes a day. If you die, everything found on that dive is lost.",
 
-        "Each leader has a faction, a request and a district.\n\n" +
-        "Finish a request (kill enemies, or bring materials) to earn gold and to brace that faction's homes against the " +
-        "next earthquake. A leader's first finished request also gives you a new weapon, which can then show up on " +
-        "level-up cards.\n\n" +
-        "Spend materials, gold and crystals on district buildings: permanent upgrades for every dive.",
+        "Each leader has a faction, a request, a daily order and a district. Click a leader to see them.\n\n" +
+        "Finish a request (kill enemies, or bring materials) for gold. A leader's first finished request also teaches " +
+        "you their weapon's evolution: the Guard's Spear, the Elder's Dagger, the Shaman's Crystal Orbit.\n\n" +
+        "Spend materials, gold and crystals on district buildings: permanent upgrades. Under half its people, a " +
+        "faction's district works at half strength; at 0, the faction is gone.",
 
         "Earthquakes hit on days 4, 7, 10 and 13. The quake meter rises every day; the top bar shows how strong the next " +
-        "one will be.\n\n" +
-        "From 40%, a quake costs every faction that isn't braced some of its people and a building level. People never " +
-        "come back: under half, a district works at half strength; at 0, the faction is gone.\n\n" +
-        "Destroy ore veins to lower the meter, and build Ley Stones and Stone Foundations to keep it down.",
+        "one will be. Destroy ore veins in the dungeon to weaken it, and build Ley Stones to slow it down.\n\n" +
+        "From 40%, a quake hurts every faction: some people are killed, some injured. People never come back.\n\n" +
+        "The injured can't work. Supplies treat them (one each, automatically); anyone still untreated 2 days after " +
+        "the quake dies. A report shows what happened when you get back.",
+
+        "Every faction does one order a day until you change it (in its leader's window):\n" +
+        "  •  Reinforce homes (5 materials): reinforced homes spare people when a quake hits. Quakes crack them.\n" +
+        "  •  Stockpile supplies: to treat the injured after a quake.\n" +
+        "  •  Drill: drilled people are hurt instead of killed. It fades if they stop.\n" +
+        "  •  Work: gold, crystals or materials.\n\n" +
+        "You can't do everything at once: decide who prepares, and how, before each quake. Today's orders count for " +
+        "tomorrow's quake.",
     };
 
     [Header("Scene references")]

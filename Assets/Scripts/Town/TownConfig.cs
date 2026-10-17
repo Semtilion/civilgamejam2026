@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [System.Serializable]
 public class NpcDefinition
@@ -9,8 +10,8 @@ public class NpcDefinition
     [Tooltip("The faction's people at the start. Lost people never come back: below half = their district works at half " +
              "strength, 0 = wiped out (the district stops).")]
     public int startPopulation = 100;
-    [Tooltip("Their first completed request unlocks this weapon (it can then appear on level-up cards in the dungeon).")]
-    public bool unlocksWeapon;
+    [Tooltip("Their first completed request unlocks this weapon's evolution (a card once it reaches Lv 5 in a dive).")]
+    [FormerlySerializedAs("unlocksWeapon")] public bool unlocksEvolution;
     public WeaponId weapon;
     [Tooltip("Their bust in the leader window. Jam > Build Game Scenes fills in Assets/Art/NPCs/Portrait_<name>.png when empty.")]
     public Sprite portrait;
@@ -18,10 +19,15 @@ public class NpcDefinition
     public string greeting;
     [Tooltip("What they say after you buy a building level in their district or finish their materials request.")]
     public string thanks;
+    [Tooltip("What a day of the Work order makes at full health (scaled by the faction's healthy share, rounded up).")]
+    public int workGold, workMaterials, workCrystals;
 }
 
+// A faction's job for the day (TownConfig > Preparedness has the numbers). It stays until changed.
+public enum TownOrder { Work, Reinforce, Stockpile, Drill }
+
 // What a district building does per level (see Building.amountPerLevel for the units).
-public enum BuildingEffect { Stat, QuakePassive, QuakeStart, XpGain, MaterialBonus, DepthHeal }
+public enum BuildingEffect { Stat, QuakePassive, ReinforceBonus, XpGain, MaterialBonus, TreatInjured }
 
 [System.Serializable]
 public class Building
@@ -32,8 +38,9 @@ public class Building
     public BuildingEffect effect;
     [Tooltip("Stat buildings only.")]
     public StatType stat;
-    [Tooltip("Per level. Stat: Player.AddStat units (Max HP flat, the rest 0.05 = +5%). QuakePassive / QuakeStart: " +
-             "% points. XpGain / DepthHeal: a share (0.15 = 15%). MaterialBonus: materials added to every drop.")]
+    [Tooltip("Per level. Stat: Player.AddStat units (Max HP flat, the rest 0.05 = +5%). QuakePassive / ReinforceBonus: " +
+             "% points. XpGain: a share (0.15 = 15%). MaterialBonus: materials added to every drop. TreatInjured: injured " +
+             "people treated per day without supplies.")]
     public float amountPerLevel;
     [Tooltip("Also costs crystals (the Shaman's district).")]
     public bool costsCrystals;
@@ -45,10 +52,10 @@ public class Building
         {
             case BuildingEffect.Stat: return Player.StatText(stat, amount);
             case BuildingEffect.QuakePassive: return $"-{amount:0.#}% quake rise/day";
-            case BuildingEffect.QuakeStart: return $"quake resets {amount:0.#}% lower";
+            case BuildingEffect.ReinforceBonus: return $"+{amount:0.#}% per Reinforce day";
             case BuildingEffect.XpGain: return $"+{amount * 100f:0}% XP";
             case BuildingEffect.MaterialBonus: return $"+{amount:0.#} material per drop";
-            default: return $"heal {amount * 100f:0}% HP per depth"; // DepthHeal
+            default: return $"treats {amount:0.#} injured a day"; // TreatInjured
         }
     }
 }
@@ -90,9 +97,9 @@ public class TownConfig : ScriptableObject
         new Building { name = "Ley Stones", district = 1, effect = BuildingEffect.QuakePassive, amountPerLevel = 1f, costsCrystals = true },
         new Building { name = "Scrying Pool", district = 1, effect = BuildingEffect.XpGain, amountPerLevel = 0.15f, costsCrystals = true },
         new Building { name = "Crystal Altar", district = 1, effect = BuildingEffect.Stat, stat = StatType.Area, amountPerLevel = 0.1f, costsCrystals = true },
-        new Building { name = "Stone Foundations", district = 2, effect = BuildingEffect.QuakeStart, amountPerLevel = 5f },
+        new Building { name = "Stone Foundations", district = 2, effect = BuildingEffect.ReinforceBonus, amountPerLevel = 5f },
         new Building { name = "Workshop", district = 2, effect = BuildingEffect.MaterialBonus, amountPerLevel = 1f },
-        new Building { name = "Infirmary", district = 2, effect = BuildingEffect.DepthHeal, amountPerLevel = 0.2f },
+        new Building { name = "Infirmary", district = 2, effect = BuildingEffect.TreatInjured, amountPerLevel = 4f },
     };
     public int maxBuildingLevel = 3;
     [Tooltip("Level N of a building costs N x these (crystals only for buildings that cost crystals).")]
@@ -117,8 +124,30 @@ public class TownConfig : ScriptableObject
     public float orePercent = 4f;
     [Tooltip("Quakes weaker than this cost no one.")]
     public float quakeHarmAt = 40f;
-    [Tooltip("Share of an unbraced faction's starting people lost per 1% of quake strength (0.2: a 75% quake costs 15%).")]
+    [Tooltip("Share of a faction's starting people hurt per 1% of quake strength, before its preparation (0.2: a 75% " +
+             "quake hurts 15%).")]
     public float lossPerQuakePercent = 0.2f;
+
+    [Header("Preparedness (daily orders, at full health; scaled by the faction's healthy share)")]
+    [Tooltip("Reinforce: homes reinforced gained per day (% points). A quake's casualties x (1 - reinforced).")]
+    public float reinforcePerDay = 15f;
+    [Tooltip("Materials a Reinforce day costs. Can't pay: that faction idles.")]
+    public int reinforceMaterials = 5;
+    [Tooltip("Each quake cracks reinforcement by this share of its strength (0.5: a 75% quake takes 37 points off).")]
+    public float reinforceCrack = 0.5f;
+    [Tooltip("Stockpile: supplies gained per day, as a share of the faction's starting people (0.1: Peasants 200 -> 20).")]
+    public float stockpileShare = 0.1f;
+    [Tooltip("Drill: readiness gained per day (% points).")]
+    public float drillPerDay = 35f;
+    [Tooltip("Readiness lost every day (% points): people forget.")]
+    public float readinessFade = 10f;
+    [Tooltip("Share of a quake's casualties killed at 0% readiness (the rest are injured).")]
+    [Range(0f, 1f)] public float killedUnready = 0.7f;
+    [Tooltip("Share of a quake's casualties killed at 100% readiness.")]
+    [Range(0f, 1f)] public float killedReady = 0.2f;
+    [Tooltip("The injured are treated from the supplies (1 each) right after the quake and every day after; those still " +
+             "untreated this many days after the quake die.")]
+    public int injuredDays = 2;
 
     public Quest NewQuest()
     {

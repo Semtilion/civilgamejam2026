@@ -26,7 +26,7 @@ public class MineSpot : MonoBehaviour
     {
         GameObject go = new GameObject(kind == SpotKind.Ore ? "Ore Vein" : kind.ToString());
         go.transform.position = position;
-        NewPart("Rock", go.transform, sprite, Vector2.zero, Vector2.one * scale, color, -1);
+        NewPart("Rock", go.transform, sprite, Vector2.zero, Vector2.one * scale, color, -1).gameObject.AddComponent<SpriteOutline>();
         // Ores smoulder red (they feed the quake); shrines glow in their own color.
         Glow.Add(go, kind == SpotKind.Ore ? new Color(1f, 0.4f, 0.25f) : color, 3.5f, 1f);
 

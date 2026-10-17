@@ -21,6 +21,9 @@ MonoBehaviour:
     portrait: {fileID: 21300000, guid: 8b267f7ab18c4724db375f46cd377dd1, type: 3}
     greeting: Steel holds. Stone doesn't.
     thanks: "Good. My soldiers will put it to use."
+    workGold: 20
+    workMaterials: 0
+    workCrystals: 0
   - name: Shaman
     faction: Mages
     startPopulation: 50
@@ -29,6 +32,9 @@ MonoBehaviour:
     portrait: {fileID: 21300000, guid: e84a8475e799acb4dacbfdb9201464ab, type: 3}
     greeting: The crystals sing louder every day. Every vein you break, the island hears it.
     thanks: "The crystals approve. So do I."
+    workGold: 10
+    workMaterials: 0
+    workCrystals: 1
   - name: Elder
     faction: Peasants
     startPopulation: 200
@@ -37,6 +43,9 @@ MonoBehaviour:
     portrait: {fileID: 21300000, guid: 8bfd9def369a90c46bedce41a68f0bf8, type: 3}
     greeting: My old bones feel the quakes before the ground does. Build us something that stands.
     thanks: "Bless you. That will hold a while longer."
+    workGold: 0
+    workMaterials: 8
+    workCrystals: 0
   halfHelpBelow: 0.5
   questInterval: 3
   questGold: 50
@@ -102,7 +111,7 @@ MonoBehaviour:
     district: 2
     effect: 5
     stat: 0
-    amountPerLevel: 0.2
+    amountPerLevel: 4
     costsCrystals: 0
   maxBuildingLevel: 3
   materialsPerLevel: 10
@@ -117,3 +126,12 @@ MonoBehaviour:
   orePercent: 4
   quakeHarmAt: 40
   lossPerQuakePercent: 0.2
+  reinforcePerDay: 15
+  reinforceMaterials: 5
+  reinforceCrack: 0.5
+  stockpileShare: 0.1
+  drillPerDay: 35
+  readinessFade: 10
+  killedUnready: 0.7
+  killedReady: 0.2
+  injuredDays: 2

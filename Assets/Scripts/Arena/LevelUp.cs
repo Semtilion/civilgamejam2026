@@ -4,8 +4,10 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 // In-dive leveling (on by default, resets every dive): XP gems -> level up -> pause and pick 1 of 3 random cards,
-// by clicking or pressing 1 / 2 / 3. Cards: a weapon the town has unlocked (arrives at Lv 1), a level-up for a weapon
-// you have (damage, plus its bonus at Lv 3 and 5), or a small stat boost.
+// by clicking or pressing 1 / 2 / 3. Cards: a new weapon (Sword, Dagger, Spear or Crystal Orbit; arrives at Lv 1), a
+// level-up for a weapon you have (damage, plus its bonus at Lv 3 and 5), a small stat boost, or, for a Lv 5 weapon
+// whose evolution the town has unlocked, its evolution (gold title; always one of the 3 when there is one; at most
+// maxEvolutions per dive).
 public class LevelUp : MonoBehaviour
 {
     // Stat cards: what each one raises and by how much per pick (units as in Player.AddStat).
@@ -21,10 +23,14 @@ public class LevelUp : MonoBehaviour
         public string title;
         public string description;
         public System.Action apply;
+        public bool evolution;
     }
 
     [Tooltip("XP gems and level-up cards during dives. Off = the Sword only, all other power from the town.")]
     public bool levelingEnabled = true;
+
+    [Tooltip("Evolutions per dive (a relic or boost could raise this later).")]
+    public int maxEvolutions = 3;
 
     [Header("XP needed for the next level = xpBase + xpPerLevel x current level")]
     public int xpBase = 5;
@@ -51,14 +57,17 @@ public class LevelUp : MonoBehaviour
     int pendingPicks;
     readonly int[] statRanks = new int[CardStats.Length];
     readonly List<Card> shownCards = new List<Card>();
-    bool[] unlockedWeapons = new bool[0]; // by WeaponId, from the town
+    bool[] evolutionUnlocked = new bool[0]; // by WeaponId, from the town
+    int evolutionsTaken;
 
     int XpToNext => xpBase + xpPerLevel * level;
 
-    // Level 1, no XP, no stat cards. `unlocked` = the weapons the town has unlocked (Campaign.weaponUnlocked).
-    public void ResetForNewRun(bool[] unlocked)
+    // Level 1, no XP, no stat cards, no evolutions. `evolutions` = the ones the town has unlocked
+    // (Campaign.evolutionUnlocked).
+    public void ResetForNewRun(bool[] evolutions)
     {
-        unlockedWeapons = unlocked;
+        evolutionUnlocked = evolutions;
+        evolutionsTaken = 0;
         level = 1;
         xp = 0;
         pendingPicks = 0;
@@ -144,6 +153,8 @@ public class LevelUp : MonoBehaviour
             return;
         }
         Shuffle(cards);
+        int evolution = cards.FindIndex(c => c.evolution); // an evolution always gets the first slot
+        if (evolution > 0) (cards[0], cards[evolution]) = (cards[evolution], cards[0]);
 
         shownCards.Clear();
         Time.timeScale = 0f;
@@ -179,8 +190,7 @@ public class LevelUp : MonoBehaviour
 
         foreach (Weapon weapon in weapons)
         {
-            bool unlocked = (int)weapon.id < unlockedWeapons.Length && unlockedWeapons[(int)weapon.id];
-            if (!weapon.enabled && unlocked)
+            if (!weapon.enabled && !Weapon.IsRelicWeapon(weapon.id)) // relic weapons only come from relics
             {
                 cards.Add(new Card
                 {
@@ -198,6 +208,20 @@ public class LevelUp : MonoBehaviour
                     title = $"{weapon.DisplayName} Lv {next}",
                     description = $"+{weapon.damagePerLevel} damage{bonus}",
                     apply = () => weapon.level++,
+                });
+            }
+            else if (weapon.enabled && CanEvolve(weapon))
+            {
+                cards.Add(new Card
+                {
+                    title = $"<color=#FFCC4D>EVOLVE: {weapon.EvolutionName}</color>",
+                    description = $"{weapon.DisplayName}: {weapon.evolutionText}",
+                    apply = () =>
+                    {
+                        weapon.evolved = true;
+                        evolutionsTaken++;
+                    },
+                    evolution = true,
                 });
             }
         }
@@ -218,6 +242,14 @@ public class LevelUp : MonoBehaviour
             });
         }
         return cards;
+    }
+
+    // At Lv 5, not evolved yet, its evolution unlocked by the town, and this dive's evolutions not used up.
+    bool CanEvolve(Weapon weapon)
+    {
+        int id = (int)weapon.id;
+        return weapon.level >= Weapon.MaxLevel && !weapon.evolved && Weapon.HasEvolution(weapon.id) &&
+               id < evolutionUnlocked.Length && evolutionUnlocked[id] && evolutionsTaken < maxEvolutions;
     }
 
     static void Shuffle(List<Card> cards)

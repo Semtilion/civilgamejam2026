@@ -6,10 +6,11 @@ using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
 // news, one button per faction leader, the relics box, the Dive button, the "?" button, the leader window (portrait,
-// dialogue, district buildings, Give button), the epilogue screen and the How to play popup.
+// dialogue, daily order, district buildings, Give button), the report, the epilogue screen and the How to play popup.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
+    static readonly Color OrderMarkColor = new Color(1f, 0.80f, 0.30f); // gold: the faction's current order
 
     public static void Build(GameAssets a)
     {
@@ -103,20 +104,51 @@ public static class TownSceneBuilder
             .gameObject.AddComponent<UIBurst>();
         purchaseBurst.sprite = a.square;
 
+        // Right side, top to bottom: title, dialogue, the daily order (4 buttons, the current one with a gold bar along
+        // its bottom), the district's buildings, Give.
         Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
         Title(leaderTitle);
-        Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 100), new Vector2(940, 300), 22, TextAnchor.UpperLeft);
+        Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 135), new Vector2(940, 230), 22, TextAnchor.UpperLeft);
         dialogueText.raycastTarget = true; // click to show it all at once
         Typewriter dialogue = dialogueText.gameObject.AddComponent<Typewriter>();
-        RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -130), new Vector2(940, 100), 12);
+        Text ordersCaption = Title(NewText("Orders Caption", window.transform, new Vector2(280, 5), new Vector2(940, 30), 20, TextAnchor.MiddleLeft));
+        ordersCaption.text = "DAILY ORDER (every day until changed)";
+        RectTransform orderRow = NewRow("Orders", window.transform, new Vector2(280, -50), new Vector2(940, 70), 12);
+        int orderCount = System.Enum.GetValues(typeof(TownOrder)).Length;
+        Button[] orderButtons = new Button[orderCount];
+        Image[] orderMarks = new Image[orderCount];
+        for (int i = 0; i < orderCount; i++)
+        {
+            orderButtons[i] = NewButton(((TownOrder)i).ToString(), orderRow, new Vector2(226, 70), 17, useTitleFont: false);
+            orderMarks[i] = NewImage("Current", orderButtons[i].transform, new Vector2(0, -31), new Vector2(206, 5), OrderMarkColor);
+            orderMarks[i].raycastTarget = false;
+        }
+        Text districtCaption = Title(NewText("District Caption", window.transform, new Vector2(280, -105), new Vector2(940, 30), 20, TextAnchor.MiddleLeft));
+        districtCaption.text = "DISTRICT BUILDINGS (permanent)";
+        RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -175), new Vector2(940, 100), 12);
         Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
         for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17, useTitleFont: false);
         Button giveButton = NewButton("Give", window.transform, new Vector2(380, 56), 22);
-        Place(giveButton, new Vector2(280, -250));
+        Place(giveButton, new Vector2(280, -295));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
         Place(close, new Vector2(762, 312));
         AddPopIn(window);
         leaderWindow.gameObject.SetActive(false);
+
+        // The report: what happened to the people while you were away (a quake, the injured). A dark backdrop blocks
+        // the town until Continue (or Esc).
+        Image report = NewImage("Report", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
+        Stretch(report.rectTransform);
+        Image reportWindow = NewPanel("Window", report.transform, Vector2.zero, new Vector2(1400, 760));
+        Text reportHeading = Title(NewText("Title", reportWindow.transform, new Vector2(0, 320), new Vector2(1300, 70), 48, TextAnchor.MiddleCenter));
+        Text reportText = NewText("Body", reportWindow.transform, new Vector2(0, 15), new Vector2(1300, 510), 24, TextAnchor.UpperLeft);
+        reportText.resizeTextForBestFit = true; // a bad quake can mean a long report
+        reportText.resizeTextMinSize = 16;
+        reportText.resizeTextMaxSize = 24;
+        Button reportClose = NewButton("Continue", reportWindow.transform, new Vector2(320, 80), 32);
+        Place(reportClose, new Vector2(0, -315));
+        AddPopIn(reportWindow);
+        report.gameObject.SetActive(false);
 
         // Epilogue: covers everything once the game has ended (draws over the town and blocks its clicks)
         Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.07f, 0.97f));
@@ -166,8 +198,15 @@ public static class TownSceneBuilder
         town.nameplate = nameplate;
         town.leaderTitle = leaderTitle;
         town.dialogue = dialogue;
+        town.orderButtons = orderButtons;
+        town.orderMarks = orderMarks;
         town.buildingButtons = buildingButtons;
         town.giveButton = giveButton;
+        town.aliveOnly = new[] { ordersCaption.gameObject, districtCaption.gameObject };
+        town.reportPanel = report.gameObject;
+        town.reportHeading = reportHeading;
+        town.reportText = reportText;
+        town.reportClose = reportClose;
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);

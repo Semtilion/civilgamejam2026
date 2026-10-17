@@ -1,18 +1,25 @@
 using UnityEngine;
 
-// Every weapon in the game. The town tracks which are unlocked by this id (Campaign.weaponUnlocked).
+// Every weapon in the game. The town tracks which evolutions are unlocked by this id (Campaign.evolutionUnlocked).
 // The last four only come from relics (see Relics).
-public enum WeaponId { Sword, Dagger, Whip, CrystalOrbit, QuakeHammer, LightningStaff, FireBomb, Axe }
+public enum WeaponId { Sword, Dagger, Spear, CrystalOrbit, QuakeHammer, LightningStaff, FireBomb, Axe }
 
 // Base for the hero's auto-firing weapons. All weapons sit on the hero; owned = component enabled.
-// A dive starts with the Sword (plus relic weapons); unlocked weapons and level-ups come from level-up cards and reset
+// A dive starts with the Sword (plus relic weapons); the other weapons and level-ups come from level-up cards and reset
 // every dive. Levels 1-5: every level adds damage, levels 3 and 5 also add the weapon's bonus (BonusCount).
+// After Lv 5, a weapon with an unlocked evolution can evolve (a card; `evolved`), which changes how it works.
 // The hero's damage / attack speed / area multipliers (town buffs, level-up cards, relics) apply to every weapon.
 public abstract class Weapon : MonoBehaviour
 {
     public const int MaxLevel = 5;
     public static readonly string[] Names = // in WeaponId order
-        { "Sword", "Dagger", "Whip", "Crystal Orbit", "Quake Hammer", "Lightning Staff", "Fire Bomb", "Axe" };
+        { "Sword", "Dagger", "Spear", "Crystal Orbit", "Quake Hammer", "Lightning Staff", "Fire Bomb", "Axe" };
+    // Each weapon's evolution, in WeaponId order ("" = none). The town shows them too, so they live here.
+    public static readonly string[] EvolutionNames =
+        { "Twin Strike", "Ricochet", "Impale", "Shatter", "", "", "", "" };
+
+    public static bool IsRelicWeapon(WeaponId id) => id >= WeaponId.QuakeHammer;
+    public static bool HasEvolution(WeaponId id) => EvolutionNames[(int)id] != "";
 
     [Header("Weapon")]
     public WeaponId id;
@@ -20,6 +27,8 @@ public abstract class Weapon : MonoBehaviour
     public string description;
     [Tooltip("Shown on the level-up cards for levels 3 and 5.")]
     public string bonusText;
+    [Tooltip("Shown on its evolution card (what the evolution does).")]
+    public string evolutionText;
     public int baseDamage = 10;
     public int damagePerLevel = 3;
     [Tooltip("Seconds between attacks, before attack speed bonuses.")]
@@ -27,11 +36,13 @@ public abstract class Weapon : MonoBehaviour
 
     [Header("Live (this dive)")]
     [Range(1, MaxLevel)] public int level = 1;
+    public bool evolved;
 
     protected Player player;
     float timer;
 
     public string DisplayName => Names[(int)id];
+    public string EvolutionName => EvolutionNames[(int)id];
     protected int BonusCount => (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
     protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * player.damageMultiplier * player.arena.relics.DamageMultiplier);
 

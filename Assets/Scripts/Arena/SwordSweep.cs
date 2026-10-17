@@ -1,9 +1,10 @@
 using UnityEngine;
 
 // Starting weapon: hits every enemy within the radius around the hero and knocks them back. Bonus: bigger radius.
+// Evolution (Twin Strike, available from the start): a back-swing follows every swing, hitting everything again.
 // The Quake Hammer relic is a second one of these with bigger, slower numbers (set by the scene builder).
-// Look: the sword spins an arc slash once around the hero (from the way he faces); the hammer sends out an expanding
-// shockwave ring and jolts the camera.
+// Look: the sword spins an arc slash once around the hero (from the way he faces; the back-swing turns the other
+// way); the hammer sends out an expanding shockwave ring and jolts the camera.
 public class SwordSweep : Weapon
 {
     public enum SweepStyle { Spin, Shockwave }
@@ -11,6 +12,7 @@ public class SwordSweep : Weapon
     const float SwingTime = 0.18f;    // the slash's full turn / the ring's growth
     const float FlashTime = 0.25f;    // fade
     const float FlashAlpha = 0.8f;
+    const float BackSwingDelay = 0.15f; // Twin Strike
 
     [Header("Sword")]
     public float radius = 2.2f;
@@ -23,10 +25,20 @@ public class SwordSweep : Weapon
 
     float sinceSweep = 99f;
     float startAngle;
+    float turn = -1f;            // -1 = clockwise (the swing), 1 = counter-clockwise (the back-swing)
+    float backSwingIn = -1f;     // Twin Strike: seconds until the back-swing; below 0 = none coming
 
     float Radius => (radius + bonusRadius * BonusCount) * player.areaMultiplier;
 
     protected override bool Attack()
+    {
+        Sweep(-1f);
+        if (evolved) backSwingIn = BackSwingDelay;
+        return true; // always swings, even with nothing around
+    }
+
+    // Hits everything in reach and starts the look (`direction`: -1 clockwise, 1 counter-clockwise).
+    void Sweep(float direction)
     {
         Vector2 center = transform.position;
         float reachBase = Radius;
@@ -38,23 +50,30 @@ public class SwordSweep : Weapon
                 enemy.TakeDamage(Damage, center, knockback);
         }
         sinceSweep = 0f;
+        turn = direction;
         startAngle = player.sprite.flipX ? 180f : 0f; // the slash starts where he faces
         if (style == SweepStyle.Shockwave) player.arena.ShakeCamera(0.15f, 0.15f);
-        return true; // always swings, even with nothing around
     }
 
     protected override void Update()
     {
         base.Update();
+        if (backSwingIn >= 0f && player.arena.IsPlaying)
+        {
+            backSwingIn -= Time.deltaTime;
+            if (backSwingIn < 0f) Sweep(1f);
+        }
         sinceSweep += Time.deltaTime;
         FadeFlash(sweepVisual, sinceSweep, FlashTime, FlashAlpha);
 
         float swing = Mathf.Clamp01(sinceSweep / SwingTime);
         if (style == SweepStyle.Spin)
         {
-            // One fast clockwise turn (the arc sprite's bright end leads).
-            sweepVisual.transform.localScale = Vector3.one * Radius * 2f; // placeholder sprites are 1 unit wide
-            sweepVisual.transform.localRotation = Quaternion.Euler(0f, 0f, startAngle - 360f * swing);
+            // One fast turn with the arc sprite's bright end leading: mirrored (y flipped) for the counter-clockwise
+            // back-swing.
+            float size = Radius * 2f; // placeholder sprites are 1 unit wide
+            sweepVisual.transform.localScale = new Vector3(size, -turn * size, 1f);
+            sweepVisual.transform.localRotation = Quaternion.Euler(0f, 0f, startAngle + turn * 360f * swing);
         }
         else
         {

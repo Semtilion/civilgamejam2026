@@ -13,13 +13,27 @@ MonoBehaviour:
   m_Name: Shard Spitter
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Shard Spitter
-  sprite: {fileID: 21300000, guid: c2d52d951f7131b45b14ba1ff771a34f, type: 3}
-  color: {r: 0.3, g: 0.7, b: 0.7, a: 1}
+  sprite: {fileID: 21300000, guid: d4349bea61d76b042a6f44cdab36d3a8, type: 3}
+  color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.4
   maxHp: 20
   moveSpeed: 2.2
   contactDamage: 5
   behavior: 1
+  xp: 2
+  materialChance: 0.15
+  materialAmount: 1
+  crystalAmount: 0
+  goldChance: 0.15
+  goldAmount: 3
+  flower: {fileID: 21300000, guid: a1a26fe28c1f3db43a37435d66e39d02, type: 3}
+  shotAngles:
+  - 13
+  - 79
+  - 148
+  - 216
+  - 305
+  projectileSprite: {fileID: 21300000, guid: 81b151a05621a3140be6625e76b91bf8, type: 3}
   fireRange: 10
   fireWarning: 0.5
   fireInterval: 2.5
@@ -29,8 +43,3 @@ MonoBehaviour:
   chargeWindup: 0.8
   chargeSpeed: 12
   chargeDuration: 0.6
-  xp: 2
-  materialChance: 0.15
-  materialAmount: 1
-  goldChance: 0.15
-  goldAmount: 3

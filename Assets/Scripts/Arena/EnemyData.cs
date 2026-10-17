@@ -33,6 +33,8 @@ public class EnemyData : ScriptableObject
     public int materialAmount = 1;
     [Tooltip("Crystals dropped when a Crate-type enemy (e.g. a crystal cluster) is broken.")]
     public int crystalAmount;
+    [Tooltip("Supplies (for the town's injured) dropped when a Crate-type enemy (e.g. a supply crate) is broken.")]
+    public int supplyAmount;
     [Tooltip("Chance (0-1) to drop gold coins on death (crates never do).")]
     [Range(0f, 1f)] public float goldChance;
     public int goldAmount;

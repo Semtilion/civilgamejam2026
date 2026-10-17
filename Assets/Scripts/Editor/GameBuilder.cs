@@ -36,6 +36,8 @@ public static class GameBuilder
     const string PropsFolder = "Assets/Art/Props";
     const string NpcFolder = "Assets/Art/NPCs";
     const string EnemyArtFolder = "Assets/Art/Enemies";
+    const string OrePath = "Assets/Art/Dungeon/Ore.png";
+    const float OreHeight = 1.8f; // world units (the whole image, a few px of padding included)
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     // The Spitter's stem and flower share one canvas centered on the flower's core (its hit center). 210 px = 1 unit,
     // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
@@ -133,7 +135,7 @@ public static class GameBuilder
         a.spitter  = EnemyAsset("Shard Spitter",    EnemyBehavior.Shooter, new Color(0.30f, 0.70f, 0.70f), 0.4f,   20, 2.2f,  5,   2, 0.15f,  1, a.circle, goldChance: 0.15f, gold: 3);
         a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle, goldChance: 1f, gold: 50);
         a.force    = EnemyAsset("The Force",        EnemyBehavior.Boss,    new Color(0.45f, 0.10f, 0.55f), 2.2f,  800, 1.8f, 30,   0, 0f,     0, a.circle);
-        a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square);
+        a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square, supplies: 1);
         a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
 
         // Real crate art (from the tileset) replaces the brown placeholder square on the existing asset.
@@ -261,11 +263,25 @@ public static class GameBuilder
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
-    // A piece of enemy art (Assets/Art/Enemies/<name>.png): smooth, no mipmaps, center pivot, `pixelsPerUnit` px = 1 unit
-    // before the enemy's size scales it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
-    static Sprite EnemySprite(string name, float pixelsPerUnit)
+    // A piece of enemy art (Assets/Art/Enemies/<name>.png), `pixelsPerUnit` px = 1 unit before the enemy's size scales
+    // it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
+    static Sprite EnemySprite(string name, float pixelsPerUnit) => PaintedSprite($"{EnemyArtFolder}/{name}.png", pixelsPerUnit);
+
+    // The artist's ore vein (Assets/Art/Dungeon/Ore.png), OreHeight units tall. Returns null if the file isn't there.
+    public static Sprite OreSprite()
     {
-        string path = $"{EnemyArtFolder}/{name}.png";
+        if (!File.Exists(OrePath)) return null;
+        AssetDatabase.ImportAsset(OrePath); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(OrePath) as TextureImporter;
+        if (importer == null) return null;
+        importer.GetSourceTextureWidthAndHeight(out int width, out int height);
+        return PaintedSprite(OrePath, height / OreHeight);
+    }
+
+    // Painted art (not pixel art): smooth, no mipmaps, center pivot, `pixelsPerUnit` px = 1 unit.
+    // Returns null if the file isn't there.
+    static Sprite PaintedSprite(string path, float pixelsPerUnit)
+    {
         if (!File.Exists(path)) return null;
         AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
         TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -397,7 +413,7 @@ public static class GameBuilder
 
     static EnemyData EnemyAsset(string name, EnemyBehavior behavior, Color color, float radius, int hp, float speed,
         int contactDamage, int xp, float materialChance, int materialAmount, Sprite sprite, int crystals = 0,
-        float goldChance = 0f, int gold = 0)
+        float goldChance = 0f, int gold = 0, int supplies = 0)
     {
         string path = $"{EnemiesFolder}/{name}.asset";
         EnemyData enemy = AssetDatabase.LoadAssetAtPath<EnemyData>(path);
@@ -415,6 +431,7 @@ public static class GameBuilder
         enemy.materialChance = materialChance;
         enemy.materialAmount = materialAmount;
         enemy.crystalAmount = crystals;
+        enemy.supplyAmount = supplies;
         enemy.goldChance = goldChance;
         enemy.goldAmount = gold;
         enemy.sprite = sprite;
@@ -437,15 +454,15 @@ public static class GameBuilder
         config = ScriptableObject.CreateInstance<TownConfig>();
         config.npcs = new[]
         {
-            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksWeapon = true, weapon = WeaponId.Whip,
+            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksEvolution = true, weapon = WeaponId.Spear,
                                 greeting = "Steel holds. Stone doesn't.",
-                                thanks = "Good. My soldiers will put it to use." },
-            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksWeapon = true, weapon = WeaponId.CrystalOrbit,
+                                thanks = "Good. My soldiers will put it to use.", workGold = 20 },
+            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksEvolution = true, weapon = WeaponId.CrystalOrbit,
                                 greeting = "The crystals sing louder every day. Every vein you break, the island hears it.",
-                                thanks = "The crystals approve. So do I." },
-            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksWeapon = true, weapon = WeaponId.Dagger,
+                                thanks = "The crystals approve. So do I.", workGold = 10, workCrystals = 1 },
+            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksEvolution = true, weapon = WeaponId.Dagger,
                                 greeting = "My old bones feel the quakes before the ground does. Build us something that stands.",
-                                thanks = "Bless you. That will hold a while longer." },
+                                thanks = "Bless you. That will hold a while longer.", workMaterials = 8 },
         }; // their district buildings are TownConfig.buildings (code defaults); portraits are filled in by EnsureAssets
         config.killQuests = new[]
         {

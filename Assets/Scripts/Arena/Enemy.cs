@@ -40,6 +40,7 @@ public class Enemy : MonoBehaviour
     SpriteRenderer sprite;
     SpriteRenderer flower; // a Spitter's flower (null without the art; `sprite` is then the whole enemy, else its stem)
     float stunTimer, fireTimer, flashTimer, stateTimer;
+    float pinTimer; // the Spear's Impale: held in place
     float slowTimer, slowPace = 1f; // Frost Shard: moves and attacks at slowPace speed while slowTimer runs
     float delta;                    // this frame's time for moving and attacking (slowed while chilled)
     Vector2 knockbackVelocity;
@@ -61,6 +62,7 @@ public class Enemy : MonoBehaviour
         renderer.sprite = data.sprite;
         renderer.color = data.color;
         renderer.sortingOrder = 1;
+        go.AddComponent<SpriteOutline>();
 
         Enemy enemy = go.AddComponent<Enemy>();
         enemy.Init(data, statScale, player, arena);
@@ -80,6 +82,7 @@ public class Enemy : MonoBehaviour
             flower.transform.localPosition = new Vector3(0f, 0f, FlowerDepth);
             flower.sprite = data.flower;
             flower.sortingOrder = sprite.sortingOrder;
+            flower.gameObject.AddComponent<SpriteOutline>(); // drawn over the stem (between it and the flower)
         }
 
         maxHp = Mathf.RoundToInt(data.maxHp * statScale);
@@ -196,7 +199,12 @@ public class Enemy : MonoBehaviour
         Vector2 position = transform.position;
         Vector2 target = player.transform.position;
 
-        if (stunTimer > 0f)
+        if (pinTimer > 0f)
+        {
+            pinTimer -= delta; // impaled: stays put, and knockback from hits meanwhile is dropped
+            stunTimer = 0f;
+        }
+        else if (stunTimer > 0f)
         {
             stunTimer -= delta; // sliding from knockback
             position += knockbackVelocity * delta;
@@ -311,5 +319,12 @@ public class Enemy : MonoBehaviour
     {
         slowTimer = duration;
         slowPace = 1f - amount;
+    }
+
+    // The Spear's Impale: a walking enemy (not a boss) can't move at all for `duration` seconds, not even when knocked back.
+    public void Pin(float duration)
+    {
+        if (IsDead || data.behavior != EnemyBehavior.Chaser) return;
+        pinTimer = Mathf.Max(pinTimer, duration);
     }
 }

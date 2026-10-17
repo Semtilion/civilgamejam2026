@@ -7,7 +7,8 @@ using UnityEngine.UI;
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, the relics you own,
 // a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on the horde day).
 // Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
-// their district's buildings and the Give button below (closes with X, Esc or a click outside). State lives in
+// their daily order, their district's buildings and the Give button below (closes with X, Esc or a click outside).
+// Coming back after a quake (or while the injured wait for care) shows the report first. State lives in
 // Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen (New game / Title screen).
 public class TownManager : MonoBehaviour
 {
@@ -46,9 +47,20 @@ public class TownManager : MonoBehaviour
     public Text nameplate;
     public Text leaderTitle;
     public Typewriter dialogue;
+    [Tooltip("One button per order, in TownOrder order (Work, Reinforce, Stockpile, Drill).")]
+    public Button[] orderButtons;
+    [Tooltip("The gold bar on each order button (same order): shown on the faction's current order.")]
+    public Image[] orderMarks;
     [Tooltip("One button per building in the leader's district.")]
     public Button[] buildingButtons;
     public Button giveButton;
+    [Tooltip("Hidden when the faction is wiped out (the section captions).")]
+    public GameObject[] aliveOnly;
+    [Header("Report (what happened to the people while you were away)")]
+    public GameObject reportPanel;
+    public Text reportHeading;
+    public Text reportText;
+    public Button reportClose;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
@@ -83,6 +95,16 @@ public class TownManager : MonoBehaviour
         backdrop.onClick.AddListener(CloseLeader);
         closeButton.onClick.AddListener(CloseLeader);
         giveButton.onClick.AddListener(() => { if (campaign.GiveMaterials(selected)) Thank(); });
+        for (int i = 0; i < orderButtons.Length; i++)
+        {
+            TownOrder order = (TownOrder)i; // copy for the lambda
+            orderButtons[i].onClick.AddListener(() =>
+            {
+                campaign.npcs[selected].order = order;
+                Refresh();
+            });
+        }
+        reportClose.onClick.AddListener(() => reportPanel.SetActive(false));
         for (int i = 0; i < buildingButtons.Length; i++)
         {
             int slot = i; // copy for the lambda
@@ -108,6 +130,20 @@ public class TownManager : MonoBehaviour
             campaign.quakeSinceTown = false;
             quakeShake.Play(0.9f, 24f);
         }
+        ShowReport();
+    }
+
+    // What happened to the people while you were away (the epilogue covers it if the game has ended), shown once.
+    void ShowReport()
+    {
+        if (campaign.report.Count > 0 && !campaign.Ended)
+        {
+            reportHeading.text = campaign.reportTitle;
+            reportText.text = string.Join("\n", campaign.report);
+            reportPanel.SetActive(true);
+        }
+        campaign.report.Clear();
+        campaign.reportTitle = null;
     }
 
     void Update()
@@ -115,7 +151,9 @@ public class TownManager : MonoBehaviour
         statusText.text = StatusLine(Time.unscaledDeltaTime); // the counters roll
 
         Keyboard keyboard = Keyboard.current;
-        if (LeaderOpen && !howToPlay.IsOpen && keyboard != null && keyboard.escapeKey.wasPressedThisFrame) CloseLeader();
+        if (howToPlay.IsOpen || keyboard == null || !keyboard.escapeKey.wasPressedThisFrame) return;
+        if (reportPanel.activeSelf) reportPanel.SetActive(false);
+        else if (LeaderOpen) CloseLeader();
     }
 
     bool LeaderOpen => leaderWindow.activeSelf;
@@ -157,7 +195,7 @@ public class TownManager : MonoBehaviour
     {
         return $"Day {campaign.day}    Materials {materialsShown.Next(campaign.materials, deltaTime)}    " +
                $"Crystals {crystalsShown.Next(campaign.crystals, deltaTime)}    Gold {goldShown.Next(campaign.gold, deltaTime)}    " +
-               $"Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
+               $"Supplies {campaign.supplies}    Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
     }
 
     // Redraws everything from Campaign.Current (also called by the debug keys).
@@ -204,7 +242,7 @@ public class TownManager : MonoBehaviour
     {
         int quakeDay = campaign.NextQuakeDay;
         if (quakeDay > 0)
-            return $"Next quake: day {quakeDay}, {campaign.QuakeForecast:0}% if no more ores are mined (harmful from {config.quakeHarmAt:0}%)";
+            return $"Next quake: day {quakeDay} at {campaign.QuakeForecast:0}% (harmful from {config.quakeHarmAt:0}%)";
         return campaign.day <= config.hordeDay ? $"Horde on day {config.hordeDay}" : "";
     }
 
@@ -234,8 +272,10 @@ public class TownManager : MonoBehaviour
         if (!npc.Alive) return $"{definition.name}\n{definition.faction}: WIPED OUT";
 
         string half = campaign.DistrictStrength(i) < 1f ? "  (half strength)" : "";
-        string request = npc.quest == null ? "Request done (braced)" : $"{npc.quest.Describe()} ({QuestProgress(npc.quest)})";
-        return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}\n{request}";
+        string injured = npc.injured > 0 ? $"  ({npc.injured} injured)" : "";
+        string request = npc.quest == null ? "Request done" : $"{npc.quest.Describe()} ({QuestProgress(npc.quest)})";
+        return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}{injured}\n" +
+               $"{npc.order} · Homes {npc.reinforced:0}% · Ready {npc.readiness:0}%\n{request}";
     }
 
     // Fills the leader window for `selected`. `retype` starts the dialogue over (opening the window); otherwise the new
@@ -256,7 +296,9 @@ public class TownManager : MonoBehaviour
         if (retype) dialogue.Play(text);
         else dialogue.Set(text);
 
+        ShowOrders(i);
         ShowBuildings(i);
+        foreach (GameObject section in aliveOnly) section.SetActive(npc.Alive);
 
         bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
         giveButton.gameObject.SetActive(materialsRequest);
@@ -267,7 +309,7 @@ public class TownManager : MonoBehaviour
         }
     }
 
-    // What the leader says (spokenLine, in quotes), then their faction, request, weapon and quake risk.
+    // What the leader says (spokenLine, in quotes), then their people (and injured), preparedness and request.
     string Dialogue(int i)
     {
         NpcDefinition definition = config.npcs[i];
@@ -283,21 +325,18 @@ public class TownManager : MonoBehaviour
         {
             int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
             body = string.IsNullOrEmpty(spokenLine) ? "" : $"\"{spokenLine}\"\n\n";
-            body += $"{definition.faction}: {npc.population}/{definition.startPopulation} people (lost ones never come back). " +
-                    $"Under {halfLine}: district at half strength. At 0: wiped out.";
+            body += $"{definition.faction}: {npc.population}/{definition.startPopulation} people (half strength under {halfLine}).";
+            if (npc.injured > 0)
+                body += $" Injured: {npc.injured}. They can't work, and die on day {npc.injuredDeadline} unless treated.";
+            body += $"\nHomes reinforced {npc.reinforced:0}% · Readiness {npc.readiness:0}% (fades {config.readinessFade:0}% a day) · " +
+                    $"Town supplies {campaign.supplies}";
+            int w = (int)definition.weapon;
+            string weapon = definition.unlocksEvolution && !npc.everCompleted
+                ? $" and teaches you {Weapon.EvolutionNames[w]}, the {Weapon.Names[w]}'s evolution" : "";
             body += npc.quest != null
-                ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}. Pays {config.questGold} gold."
+                ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}), due before day {campaign.NextQuestDay}. " +
+                  $"Pays {config.questGold} gold{weapon}."
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
-            if (definition.unlocksWeapon)
-            {
-                string weapon = Weapon.Names[(int)definition.weapon];
-                body += npc.everCompleted
-                    ? $"\nYou have their {weapon}: it can show up on level-up cards in the dungeon."
-                    : $"\nTheir first finished request also gives you the {weapon}.";
-            }
-            body += npc.quest == null
-                ? $"\nHomes braced: the next quake can't hurt the {definition.faction} or their district."
-                : $"\nAt risk: a harmful quake costs the {definition.faction} people and a building level. Finish the request to brace them.";
         }
         return body;
     }
@@ -322,6 +361,29 @@ public class TownManager : MonoBehaviour
         grey = Sprite.Create(texture, colored.rect, new Vector2(0.5f, 0.5f));
         greyPortraits[colored] = grey;
         return grey;
+    }
+
+    // The faction's order buttons: what one day of each gives them now; the current order has the gold bar.
+    void ShowOrders(int npcIndex)
+    {
+        NpcState npc = campaign.npcs[npcIndex];
+        for (int k = 0; k < orderButtons.Length; k++)
+        {
+            orderButtons[k].gameObject.SetActive(npc.Alive);
+            SetLabel(orderButtons[k], OrderLabel(npcIndex, (TownOrder)k));
+            orderMarks[k].enabled = npc.order == (TownOrder)k;
+        }
+    }
+
+    string OrderLabel(int i, TownOrder order)
+    {
+        switch (order)
+        {
+            case TownOrder.Reinforce: return $"REINFORCE\n+{campaign.ReinforceGain(i):0}% homes, {config.reinforceMaterials} materials";
+            case TownOrder.Stockpile: return $"STOCKPILE\n+{campaign.StockpileGain(i)} supplies";
+            case TownOrder.Drill: return $"DRILL\n+{campaign.DrillGain(i):0}% readiness";
+            default: return $"WORK\n{campaign.WorkGains(i)}";
+        }
     }
 
     // One button per building in this leader's district: name, level, effect per level and the next level's price.

@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// The Shaman's weapon: crystals circle the hero all the time and hit whatever they touch.
+// Crystals circle the hero all the time and hit whatever they touch.
 // An enemy can be hit by the orbit at most once per `interval` (0.5s). Bonus: +1 crystal.
+// Evolution (Shatter, from the Shaman): a hit may make the crystal burst, hitting every enemy around it.
 public class CrystalOrbit : Weapon
 {
     const int MaxRememberedHits = 1000;
+    static readonly Color ShatterColor = new Color(0.75f, 0.45f, 1f, 0.6f);
 
     [Header("Crystal Orbit")]
     public int baseCrystals = 2;
@@ -16,6 +18,11 @@ public class CrystalOrbit : Weapon
     public float knockback = 3f;
     public Sprite crystalSprite;
     public Color crystalColor = new Color(0.75f, 0.45f, 1f);
+    [Header("Shatter (evolved)")]
+    [Tooltip("Chance per crystal hit to burst.")]
+    [Range(0f, 1f)] public float shatterChance = 0.25f;
+    [Tooltip("The burst hits every enemy this close to the crystal (times area), for the orbit's damage.")]
+    public float shatterRadius = 1.5f;
 
     readonly List<Transform> crystals = new List<Transform>();
     readonly Dictionary<Enemy, float> nextHitTime = new Dictionary<Enemy, float>();
@@ -54,7 +61,22 @@ public class CrystalOrbit : Weapon
 
             nextHitTime[enemy] = Time.time + interval / player.attackSpeedMultiplier;
             enemy.TakeDamage(Damage, transform.position, knockback);
+            if (evolved && Random.value < shatterChance) Shatter(position);
         }
+    }
+
+    // Hits every enemy within shatterRadius of the crystal (the one it touched too, if it's still alive), with a
+    // violet flash. Not a weapon hit, so it doesn't set off on-hit relics.
+    void Shatter(Vector2 center)
+    {
+        float radius = shatterRadius * player.areaMultiplier;
+        foreach (Enemy enemy in Enemy.All)
+        {
+            float reach = radius + enemy.data.radius;
+            if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
+                enemy.TakeDamage(Damage, center, 0f, false);
+        }
+        FadeEffect.Circle(crystalSprite, center, radius, ShatterColor, 0.25f);
     }
 
     // One crystal object per crystal; more are added when the level bonus kicks in.

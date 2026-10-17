@@ -50,6 +50,7 @@ public static class ArenaSceneBuilder
         SpriteRenderer body = NewSprite("Body", hasArt ? a.heroIdle : a.circle, new Vector2(0f, hasArt ? feetY : 0f), Vector2.one,
             hasArt ? Color.white : new Color(0.30f, 0.55f, 0.95f), 5);
         body.transform.SetParent(hero.transform, false);
+        body.gameObject.AddComponent<SpriteOutline>(); // black outline, like enemies, ores and pickups
         Player player = hero.AddComponent<Player>();
         player.arena = arena;
         player.sprite = body;
@@ -60,7 +61,7 @@ public static class ArenaSceneBuilder
         //                      weapon                                       id                    card text                                                          bonus text             dmg +lvl interval
         SwordSweep sword    = SetWeapon(hero.AddComponent<SwordSweep>(),   WeaponId.Sword,        "Hits every enemy around you.",                                     "+sweep radius",        10, 3, 1.0f);
         DaggerThrow dagger  = SetWeapon(hero.AddComponent<DaggerThrow>(),  WeaponId.Dagger,       "Throws a dagger at the nearest enemy.",                            "+1 dagger per throw",   8, 2, 1.2f);
-        WhipLash whip       = SetWeapon(hero.AddComponent<WhipLash>(),     WeaponId.Whip,         "Lashes a line toward the nearest enemy, reaching past the sword.", "+longer lash",         12, 3, 1.3f);
+        SpearThrust spear   = SetWeapon(hero.AddComponent<SpearThrust>(),  WeaponId.Spear,        "Thrusts a spear toward the nearest enemy, reaching past the sword.", "+longer reach",      12, 3, 1.3f);
         CrystalOrbit orbit  = SetWeapon(hero.AddComponent<CrystalOrbit>(), WeaponId.CrystalOrbit, "Crystals circle you and hit whatever they touch.",                  "+1 crystal",            8, 2, 0.5f);
         // Relic weapons (equipped only once you own the relic)
         SwordSweep hammer    = SetWeapon(hero.AddComponent<SwordSweep>(),    WeaponId.QuakeHammer,    "Slams the ground every few seconds, hitting every enemy around you hard.", "+slam radius", 20, 4, 2.5f);
@@ -69,8 +70,15 @@ public static class ArenaSceneBuilder
         AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
         sword.sweepVisual = NewFlashSprite("Slash", a.arc, hero.transform, a.unlit); // spins once around the hero
         dagger.daggerSprite = a.square;
-        whip.lashVisual = NewFlashSprite("Lash", a.square, hero.transform, a.unlit);
+        spear.thrustVisual = NewFlashSprite("Thrust", a.square, hero.transform, a.unlit);
         orbit.crystalSprite = a.circle;
+        // Evolution cards (after Lv 5; the names are Weapon.EvolutionNames)
+        sword.evolutionText = "every swing is followed by a quick back-swing that hits everything again.";
+        dagger.evolutionText = $"after every hit, a {dagger.bounceChance * 100f:0}% chance to bounce to a nearby enemy " +
+                               $"(up to {dagger.maxBounces} times).";
+        spear.evolutionText = $"enemies it hits are pinned in place for {spear.pinTime:0.#} s (not bosses).";
+        orbit.evolutionText = $"every crystal hit has a {orbit.shatterChance * 100f:0}% chance to burst, hitting " +
+                              "every enemy around it.";
         hammer.radius = 3.5f;
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;
@@ -84,7 +92,7 @@ public static class ArenaSceneBuilder
         staff.impactSprite = a.circle;
         bomb.bombSprite = a.circle;
         axe.axeSprite = a.square;
-        foreach (Weapon weapon in new Weapon[] { dagger, whip, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
+        foreach (Weapon weapon in new Weapon[] { dagger, spear, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
 
         // Camera from the template
         Camera camera = Object.FindAnyObjectByType<Camera>(); // the template has exactly one
@@ -199,7 +207,7 @@ public static class ArenaSceneBuilder
 
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();
-        leveling.weapons = new Weapon[] { sword, dagger, whip, orbit, hammer, staff, bomb, axe };
+        leveling.weapons = new Weapon[] { sword, dagger, spear, orbit, hammer, staff, bomb, axe };
         leveling.player = player;
         leveling.xpHud = xpHud.gameObject;
         leveling.xpFill = xpFill;
@@ -230,11 +238,13 @@ public static class ArenaSceneBuilder
         };
         arena.crate = a.crate;
         arena.crystalCluster = a.crystalCluster;
-        // Ores: the tileset's stone pillar if it's there, otherwise a tinted, slightly bigger placeholder square.
-        Sprite pillar = PropSprite("Prop_Pillar");
-        arena.oreSprite = pillar != null ? pillar : a.square;
-        arena.oreColor = pillar != null ? Color.white : new Color(0.45f, 0.55f, 0.75f);
-        arena.oreScale = pillar != null ? 1f : 1.2f;
+        // Ores: the artist's crystal vein; without it the tileset's stone pillar, or a tinted, slightly bigger
+        // placeholder square.
+        Sprite oreArt = OreSprite();
+        if (oreArt == null) oreArt = PropSprite("Prop_Pillar");
+        arena.oreSprite = oreArt != null ? oreArt : a.square;
+        arena.oreColor = oreArt != null ? Color.white : new Color(0.45f, 0.55f, 0.75f);
+        arena.oreScale = oreArt != null ? 1f : 1.2f;
         arena.whiteSquare = a.square;
         arena.rockSprite = a.circle;
         arena.unlitMaterial = a.unlit;

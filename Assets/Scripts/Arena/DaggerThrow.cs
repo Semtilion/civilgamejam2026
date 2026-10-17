@@ -2,6 +2,7 @@ using UnityEngine;
 
 // Throws a dagger at the nearest enemy in range. Each dagger stops at the first enemy it hits.
 // Bonus: +1 dagger per throw (fanned out).
+// Evolution (Ricochet, from the Elder): after every hit a dagger may bounce on to a nearby enemy (see Dagger).
 public class DaggerThrow : Weapon
 {
     [Header("Dagger")]
@@ -13,6 +14,11 @@ public class DaggerThrow : Weapon
     public float spreadAngle = 12f;
     public Sprite daggerSprite;
     public Color daggerColor = new Color(0.85f, 0.85f, 0.90f);
+    [Header("Ricochet (evolved)")]
+    [Tooltip("Chance after every hit to bounce to the nearest other enemy within bounceRange.")]
+    [Range(0f, 1f)] public float bounceChance = 0.2f;
+    public int maxBounces = 3;
+    public float bounceRange = 4f;
 
     protected override bool Attack()
     {
@@ -25,7 +31,8 @@ public class DaggerThrow : Weapon
         {
             float angle = (i - (count - 1) / 2f) * spreadAngle;
             Vector2 direction = Quaternion.Euler(0f, 0f, angle) * aim;
-            Dagger.Throw(daggerSprite, daggerColor, transform.position, direction, speed, range, Damage, knockback, player);
+            Dagger.Throw(daggerSprite, daggerColor, transform.position, direction, speed, range, Damage, knockback, player,
+                evolved ? maxBounces : 0, bounceChance, bounceRange);
         }
         return true;
     }
