@@ -49,7 +49,8 @@ public class LevelUp : MonoBehaviour
     public Weapon[] weapons;
     public Player player;
     public GameObject xpHud;
-    public RectTransform xpFill;
+    [Tooltip("The XP bar (a DynamicBar: glows on a gain, flashes on a level-up).")]
+    public DynamicBar xpBar;
     public Text levelText;
     public GameObject cardPanel;
     [Tooltip("The panel's title: LEVEL UP! or RELIC FOUND.")]
@@ -92,12 +93,13 @@ public class LevelUp : MonoBehaviour
         pendingPicks = 0;
         System.Array.Clear(statRanks, 0, statRanks.Length);
         cardPanel.SetActive(false);
+        xpBar.Snap(0f);
     }
 
     void Update()
     {
         if (xpHud.activeSelf != levelingEnabled) xpHud.SetActive(levelingEnabled);
-        xpFill.anchorMax = new Vector2(Mathf.Clamp01(xp / XpToNext), 1f);
+        xpBar.Set(xp / XpToNext);
         levelText.text = $"Lv {level}";
 
         if (IsChoosing) PickWithKeys();
@@ -155,6 +157,7 @@ public class LevelUp : MonoBehaviour
             xp -= XpToNext;
             level++;
             pendingPicks++;
+            xpBar.LevelUp();
         }
         TryShowCards();
     }

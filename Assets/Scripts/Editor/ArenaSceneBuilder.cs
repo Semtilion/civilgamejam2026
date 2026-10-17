@@ -13,6 +13,9 @@ public static class ArenaSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Arena.unity";
     const float TorchHeight = 1.6f; // world units: the artist's torch (its whole image)
+    static readonly Color HpColor = new Color(0.80f, 0.15f, 0.15f);
+    static readonly Color TrailColor = new Color(1f, 0.88f, 0.55f); // a health bar's trail: what a hit just took
+    static readonly Vector2 HeroBarSize = new Vector2(120, 14);    // canvas units (100 = 1 world unit)
     const float TorchFlameY = 0.5f; // its flame, above the torch's center
 
     public static void Build(GameAssets a)
@@ -53,6 +56,22 @@ public static class ArenaSceneBuilder
             hasArt ? Color.white : new Color(0.30f, 0.55f, 0.95f), 5);
         body.transform.SetParent(hero.transform, false);
         body.gameObject.AddComponent<SpriteOutline>(); // black outline, like enemies, ores and pickups
+        // A small health bar just under the feet: a world-space canvas on the hero, so it follows; over everything in
+        // the cave, and unlit (UI).
+        RectTransform barCanvas = new GameObject("Health Bar", typeof(RectTransform), typeof(Canvas)).GetComponent<RectTransform>();
+        barCanvas.SetParent(hero.transform, false);
+        barCanvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+        barCanvas.GetComponent<Canvas>().sortingOrder = 7;
+        barCanvas.sizeDelta = HeroBarSize;
+        barCanvas.localScale = Vector3.one * 0.01f;
+        barCanvas.localPosition = new Vector3(0f, feetY - 0.3f, 0f);
+        RectTransform heroBar = NewBar("Bar", barCanvas, Vector2.zero, HeroBarSize, HpColor, out RectTransform heroFill);
+        DynamicBar heroHealth = HealthBar(heroBar, heroFill);
+        foreach (RectTransform part in new[] { heroFill, heroHealth.trail }) // inset: the dark back is its border
+        {
+            part.offsetMin = new Vector2(2f, 2f);
+            part.offsetMax = new Vector2(-2f, -2f);
+        }
         Player player = hero.AddComponent<Player>();
         player.arena = arena;
         player.sprite = body;
@@ -139,16 +158,13 @@ public static class ArenaSceneBuilder
         Transform canvas = NewCanvas("HUD");
         Color backing = new Color(0.05f, 0.04f, 0.07f, 0.6f); // dark, so the text reads over the floor
 
-        // Top-left: HP bar, day / depth / kills, then the dive's loot
-        Image topLeft = NewImage("Top-Left Backing", canvas, new Vector2(20, -20), new Vector2(620, 140), backing);
+        // Top-left: day / depth / kills, then the dive's loot (the hero's health is the bar under their feet)
+        Image topLeft = NewImage("Top-Left Backing", canvas, new Vector2(20, -20), new Vector2(620, 100), backing);
         Pin(topLeft.rectTransform, new Vector2(0f, 1f));
         AddFrame(topLeft.transform, HudFrameThickness, FrameColor);
-        RectTransform hpBar = NewBar("HP Bar", canvas, new Vector2(40, -40), new Vector2(420, 30), new Color(0.80f, 0.15f, 0.15f), out RectTransform hpFill);
-        Pin(hpBar, new Vector2(0f, 1f));
-        Text hpText = Shadowed(NewText("HP Text", hpBar, Vector2.zero, new Vector2(420, 30), 20, TextAnchor.MiddleCenter));
-        Text depthText = Shadowed(NewText("Depth", canvas, new Vector2(40, -80), new Vector2(600, 36), 26, TextAnchor.MiddleLeft));
+        Text depthText = Shadowed(NewText("Depth", canvas, new Vector2(40, -36), new Vector2(600, 36), 26, TextAnchor.MiddleLeft));
         Pin(depthText.rectTransform, new Vector2(0f, 1f));
-        Text lootText = Shadowed(NewText("Loot", canvas, new Vector2(40, -116), new Vector2(600, 32), 24, TextAnchor.MiddleLeft));
+        Text lootText = Shadowed(NewText("Loot", canvas, new Vector2(40, -72), new Vector2(600, 32), 24, TextAnchor.MiddleLeft));
         Pin(lootText.rectTransform, new Vector2(0f, 1f));
 
         // Bottom-left (above the level): quake meter + ores mined this dive
@@ -193,6 +209,9 @@ public static class ArenaSceneBuilder
         Stretch(xpHud);
         RectTransform xpBar = NewBar("XP Bar", xpHud, new Vector2(0, 16), new Vector2(1880, 16), new Color(0.30f, 0.90f, 1f), out RectTransform xpFill);
         Pin(xpBar, new Vector2(0.5f, 0f));
+        DynamicBar xpDynamic = xpBar.gameObject.AddComponent<DynamicBar>();
+        xpDynamic.kind = DynamicBar.Kind.Experience;
+        xpDynamic.fill = xpFill;
         Text levelText = Shadowed(NewText("Level", xpHud, new Vector2(24, 40), new Vector2(200, 36), 28, TextAnchor.MiddleLeft));
         Pin(levelText.rectTransform, new Vector2(0f, 0f));
 
@@ -228,7 +247,7 @@ public static class ArenaSceneBuilder
         leveling.weapons = new Weapon[] { sword, dagger, spear, orbit, hammer, staff, bomb, axe };
         leveling.player = player;
         leveling.xpHud = xpHud.gameObject;
-        leveling.xpFill = xpFill;
+        leveling.xpBar = xpDynamic;
         leveling.levelText = levelText;
         leveling.cardPanel = cardPanel.gameObject;
         leveling.panelTitle = levelUpTitle;
@@ -279,8 +298,7 @@ public static class ArenaSceneBuilder
         arena.shadowSprite = a.circle;
         arena.dangerZoneSprite = a.roundEnd;
         arena.cam = camera;
-        arena.hpFill = hpFill;
-        arena.hpText = hpText;
+        arena.heroHpBar = heroHealth;
         arena.depthText = depthText;
         arena.goalText = goalText;
         arena.goalBar = goalBar.gameObject;
@@ -435,6 +453,19 @@ public static class ArenaSceneBuilder
                 torchLight.transform.localPosition = new Vector3(0f, TorchFlameY, 0f);
                 flicker.frames = flames;
             }
+    }
+
+    // Makes a NewBar a health bar (DynamicBar): a light trail behind its fill shows what a hit just took.
+    static DynamicBar HealthBar(RectTransform bar, RectTransform fill)
+    {
+        RectTransform trail = NewImage("Trail", bar, Vector2.zero, Vector2.zero, TrailColor).rectTransform;
+        Stretch(trail);
+        trail.SetSiblingIndex(0); // behind the fill
+        DynamicBar health = bar.gameObject.AddComponent<DynamicBar>();
+        health.kind = DynamicBar.Kind.Health;
+        health.fill = fill;
+        health.trail = trail;
+        return health;
     }
 
     // Invisible child sprite a weapon flashes on each attack (the weapon sets its alpha, size and rotation).

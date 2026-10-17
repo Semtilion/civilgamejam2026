@@ -174,8 +174,8 @@ public class ArenaManager : MonoBehaviour
     [Tooltip("Plain white square, used for simple bars (ore mining progress).")]
     public Sprite whiteSquare;
     public Camera cam;
-    public RectTransform hpFill;
-    public Text hpText;
+    [Tooltip("The hero's health: the small bar under their feet (a DynamicBar health bar).")]
+    public DynamicBar heroHpBar;
     public Text depthText;
     public Text quakeText;
     [Tooltip("Top-left, second line: the dive's materials, crystals and gold.")]
@@ -253,7 +253,7 @@ public class ArenaManager : MonoBehaviour
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
             whiteSquare == null || crystalCluster == null || crystalSprite == null ||
             rockSprite == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
-            deathBursts == null || lootText == null || goalBar == null || debugKeys == null)
+            deathBursts == null || lootText == null || goalBar == null || debugKeys == null || heroHpBar == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -292,6 +292,7 @@ public class ArenaManager : MonoBehaviour
         diveKills.Clear();
         depth = 0;
         depthsCleared = 0;
+        heroHpBar.Snap(1f); // full, without a heal flash
     }
 
     // HP, levels and loot carry over between depths; the hero starts each depth in the middle of a fresh cave.
@@ -918,8 +919,7 @@ public class ArenaManager : MonoBehaviour
 
     void UpdateHud()
     {
-        SetFill(hpFill, (float)player.Hp / player.maxHp);
-        hpText.text = $"{player.Hp} / {player.maxHp}";
+        heroHpBar.Set((float)player.Hp / player.maxHp);
 
         float goal = -1f; // the goal bar's fill; below 0 = hidden
         float dt = Time.unscaledDeltaTime; // the loot counters roll up toward the real numbers
