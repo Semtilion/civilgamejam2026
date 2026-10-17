@@ -3,7 +3,7 @@ using UnityEngine;
 public enum EnemyBehavior
 {
     Chaser,  // runs straight at the hero
-    Shooter, // never moves; flashes red, then fires at where the hero was when the flash started
+    Shooter, // never moves; warns (swells, red), then fires a volley in fixed directions (shotAngles)
     Boss,    // chases, and every few seconds winds up and charges
     Crate    // a breakable prop (supply crate, crystal cluster): never moves, harmless, weapons break it for its loot (not a kill)
 }
@@ -13,7 +13,7 @@ public enum EnemyBehavior
 public class EnemyData : ScriptableObject
 {
     public string displayName;
-    [Tooltip("Placeholder circle for now. Real art should be 1 unit wide: the size comes from Radius.")]
+    [Tooltip("Scaled by Radius x 2, so a 1-unit-wide sprite (the placeholders) fills the hit circle. A Spitter's stem.")]
     public Sprite sprite;
     public Color color = Color.white;
     [Tooltip("Size in world units (hit size and sprite size).")]
@@ -38,11 +38,19 @@ public class EnemyData : ScriptableObject
     public int goldAmount;
 
     [Header("Shooter only (stands still, ignores moveSpeed)")]
+    [Tooltip("Optional: the part that sways, then shakes, swells and glows red before each volley (the Spitter's flower), " +
+             "drawn over Sprite at the same size and center (both images share one canvas). Empty = Sprite does it all.")]
+    public Sprite flower;
+    [Tooltip("Each volley fires one shot per entry, all at once, in these directions (degrees: 0 = right, counter-clockwise; " +
+             "the flower's tips). They never turn.")]
+    public float[] shotAngles = { 18f, 90f, 162f, 234f, 306f };
+    [Tooltip("The shots' art, pointing right (each turns to face where it flies). Empty = Sprite.")]
+    public Sprite projectileSprite;
     [Tooltip("Only starts a shot when the hero is this close.")]
     public float fireRange = 10f;
-    [Tooltip("Red flash before each shot. The aim locks when the flash starts.")]
+    [Tooltip("The warning (swell, shake, red) before each volley.")]
     public float fireWarning = 0.5f;
-    [Tooltip("Seconds per shot, including the warning flash.")]
+    [Tooltip("Seconds per volley, including the warning.")]
     public float fireInterval = 2.5f;
     public float projectileSpeed = 4f;
     public int projectileDamage = 8;

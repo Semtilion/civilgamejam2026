@@ -3,8 +3,9 @@ using UnityEngine;
 
 // One enemy in the arena. Moves in code, no physics: enemies overlap freely and are kept inside the cave walls.
 // Hits the hero by touch (distance check).
-// Look: pops in with a dust puff, wobbles (squash and stretch) while moving, Spitters breathe and swell before a shot,
-// bosses tremble while winding up, and everything squishes when hit. Only the look: hits use data.radius.
+// Look: pops in with a dust puff, wobbles (squash and stretch) while moving, a Spitter's flower sways on its stem, then
+// shakes, swells and glows red before a volley and pops as it fires, bosses tremble while winding up, and everything
+// squishes when hit. Only the look: hits use data.radius.
 public class Enemy : MonoBehaviour
 {
     enum BossState { Chase, WindUp, Charge }
@@ -19,7 +20,14 @@ public class Enemy : MonoBehaviour
     const float WobbleSquash = 0.05f;
     const float WobbleTilt = 2.5f; // degrees
     const float WobbleSpeed = 4f;  // + 1.2 x move speed, radians per second
-    const float BreathAmount = 0.04f; // Spitters
+    // Spitters' flowers (or the placeholder): breath, sway, the shake at the end of the warning (degrees, and how far it
+    // jitters: 1 = the enemy's width), the bounce after a volley, and the flower sits just in front of the stem.
+    const float BreathAmount = 0.04f;
+    const float SwayAngle = 4f;
+    const float ShakeAngle = 7f;
+    const float ShakeOffset = 0.05f;
+    const float PopTime = 0.2f;
+    const float FlowerDepth = -0.01f;
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
 
@@ -30,16 +38,16 @@ public class Enemy : MonoBehaviour
     Player player;
     ArenaManager arena;
     SpriteRenderer sprite;
+    SpriteRenderer flower; // a Spitter's flower (null without the art; `sprite` is then the whole enemy, else its stem)
     float stunTimer, fireTimer, flashTimer, stateTimer;
     float slowTimer, slowPace = 1f; // Frost Shard: moves and attacks at slowPace speed while slowTimer runs
     float delta;                    // this frame's time for moving and attacking (slowed while chilled)
     Vector2 knockbackVelocity;
     BossState bossState;
     Vector2 chargeDirection;
-    bool aiming;          // shooter is flashing red, about to fire
-    Vector2 aimDirection; // locked when the flash starts
+    bool aiming;          // shooter is warning (swelling, red), about to fire
     Vector3 baseScale;    // the size from data.radius
-    float age, animTime, squishTimer, wobblePhase;
+    float age, animTime, squishTimer, popTimer, wobblePhase;
 
     public bool IsDead => hp <= 0;
 
@@ -65,6 +73,14 @@ public class Enemy : MonoBehaviour
         player = target;
         arena = owner;
         sprite = GetComponent<SpriteRenderer>();
+        if (data.flower != null)
+        {
+            flower = new GameObject("Flower").AddComponent<SpriteRenderer>();
+            flower.transform.SetParent(transform, false);
+            flower.transform.localPosition = new Vector3(0f, 0f, FlowerDepth);
+            flower.sprite = data.flower;
+            flower.sortingOrder = sprite.sortingOrder;
+        }
 
         maxHp = Mathf.RoundToInt(data.maxHp * statScale);
         hp = maxHp;
@@ -102,17 +118,20 @@ public class Enemy : MonoBehaviour
 
         if (flashTimer > 0f) flashTimer -= Time.deltaTime;
         bool warning = aiming || bossState == BossState.WindUp;
-        Color normal = slowTimer > 0f ? Color.Lerp(data.color, IceColor, 0.6f) : data.color; // icy while chilled
-        sprite.color = flashTimer > 0f ? Color.white : warning ? WarningColor : normal;
+        Color normal = flashTimer > 0f ? Color.white : slowTimer > 0f ? Color.Lerp(data.color, IceColor, 0.6f) : data.color; // icy while chilled
+        Color warned = warning && flashTimer <= 0f ? WarningColor : normal;
+        sprite.color = flower != null ? normal : warned; // with a flower, only the flower glows red
+        if (flower != null) flower.color = warned;
         Animate();
     }
 
-    // The look only (scale and tilt of this object; the size used for hits is data.radius).
+    // The look only (scale and tilt of this object and its flower; the size used for hits is data.radius).
     void Animate()
     {
         age += Time.deltaTime;
         animTime += delta; // slower while chilled
         if (squishTimer > 0f) squishTimer -= Time.deltaTime;
+        if (popTimer > 0f) popTimer -= Time.deltaTime;
 
         float sx = 1f, sy = 1f, angle = 0f;
         bool windingUp = data.behavior == EnemyBehavior.Boss && bossState == BossState.WindUp;
@@ -132,13 +151,31 @@ public class Enemy : MonoBehaviour
         }
         else if (data.behavior == EnemyBehavior.Shooter)
         {
+            // Breathes and sways; through the warning it swells and shakes harder and harder; after a volley it pops
+            // and springs back.
             float breath = BreathAmount * Mathf.Sin(animTime * 3f + wobblePhase);
-            sx -= breath * 0.5f;
-            sy += breath;
+            float swell = 1f, tilt = SwayAngle * Mathf.Sin(animTime * 1.5f + wobblePhase);
+            Vector2 shake = Vector2.zero;
             if (aiming)
             {
-                sx *= 1.15f; // swells before it fires
-                sy *= 1.15f;
+                float charge = Mathf.Clamp01(1f - fireTimer / Mathf.Max(data.fireWarning, 0.01f)); // 0 -> 1 through the warning
+                swell = 1f + 0.15f * charge;
+                tilt += Random.Range(-ShakeAngle, ShakeAngle) * charge;
+                shake = Random.insideUnitCircle * ShakeOffset * charge;
+            }
+            if (popTimer > 0f) swell += 0.25f * popTimer / PopTime;
+            float headX = swell * (1f - breath * 0.5f), headY = swell * (1f + breath);
+            if (flower != null)
+            {
+                flower.transform.localScale = new Vector3(headX, headY, 1f);
+                flower.transform.localRotation = Quaternion.Euler(0f, 0f, tilt);
+                flower.transform.localPosition = new Vector3(shake.x, shake.y, FlowerDepth);
+            }
+            else // the placeholder moves as a whole (but doesn't jitter: its position is where it is)
+            {
+                sx *= headX;
+                sy *= headY;
+                angle = tilt;
             }
         }
 
@@ -214,7 +251,8 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    // Reload -> (hero in range) flash red and lock the aim -> fire -> reload. Once the flash starts, the shot always comes.
+    // Reload -> (hero in range) warning -> a volley: one shot per data.shotAngles, all at once, starting at the edge of
+    // its hit circle (by the flower's tips) -> reload. Once the warning starts, the volley always comes.
     void UpdateShooter()
     {
         fireTimer -= delta;
@@ -224,15 +262,21 @@ public class Enemy : MonoBehaviour
             if (fireTimer <= 0f && toPlayer.sqrMagnitude <= data.fireRange * data.fireRange)
             {
                 aiming = true;
-                aimDirection = toPlayer.normalized;
                 fireTimer = data.fireWarning;
             }
         }
         else if (fireTimer <= 0f)
         {
             aiming = false;
+            popTimer = PopTime;
             fireTimer = Mathf.Max(0f, data.fireInterval - data.fireWarning);
-            Projectile.Fire(data.sprite, data.color, transform.position, aimDirection, data.projectileSpeed, projectileDamage, player);
+            Sprite shot = data.projectileSprite != null ? data.projectileSprite : data.sprite;
+            foreach (float degrees in data.shotAngles)
+            {
+                Vector2 direction = new Vector2(Mathf.Cos(degrees * Mathf.Deg2Rad), Mathf.Sin(degrees * Mathf.Deg2Rad));
+                Vector2 from = (Vector2)transform.position + direction * data.radius;
+                Projectile.Fire(shot, data.color, from, direction, data.projectileSpeed, projectileDamage, player);
+            }
         }
     }
 

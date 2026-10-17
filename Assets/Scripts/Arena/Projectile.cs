@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Enemy shot: flies straight, hurts the hero on touch, disappears after a few seconds.
+// Enemy shot: flies straight (its art turned to face that way: drawn pointing right), hurts the hero on touch,
+// disappears after a few seconds.
 public class Projectile : MonoBehaviour
 {
     public static readonly List<Projectile> All = new List<Projectile>();
@@ -18,6 +19,7 @@ public class Projectile : MonoBehaviour
     {
         GameObject go = new GameObject("Projectile");
         go.transform.position = from;
+        go.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
         go.transform.localScale = Vector3.one * Radius * 2f;
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();

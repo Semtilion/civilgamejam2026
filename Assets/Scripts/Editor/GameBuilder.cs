@@ -14,6 +14,7 @@ public class GameAssets
 {
     public Sprite circle, square;
     public Sprite ring, arc;  // generated: the hammer's shockwave, the sword's slash
+    public Sprite shard;      // generated: the Spitter's shots until the artist's arrive
     public Sprite glow;       // generated: soft-edged, 9-sliced (the glow around the leader portrait)
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
@@ -34,7 +35,12 @@ public static class GameBuilder
     const string TilesFolder = "Assets/Art/Tiles";
     const string PropsFolder = "Assets/Art/Props";
     const string NpcFolder = "Assets/Art/NPCs";
+    const string EnemyArtFolder = "Assets/Art/Enemies";
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
+    // The Spitter's stem and flower share one canvas centered on the flower's core (its hit center). 210 px = 1 unit,
+    // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
+    // its hit circle.
+    const float SpitterPixelsPerUnit = 210f;
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
     const string UnlitMaterialPath = "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat";
@@ -109,6 +115,12 @@ public static class GameBuilder
         a.ring = GeneratedSprite("Ring", 128, (r, angle) => Mathf.Clamp01((r - 0.80f) / 0.06f) * Mathf.Clamp01((0.99f - r) / 0.04f));
         a.arc = GeneratedSprite("Arc", 128, (r, angle) =>
             Mathf.Clamp01((r - 0.55f) / 0.12f) * Mathf.Clamp01((0.99f - r) / 0.05f) * Mathf.Clamp01(1f - angle / 220f));
+        // A slim diamond pointing right (shots turn to face where they fly).
+        a.shard = GeneratedSprite("Shard", 64, (r, angle) =>
+        {
+            float x = r * Mathf.Cos(angle * Mathf.Deg2Rad), y = r * Mathf.Sin(angle * Mathf.Deg2Rad);
+            return (0.95f - Mathf.Abs(x) - Mathf.Abs(y) / 0.45f) / 0.08f;
+        });
         a.glow = GlowSprite();
         a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
         if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
@@ -131,6 +143,22 @@ public static class GameBuilder
             a.crate.sprite = crateArt;
             a.crate.color = Color.white;
             EditorUtility.SetDirty(a.crate);
+        }
+        // The artist's Spitter (a crystal flower on a stem) replaces its placeholder circle and fires from the flower's 5 tips.
+        Sprite spitterStem = EnemySprite("Spitter_Stem", SpitterPixelsPerUnit);
+        Sprite spitterFlower = EnemySprite("Spitter_Flower", SpitterPixelsPerUnit);
+        if (spitterStem != null && spitterFlower != null && a.spitter.flower != spitterFlower)
+        {
+            a.spitter.sprite = spitterStem;
+            a.spitter.flower = spitterFlower;
+            a.spitter.color = Color.white;
+            a.spitter.shotAngles = new[] { 13f, 79f, 148f, 216f, 305f };
+            EditorUtility.SetDirty(a.spitter);
+        }
+        if (a.spitter.projectileSprite == null)
+        {
+            a.spitter.projectileSprite = a.shard;
+            EditorUtility.SetDirty(a.spitter);
         }
         a.townConfig = TownConfigAsset(a);
         // The artist's portraits go on the leaders that don't have one yet.
@@ -228,6 +256,35 @@ public static class GameBuilder
             importer.mipmapEnabled = false;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // A piece of enemy art (Assets/Art/Enemies/<name>.png): smooth, no mipmaps, center pivot, `pixelsPerUnit` px = 1 unit
+    // before the enemy's size scales it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
+    static Sprite EnemySprite(string name, float pixelsPerUnit)
+    {
+        string path = $"{EnemyArtFolder}/{name}.png";
+        if (!File.Exists(path)) return null;
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+
+        TextureImporterSettings settings = new TextureImporterSettings();
+        importer.ReadTextureSettings(settings);
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+            Mathf.Abs(importer.spritePixelsPerUnit - pixelsPerUnit) > 0.01f || importer.mipmapEnabled ||
+            settings.spriteAlignment != (int)SpriteAlignment.Center)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = pixelsPerUnit;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.ReadTextureSettings(settings); // re-read: the lines above changed the importer
+            settings.spriteAlignment = (int)SpriteAlignment.Center;
+            importer.SetTextureSettings(settings);
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
