@@ -29,6 +29,7 @@ public class Enemy : MonoBehaviour
     const float PopTime = 0.2f;
     const float FlowerDepth = -0.01f;
     const float StepLength = 0.45f; // walk cycle: the next frame every this many units walked
+    const float TurnSpeed = 400f;   // turnsToFace: degrees per second
     const float SpawnTurn = 20f; // a shooter's flower (and its volley) is turned by up to this many degrees, random per spawn
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
@@ -54,6 +55,7 @@ public class Enemy : MonoBehaviour
     float age, animTime, squishTimer, popTimer, wobblePhase;
     float turn; // shooters: SpawnTurn, picked at spawn
     float walked; // units walked (walk cycle)
+    float facing; // turnsToFace: the tilt toward where it walks (degrees, -90..90), added to the wobble
 
     public bool IsDead => hp <= 0;
 
@@ -202,7 +204,7 @@ public class Enemy : MonoBehaviour
 
         float grow = Fx.EaseOutBack(age / SpawnTime);
         transform.localScale = new Vector3(baseScale.x * sx * grow, baseScale.y * sy * grow, 1f);
-        transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+        transform.localRotation = Quaternion.Euler(0f, 0f, angle + facing);
     }
 
     void Move()
@@ -240,12 +242,25 @@ public class Enemy : MonoBehaviour
         transform.position = position;
     }
 
-    // Enemies with walk frames (the Brute): the next frame every StepLength units walked, facing where it goes.
-    // Not while knocked back or pinned (only called for its own steps).
+    // Enemies with walk frames (Brute, Crawler): the next frame every StepLength units walked, mirrored to face where
+    // it goes; turnsToFace ones also tilt their head that way (up to straight up or down). Not while knocked back or
+    // pinned (only called for its own steps).
     void Walk(Vector2 moved)
     {
         if (data.walkFrames == null || data.walkFrames.Length == 0) return;
-        if (Mathf.Abs(moved.x) > 0.0001f) sprite.flipX = data.artFacesLeft ? moved.x > 0f : moved.x < 0f;
+        if (Mathf.Abs(moved.x) > 0.0001f)
+        {
+            bool flip = data.artFacesLeft ? moved.x > 0f : moved.x < 0f;
+            if (flip != sprite.flipX) facing = -facing; // mirrored: the same tilt now reads the other way
+            sprite.flipX = flip;
+        }
+        if (data.turnsToFace && moved.sqrMagnitude > 0.00000001f)
+        {
+            // Head up = turning toward the side it faces: counter-clockwise facing right, clockwise facing left.
+            float elevation = Mathf.Atan2(moved.y, Mathf.Abs(moved.x)) * Mathf.Rad2Deg;
+            bool facesRight = data.artFacesLeft == sprite.flipX;
+            facing = Mathf.MoveTowardsAngle(facing, facesRight ? elevation : -elevation, TurnSpeed * Time.deltaTime);
+        }
         walked += moved.magnitude;
         sprite.sprite = data.walkFrames[(int)(walked / StepLength) % data.walkFrames.Length];
     }

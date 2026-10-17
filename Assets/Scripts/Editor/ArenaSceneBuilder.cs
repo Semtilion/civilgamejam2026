@@ -20,9 +20,9 @@ public static class ArenaSceneBuilder
         ArenaManager arena = new GameObject("Arena Manager").AddComponent<ArenaManager>();
         Vector2 size = arena.arenaSize;
 
-        // Cave (visual only: the hero and enemies are kept inside the cave in code).
-        // The test tileset as a walled room if its pieces are in Assets/Art/Tiles, otherwise placeholder floor/walls.
-        if (BuildTiledRoom(size))
+        // Cave (visual only: the hero and enemies are kept inside the cave in code): the artist's painted cave if it's in
+        // Assets/Art/Cave, else the test tileset (Assets/Art/Tiles) as a walled room, else placeholder floor/walls.
+        if (BuildPaintedCave(size) || BuildTiledRoom(size))
         {
             PlaceDecorations(size);
         }
@@ -288,6 +288,62 @@ public static class ArenaSceneBuilder
         arena.secondaryButton = secondaryButton;
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    // Paints the cave from the artist's textures (Assets/Art/Cave: each texture cut into 2x2 tiles of 1 unit) on two
+    // Tilemaps: floor over the whole arena, brick walls in the cells around it (the same cells as BuildTiledRoom's walls:
+    // 2 rows north and south, 1 column west and east). Every 2x2 block of cells shows one variant of its texture, picked
+    // by a fixed hash of the block (the same on every build); the textures join seamlessly, so any variants fit together.
+    // Returns false (and paints nothing) if a tile file is missing.
+    static bool BuildPaintedCave(Vector2 size)
+    {
+        Tile[][] floors = CaveTiles("CaveFloor", "A", "B");
+        Tile[][] walls = CaveTiles("CaveWall", "A", "B", "C");
+        if (floors == null || walls == null) return false;
+
+        Grid grid = new GameObject("Cave Grid").AddComponent<Grid>();
+        Tilemap floorMap = NewTilemap("Floor", grid.transform, -10);
+        Tilemap wallMap = NewTilemap("Walls", grid.transform, -5);
+
+        int width = Mathf.RoundToInt(size.x), height = Mathf.RoundToInt(size.y);
+        int left = -width / 2, bottom = -height / 2, right = left + width - 1, top = bottom + height - 1; // floor cells
+        for (int y = bottom - 2; y <= top + 2; y++)
+            for (int x = left - 1; x <= right + 1; x++)
+            {
+                bool inside = x >= left && x <= right && y >= bottom && y <= top;
+                (inside ? floorMap : wallMap).SetTile(new Vector3Int(x, y, 0), BlockTile(inside ? floors : walls, x, y));
+            }
+        return true;
+    }
+
+    // The 4 tiles of every variant of a cave texture (<prefix>_<variant>_<0..3>), or null if any file is missing.
+    static Tile[][] CaveTiles(string prefix, params string[] variants)
+    {
+        Tile[][] tiles = new Tile[variants.Length][];
+        for (int v = 0; v < variants.Length; v++)
+        {
+            tiles[v] = new Tile[4];
+            for (int i = 0; i < 4; i++)
+            {
+                Sprite sprite = CaveSprite($"{prefix}_{variants[v]}_{i}");
+                if (sprite == null) return null;
+                tiles[v][i] = TileAsset(sprite);
+            }
+        }
+        return tiles;
+    }
+
+    // Cell (x, y): the variant of its 2x2 block, and its corner of that texture (0 bottom-left, 1 bottom-right,
+    // 2 top-left, 3 top-right).
+    static Tile BlockTile(Tile[][] set, int x, int y)
+    {
+        int blockX = Mathf.FloorToInt(x / 2f), blockY = Mathf.FloorToInt(y / 2f);
+        uint hash = (uint)(blockX * 73856093) ^ (uint)(blockY * 19349663);
+        hash ^= hash >> 13; // mix the bits, so neighbouring blocks don't fall into a pattern
+        hash *= 0x5bd1e995;
+        hash ^= hash >> 15;
+        int variant = (int)(hash % (uint)set.Length);
+        return set[variant][(x - blockX * 2) + 2 * (y - blockY * 2)];
     }
 
     // Paints the cave as a walled room from the test tileset (16 px tiles, 1 unit each) on two Tilemaps.

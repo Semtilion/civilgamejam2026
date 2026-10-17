@@ -19,6 +19,9 @@ public class EnemyData : ScriptableObject
     public Sprite[] walkFrames;
     [Tooltip("The art faces left: mirrored while walking right (off: faces right, mirrored walking left). Only with walk frames.")]
     public bool artFacesLeft;
+    [Tooltip("Walk cycle only: also turns its head toward where it walks (smoothly, up to straight up or down), still " +
+             "mirrored left/right so its back stays up. The Crawler.")]
+    public bool turnsToFace;
     public Color color = Color.white;
     [Tooltip("Size in world units (hit size and sprite size).")]
     public float radius = 0.4f;

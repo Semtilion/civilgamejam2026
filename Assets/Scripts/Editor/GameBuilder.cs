@@ -40,6 +40,7 @@ public static class GameBuilder
     const string EnemyArtFolder = "Assets/Art/Enemies";
     const string DungeonArtFolder = "Assets/Art/Dungeon";
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
+    const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
@@ -51,6 +52,9 @@ public static class GameBuilder
     // The Brute's two poses (stand, step) share one canvas centered on its torso (its hit center). The figure (264 px)
     // stands 2.6 units tall at the Brute's size (radius 0.6 x 2 = 1.2): 264 / (2.6 / 1.2) = 122 px per unit.
     const float BrutePixelsPerUnit = 122f;
+    // The Crawler's two poses (stretched, bunched up), same treatment (canvas centered on its body): the figure (289 px)
+    // is 1.3 units long at the Crawler's size (radius 0.3 x 2 = 0.6): 289 / (1.3 / 0.6) = 133 px per unit.
+    const float CrawlerPixelsPerUnit = 133f;
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
     const string UnlitMaterialPath = "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat";
@@ -162,16 +166,9 @@ public static class GameBuilder
             a.crate.color = Color.white;
             EditorUtility.SetDirty(a.crate);
         }
-        // The artist's Brute (a crystal-backed hulk): a 2-pose walk cycle, drawn facing left.
-        Sprite brute1 = EnemySprite("Brute_1", BrutePixelsPerUnit), brute2 = EnemySprite("Brute_2", BrutePixelsPerUnit);
-        if (brute1 != null && brute2 != null && a.brute.sprite != brute1)
-        {
-            a.brute.sprite = brute1;
-            a.brute.walkFrames = new[] { brute1, brute2 };
-            a.brute.artFacesLeft = true;
-            a.brute.color = Color.white;
-            EditorUtility.SetDirty(a.brute);
-        }
+        // The artist's Brute (a crystal-backed hulk) and Crawler (a crystal-backed slug): 2-pose walk cycles, facing left.
+        WalkArt(a.brute, "Brute", BrutePixelsPerUnit);
+        WalkArt(a.crawler, "Crawler", CrawlerPixelsPerUnit, turnsToFace: true);
         // The artist's Spitter (a crystal flower on a stem) replaces its placeholder circle and fires from the flower's 5 tips.
         Sprite spitterStem = EnemySprite("Spitter_Stem", SpitterPixelsPerUnit);
         Sprite spitterFlower = EnemySprite("Spitter_Flower", SpitterPixelsPerUnit);
@@ -321,6 +318,20 @@ public static class GameBuilder
         return material;
     }
 
+    // An enemy's 2-pose walk cycle (Assets/Art/Enemies/<name>_1.png and _2.png, drawn facing left) replaces its
+    // placeholder: sprite = pose 1, walkFrames = both, untinted. Nothing changes once pose 1 is its sprite.
+    static void WalkArt(EnemyData enemy, string name, float pixelsPerUnit, bool turnsToFace = false)
+    {
+        Sprite pose1 = EnemySprite(name + "_1", pixelsPerUnit), pose2 = EnemySprite(name + "_2", pixelsPerUnit);
+        if (pose1 == null || pose2 == null || enemy.sprite == pose1) return;
+        enemy.sprite = pose1;
+        enemy.walkFrames = new[] { pose1, pose2 };
+        enemy.artFacesLeft = true;
+        enemy.turnsToFace = turnsToFace;
+        enemy.color = Color.white;
+        EditorUtility.SetDirty(enemy);
+    }
+
     // A piece of enemy art (Assets/Art/Enemies/<name>.png), `pixelsPerUnit` px = 1 unit before the enemy's size scales
     // it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
     static Sprite EnemySprite(string name, float pixelsPerUnit) => PaintedSprite($"{EnemyArtFolder}/{name}.png", pixelsPerUnit);
@@ -334,20 +345,24 @@ public static class GameBuilder
     // Returns null if the file isn't there.
     public static Sprite EffectSprite(string name) => SizedSprite($"{EffectsFolder}/{name}.png", 1f, byWidth: true);
 
+    // One tile of the artist's cave (Assets/Art/Cave/<name>.png), 1 unit wide, with mipmaps (the painted floor would
+    // shimmer when the camera scrolls if it were only shrunk). Returns null if the file isn't there.
+    public static Sprite CaveSprite(string name) => SizedSprite($"{CaveFolder}/{name}.png", 1f, byWidth: true, mipmaps: true);
+
     // Painted art imported so its whole image is `units` tall (or wide, `byWidth`). Returns null if the file isn't there.
-    static Sprite SizedSprite(string path, float units, bool byWidth = false)
+    static Sprite SizedSprite(string path, float units, bool byWidth = false, bool mipmaps = false)
     {
         if (!File.Exists(path)) return null;
         AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
         TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
         if (importer == null) return null;
         importer.GetSourceTextureWidthAndHeight(out int width, out int height);
-        return PaintedSprite(path, (byWidth ? width : height) / units);
+        return PaintedSprite(path, (byWidth ? width : height) / units, mipmaps);
     }
 
-    // Painted art (not pixel art): smooth, no mipmaps, center pivot, `pixelsPerUnit` px = 1 unit.
+    // Painted art (not pixel art): smooth, center pivot, `pixelsPerUnit` px = 1 unit, mipmaps only if asked.
     // Returns null if the file isn't there.
-    static Sprite PaintedSprite(string path, float pixelsPerUnit)
+    static Sprite PaintedSprite(string path, float pixelsPerUnit, bool mipmaps = false)
     {
         if (!File.Exists(path)) return null;
         AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
@@ -357,13 +372,13 @@ public static class GameBuilder
         TextureImporterSettings settings = new TextureImporterSettings();
         importer.ReadTextureSettings(settings);
         if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
-            Mathf.Abs(importer.spritePixelsPerUnit - pixelsPerUnit) > 0.01f || importer.mipmapEnabled ||
+            Mathf.Abs(importer.spritePixelsPerUnit - pixelsPerUnit) > 0.01f || importer.mipmapEnabled != mipmaps ||
             settings.spriteAlignment != (int)SpriteAlignment.Center)
         {
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.spritePixelsPerUnit = pixelsPerUnit;
-            importer.mipmapEnabled = false;
+            importer.mipmapEnabled = mipmaps;
             importer.alphaIsTransparency = true;
             importer.ReadTextureSettings(settings); // re-read: the lines above changed the importer
             settings.spriteAlignment = (int)SpriteAlignment.Center;
