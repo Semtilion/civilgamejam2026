@@ -53,6 +53,9 @@ public class Campaign
     public float quakeMeter; // %
     float passiveRise;       // all the passive quake rise so far (never undone by quakes)
     public bool howToPlayShown; // the town pops up How to play once per new game
+    public bool quakeSinceTown; // a quake hit while you were away: the town screen shakes once when you get back
+    // What the town's counters showed when you left, so they roll up (or down) to the new amounts when you return.
+    public int shownMaterials, shownCrystals, shownGold;
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
@@ -210,6 +213,7 @@ public class Campaign
     void Earthquake()
     {
         news.Add($"Day {day}: EARTHQUAKE! Strength {quakeMeter:0}%.");
+        quakeSinceTown = true;
 
         if (quakeMeter < config.quakeHarmAt)
         {

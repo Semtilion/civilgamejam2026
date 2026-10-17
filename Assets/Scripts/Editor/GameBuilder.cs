@@ -13,6 +13,8 @@ using UnityEngine.UI;
 public class GameAssets
 {
     public Sprite circle, square;
+    public Sprite ring, arc;  // generated: the hammer's shockwave, the sword's slash
+    public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
     public Sprite[] heroWalk;
     public EnemyData crawler, brute, spitter, colossus, force, crate, crystalCluster;
@@ -33,6 +35,7 @@ public static class GameBuilder
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
+    const string UnlitMaterialPath = "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat";
 
     static Font font;
     public static Font UIFont => font; // the UI font (set when building starts)
@@ -75,6 +78,12 @@ public static class GameBuilder
         GameAssets a = new GameAssets();
         a.circle = PlaceholderSprite("Circle", 64, true);
         a.square = PlaceholderSprite("Square", 4, false);
+        // A thin ring, and a crescent whose bright end (pointing right) fades out counter-clockwise like a slash's tail.
+        a.ring = GeneratedSprite("Ring", 128, (r, angle) => Mathf.Clamp01((r - 0.80f) / 0.06f) * Mathf.Clamp01((0.99f - r) / 0.04f));
+        a.arc = GeneratedSprite("Arc", 128, (r, angle) =>
+            Mathf.Clamp01((r - 0.55f) / 0.12f) * Mathf.Clamp01((0.99f - r) / 0.05f) * Mathf.Clamp01(1f - angle / 220f));
+        a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
+        if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
         a.heroIdle = HeroSprite("Hero_Idle");
         a.heroWalk = new[] { HeroSprite("Hero_Walk1"), HeroSprite("Hero_Walk2") }.Where(s => s != null).ToArray();
 
@@ -159,6 +168,36 @@ public static class GameBuilder
             importer.ReadTextureSettings(settings); // re-read: the lines above changed the importer
             settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
             importer.SetTextureSettings(settings);
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // A white sprite drawn from a formula, 1 world unit wide: alpha(r, angle) with r = 0 (center) to 1 (edge) and
+    // angle in degrees, 0 = right, counter-clockwise. Made once (delete the file to remake it).
+    static Sprite GeneratedSprite(string name, int size, System.Func<float, float, float> alpha)
+    {
+        string path = $"{ArtFolder}/{name}.png";
+        if (!File.Exists(path))
+        {
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float half = size / 2f;
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + 0.5f - half) / half, dy = (y + 0.5f - half) / half;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float angle = Mathf.Repeat(Mathf.Atan2(dy, dx) * Mathf.Rad2Deg, 360f);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, r > 1f ? 0f : Mathf.Clamp01(alpha(r, angle))));
+            }
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = size;
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -418,6 +457,14 @@ public static class GameBuilder
         dim.button = button;
         dim.label = label;
         dim.labelColor = label.color;
+        button.gameObject.AddComponent<ButtonMotion>().button = button; // grows on hover, bounces on click
+    }
+
+    // The panel pops in (scale + fade) every time it's shown.
+    public static void AddPopIn(Component panel, float startScale = 0.9f)
+    {
+        panel.gameObject.AddComponent<CanvasGroup>();
+        panel.gameObject.AddComponent<PopIn>().startScale = startScale;
     }
 
     // A dark outline so HUD text reads over the cave floor.

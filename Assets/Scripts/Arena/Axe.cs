@@ -29,6 +29,7 @@ public class Axe : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = 3;
+        Fx.Unlit(renderer);
 
         Axe axe = go.AddComponent<Axe>();
         axe.player = player;

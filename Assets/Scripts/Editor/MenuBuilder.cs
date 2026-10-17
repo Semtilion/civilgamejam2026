@@ -30,6 +30,7 @@ public static class MenuBuilder
 
         Button close = NewButton("Close", panel.transform, new Vector2(260, 64), 30);
         Place(close, new Vector2(0, -240));
+        AddPopIn(panel);
         panel.gameObject.SetActive(false);
 
         SettingsMenu menu = new GameObject("Settings").AddComponent<SettingsMenu>();
@@ -58,6 +59,7 @@ public static class MenuBuilder
         Place(close, new Vector2(0, -350));
         Button next = NewButton("Next", panel.transform, new Vector2(220, 64), 28);
         Place(next, new Vector2(450, -350));
+        AddPopIn(panel);
         panel.gameObject.SetActive(false);
 
         HowToPlay howToPlay = new GameObject("How To Play").AddComponent<HowToPlay>();
@@ -82,6 +84,7 @@ public static class MenuBuilder
         Button howToPlay = PauseButton("How to play", panel.transform, 10);
         Button settings = PauseButton("Settings", panel.transform, -80);
         Button quit = PauseButton("Quit to title", panel.transform, -170);
+        AddPopIn(panel);
         panel.gameObject.SetActive(false);
 
         PauseMenu menu = new GameObject("Pause Menu").AddComponent<PauseMenu>();
@@ -92,6 +95,40 @@ public static class MenuBuilder
         menu.settingsButton = settings;
         menu.quitButton = quit;
         return menu;
+    }
+
+    // Test keys (DebugKeys): a small hint in a corner, and in the dungeon (arena != null) the F1 relic list.
+    // `hintCorner`: where the hint goes, e.g. (1,1) = top-right.
+    public static DebugKeys DebugKeysUI(Transform canvas, ArenaManager arena, TownManager town, Vector2 hintCorner)
+    {
+        DebugKeys keys = new GameObject("Debug Keys").AddComponent<DebugKeys>();
+        keys.arena = arena;
+        keys.town = town;
+
+        TextAnchor alignment = hintCorner.x > 0.5f ? TextAnchor.UpperRight : TextAnchor.LowerLeft;
+        Text hint = NewText("Debug Hint", canvas, new Vector2(hintCorner.x > 0.5f ? -20 : 12, hintCorner.y > 0.5f ? -20 : 8),
+            new Vector2(900, 50), 18, alignment);
+        hint.color = new Color(1f, 1f, 1f, 0.45f);
+        Pin(hint.rectTransform, hintCorner);
+        keys.hintText = hint;
+        if (arena == null) return keys;
+
+        Image panel = NewPanel("Debug Relic Panel", canvas, Vector2.zero, new Vector2(760, 620));
+        Text title = NewText("Title", panel.transform, new Vector2(0, 260), new Vector2(700, 60), 40, TextAnchor.MiddleCenter);
+        title.text = "DEBUG: GET A RELIC";
+        title.color = TitleColor;
+        keys.relicButtons = new Button[Relics.Names.Length];
+        for (int i = 0; i < keys.relicButtons.Length; i++)
+        {
+            keys.relicButtons[i] = NewButton(Relics.Names[i], panel.transform, new Vector2(340, 50), 24);
+            Place(keys.relicButtons[i], new Vector2(i % 2 == 0 ? -180 : 180, 190 - 60 * (i / 2))); // two columns
+        }
+        keys.relicCloseButton = NewButton("Close (F1)", panel.transform, new Vector2(260, 56), 26);
+        Place(keys.relicCloseButton, new Vector2(0, -250));
+        AddPopIn(panel);
+        panel.gameObject.SetActive(false);
+        keys.relicPanel = panel.gameObject;
+        return keys;
     }
 
     static Button PauseButton(string label, Transform panel, float y)

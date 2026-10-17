@@ -102,6 +102,14 @@ public class Relics : MonoBehaviour
         return true;
     }
 
+    // Debug (F1 list): this relic, working right away. The caller also makes it owned for good.
+    public void DebugGive(RelicId id)
+    {
+        if (active[(int)id]) return;
+        active[(int)id] = true;
+        Apply(id);
+    }
+
     // Relics that change something once: weapons (equipped at Lv 1) and Glass Cannon. The rest are checked as they happen.
     void Apply(RelicId id)
     {

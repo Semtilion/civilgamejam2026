@@ -17,7 +17,11 @@ public static class TownSceneBuilder
         Camera camera = Object.FindAnyObjectByType<Camera>(); // the template has exactly one
         camera.backgroundColor = Color.black;
 
-        Transform canvas = NewCanvas("Town UI");
+        // Everything goes under a full-screen "Shake Root", so an earthquake can shake the whole town screen
+        Transform canvasRoot = NewCanvas("Town UI");
+        RectTransform shakeRoot = NewUI("Shake Root", canvasRoot, Vector2.zero, Vector2.zero);
+        Stretch(shakeRoot);
+        Transform canvas = shakeRoot;
         Image background = NewImage("Background (placeholder town)", canvas, Vector2.zero, Vector2.zero, BackgroundColor);
         Stretch(background.rectTransform);
 
@@ -75,9 +79,18 @@ public static class TownSceneBuilder
         Place(newGame, new Vector2(-220, -350));
         Button titleScreen = NewButton("Title screen", epilogue.transform, new Vector2(360, 100), 36);
         Place(titleScreen, new Vector2(220, -350));
+        AddPopIn(epilogue, 0.97f);
         epilogue.gameObject.SetActive(false);
 
-        HowToPlay howToPlay = MenuBuilder.HowToPlayPopup(canvas); // last: on top of everything
+        HowToPlay howToPlay = MenuBuilder.HowToPlayPopup(canvas); // on top of the town
+
+        // The quake flash: over everything, see-through until it flashes (UIShake)
+        Image quakeFlash = NewImage("Quake Flash", canvasRoot, Vector2.zero, Vector2.zero, new Color(1f, 0.85f, 0.6f, 0f));
+        Stretch(quakeFlash.rectTransform);
+        quakeFlash.raycastTarget = false;
+        UIShake quakeShake = new GameObject("Quake Shake").AddComponent<UIShake>();
+        quakeShake.target = shakeRoot;
+        quakeShake.flash = quakeFlash;
 
         TownManager town = new GameObject("Town Manager").AddComponent<TownManager>();
         town.config = a.townConfig;
@@ -98,6 +111,8 @@ public static class TownSceneBuilder
         town.titleButton = titleScreen;
         town.helpButton = help;
         town.howToPlay = howToPlay;
+        town.quakeShake = quakeShake;
+        MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);
     }

@@ -153,6 +153,10 @@ public class ArenaManager : MonoBehaviour
     public PauseMenu pauseMenu;
     public DamageNumbers damageNumbers;
     public DeathBursts deathBursts;
+    [Tooltip("F1-F4 test keys (editor and Development builds only).")]
+    public DebugKeys debugKeys;
+    [Tooltip("Unlit sprite material: effects, shots and pickups use it to stay bright in the dark cave.")]
+    public Material unlitMaterial;
     public Sprite xpSprite;
     public Sprite materialSprite;
     public Sprite crystalSprite;
@@ -185,7 +189,7 @@ public class ArenaManager : MonoBehaviour
     public Rect Bounds { get; private set; }
     public bool PanelOpen => panel.activeSelf;
     // False = paused (or the scene is out of date and this component switched itself off): nothing should act.
-    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen;
+    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen;
 
     Campaign campaign;
     bool horde;     // this run is the final horde, not a dive
@@ -196,6 +200,7 @@ public class ArenaManager : MonoBehaviour
     int diveCrystals;
     int diveGold;
     int diveOres;
+    readonly Ticker materialsShown = new Ticker(), crystalsShown = new Ticker(), goldShown = new Ticker(); // HUD counters
     int materialBonus; // Workshop: added to every materials drop
     float depthHeal;   // Infirmary: share of max HP healed after each cleared depth
     readonly Dictionary<EnemyData, int> diveKills = new Dictionary<EnemyData, int>();
@@ -230,6 +235,7 @@ public class ArenaManager : MonoBehaviour
     void Awake()
     {
         Bounds = new Rect(-arenaSize / 2f, arenaSize);
+        Fx.UnlitMaterial = unlitMaterial;
     }
 
     void Start()
@@ -237,7 +243,7 @@ public class ArenaManager : MonoBehaviour
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
             hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null ||
             rockSprite == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
-            deathBursts == null || lootText == null || goalBar == null)
+            deathBursts == null || lootText == null || goalBar == null || debugKeys == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -304,7 +310,8 @@ public class ArenaManager : MonoBehaviour
     void PlaceCratesAndOres()
     {
         for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
-        for (int i = 0; i < clustersPerDepth; i++) Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this);
+        for (int i = 0; i < clustersPerDepth; i++)
+            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, crystalCluster.color, 4f, 1.1f);
         for (int i = 0; i < oresPerDepth; i++)
             MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
         for (int i = 0; i < shrinesPerDepth; i++)
@@ -432,17 +439,30 @@ public class ArenaManager : MonoBehaviour
         }
         else if (!bossSpawned && teleporter == null && depthKills >= KillsNeeded)
         {
-            // Kill goal reached: a boss depth summons its boss (next Update), a normal depth opens the teleporter.
-            if (IsBossDepth)
-            {
-                bossSpawned = true;
-                bossDue = true;
-            }
-            else
-            {
-                OpenTeleporter();
-            }
+            GoalReached();
         }
+    }
+
+    // Kill goal reached: a boss depth summons its boss (next Update), a normal depth opens the teleporter.
+    void GoalReached()
+    {
+        if (IsBossDepth)
+        {
+            bossSpawned = true;
+            bossDue = true;
+        }
+        else
+        {
+            OpenTeleporter();
+        }
+    }
+
+    // Debug (F4): the depth's kill goal is met right away (not during the horde, or once it's already met).
+    public void DebugClearDepth()
+    {
+        if (horde || bossSpawned || teleporter != null) return;
+        depthKills = Mathf.Max(depthKills, KillsNeeded);
+        GoalReached();
     }
 
     void DropLoot(Enemy enemy)
@@ -472,7 +492,9 @@ public class ArenaManager : MonoBehaviour
         glow.sprite = teleporterSprite;
         glow.color = TeleporterColor;
         glow.sortingOrder = -2; // under the stairs, pickups and enemies
+        Fx.Unlit(glow);
         teleporterGlow = glow.transform;
+        Glow.Add(teleporter, TeleporterColor, 5f, 1.3f); // lights up the cave around it
 
         if (teleporterStairs != null)
         {
@@ -575,6 +597,7 @@ public class ArenaManager : MonoBehaviour
     void Tremor()
     {
         cameraFollow.Shake(tremorTime, tremorStrength);
+        deathBursts.Debris(CameraView); // pebbles and dust fall from the ceiling
         trap = (Trap)Random.Range(0, 3);
         trapDelay = tremorTime;
     }
@@ -626,6 +649,24 @@ public class ArenaManager : MonoBehaviour
             point.y = Mathf.Clamp(point.y, inside.yMin, inside.yMax);
             SpawnRandomEnemy(point);
         }
+    }
+
+    // The part of the world the camera shows.
+    Rect CameraView
+    {
+        get
+        {
+            float halfHeight = cam.orthographicSize;
+            float halfWidth = halfHeight * cam.aspect;
+            Vector2 center = cam.transform.position;
+            return new Rect(center.x - halfWidth, center.y - halfHeight, halfWidth * 2f, halfHeight * 2f);
+        }
+    }
+
+    // A short camera jolt (e.g. the Quake Hammer's slam).
+    public void ShakeCamera(float duration, float strength)
+    {
+        cameraFollow.Shake(duration, strength);
     }
 
     // A random spot in the camera view, inside the cave.
@@ -858,7 +899,9 @@ public class ArenaManager : MonoBehaviour
         {
             string depthLabel = depth >= forceDepth ? $"Depth {depth} (the force)" : IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}";
             depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}";
-            lootText.text = $"Materials {diveMaterials}     Crystals {diveCrystals}     Gold {diveGold}";
+            float dt = Time.unscaledDeltaTime; // the counters roll up toward the real numbers
+            lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
+                            $"Gold {goldShown.Next(diveGold, dt)}";
 
             float oreDrop = diveOres * config.orePercent;
             string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";

@@ -26,6 +26,7 @@ public class Dagger : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = 3;
+        Fx.Unlit(renderer);
 
         Dagger dagger = go.AddComponent<Dagger>();
         dagger.velocity = direction * speed;

@@ -109,6 +109,14 @@ public class LevelUp : MonoBehaviour
         Gain(XpToNext * share);
     }
 
+    // Debug (F2): exactly enough XP for the next level.
+    public void DebugLevelUp()
+    {
+        if (!levelingEnabled) return;
+        xp = XpToNext;
+        Gain(0f);
+    }
+
     void Gain(float amount)
     {
         if (!levelingEnabled) return;

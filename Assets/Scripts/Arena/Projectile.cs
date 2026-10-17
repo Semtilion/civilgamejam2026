@@ -24,6 +24,7 @@ public class Projectile : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = 2;
+        Fx.Unlit(renderer); // shots must stay visible in the dark
 
         Projectile projectile = go.AddComponent<Projectile>();
         projectile.velocity = direction * speed;

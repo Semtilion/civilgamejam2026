@@ -67,6 +67,8 @@ public class CrystalOrbit : Weapon
             crystal.sprite = crystalSprite;
             crystal.color = crystalColor;
             crystal.sortingOrder = 4;
+            Fx.Unlit(crystal);
+            Glow.Add(crystal.gameObject, crystalColor, 1.6f, 0.7f);
             crystal.transform.localScale = Vector3.one * crystalRadius * 2f; // placeholder circle is 1 unit wide
             crystals.Add(crystal.transform);
         }

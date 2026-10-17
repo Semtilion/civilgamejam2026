@@ -30,6 +30,7 @@ public class FireBomb : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = 3;
+        Fx.Unlit(renderer);
 
         FireBomb bomb = go.AddComponent<FireBomb>();
         bomb.sprite = renderer;
@@ -86,6 +87,7 @@ public class FireBomb : MonoBehaviour
         color.a = PatchAlpha;
         sprite.color = color;
         sprite.sortingOrder = -1;
+        Glow.Add(gameObject, new Color(1f, 0.55f, 0.2f), radius * 2.5f, 1.1f); // the fire lights up the cave
     }
 
     void Burn()

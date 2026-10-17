@@ -2,10 +2,12 @@ using UnityEngine;
 
 // Lashes a straight line toward the nearest enemy (a bit longer than the sword's reach), hitting everything in it.
 // Only lashes when an enemy is within reach. Bonus: longer line.
+// Look: the lash snaps out from the hero to its full length, then thins and fades.
 public class WhipLash : Weapon
 {
-    const float FlashTime = 0.15f;
-    const float FlashAlpha = 0.6f;
+    const float SnapTime = 0.07f;
+    const float FlashTime = 0.22f;
+    const float FlashAlpha = 0.85f;
 
     [Header("Whip")]
     public float length = 3.2f;
@@ -17,6 +19,8 @@ public class WhipLash : Weapon
     public SpriteRenderer lashVisual;
 
     float sinceLash = 99f;
+    Vector2 lashDirection = Vector2.right;
+    float lashReach;
 
     float Length => (length + bonusLength * BonusCount) * player.areaMultiplier;
     float Width => width * player.areaMultiplier;
@@ -42,10 +46,9 @@ public class WhipLash : Weapon
                 enemy.TakeDamage(Damage, origin, knockback);
         }
 
-        // Placeholder visual: stretch the bar from the hero to the end of the lash.
-        lashVisual.transform.localPosition = direction * (reach / 2f);
+        lashDirection = direction;
+        lashReach = reach;
         lashVisual.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
-        lashVisual.transform.localScale = new Vector3(reach, Width, 1f);
         sinceLash = 0f;
         return true;
     }
@@ -55,6 +58,12 @@ public class WhipLash : Weapon
         base.Update();
         sinceLash += Time.deltaTime;
         FadeFlash(lashVisual, sinceLash, FlashTime, FlashAlpha);
+
+        // Placeholder visual: a bar from the hero that shoots out to the end of the lash, then thins.
+        float length = lashReach * Mathf.Clamp01(sinceLash / SnapTime);
+        float thin = 1f - 0.5f * Mathf.Clamp01(sinceLash / FlashTime);
+        lashVisual.transform.localPosition = lashDirection * (length / 2f);
+        lashVisual.transform.localScale = new Vector3(length, Width * thin, 1f);
     }
 
     void OnDisable()

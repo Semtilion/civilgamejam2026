@@ -1,6 +1,7 @@
 using System.Linq;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 using static GameBuilder;
@@ -66,15 +67,19 @@ public static class ArenaSceneBuilder
         LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, "A lightning bolt strikes a random enemy on screen.",                     "+1 bolt",     15, 3, 1.2f);
         FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       "Lobs a fire bomb that leaves a burning patch.",                           "+bigger fire", 6, 2, 2.0f);
         AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
-        sword.sweepVisual = NewFlashSprite("Sweep", a.circle, hero.transform);
+        sword.sweepVisual = NewFlashSprite("Slash", a.arc, hero.transform, a.unlit); // spins once around the hero
         dagger.daggerSprite = a.square;
-        whip.lashVisual = NewFlashSprite("Lash", a.square, hero.transform);
+        whip.lashVisual = NewFlashSprite("Lash", a.square, hero.transform, a.unlit);
         orbit.crystalSprite = a.circle;
         hammer.radius = 3.5f;
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;
-        hammer.sweepVisual = NewFlashSprite("Slam", a.circle, hero.transform);
-        hammer.sweepVisual.color = new Color(0.85f, 0.55f, 0.30f, 0f); // brown dust (the alpha is set by the weapon)
+        hammer.style = SwordSweep.SweepStyle.Shockwave;
+        hammer.sweepVisual = NewFlashSprite("Shockwave", a.ring, hero.transform, a.unlit);
+        hammer.sweepVisual.color = new Color(0.95f, 0.70f, 0.40f, 0f); // dusty orange (the alpha is set by the weapon)
+
+        // The cave is dark: a soft light follows the hero
+        NewLight("Hero Light", hero.transform, new Color(1f, 0.92f, 0.80f), 9f, 0.75f);
         staff.boltSprite = a.square;
         staff.impactSprite = a.circle;
         bomb.bombSprite = a.circle;
@@ -87,6 +92,13 @@ public static class ArenaSceneBuilder
         camera.orthographicSize = 6f;
         camera.backgroundColor = Color.black;
         camera.transform.position = new Vector3(0f, 0f, -10f);
+        // The template's global light, dimmed to a cold dark: torches, the hero's light and glows do the rest
+        Light2D globalLight = Object.FindObjectsByType<Light2D>().FirstOrDefault(l => l.lightType == Light2D.LightType.Global);
+        if (globalLight != null)
+        {
+            globalLight.intensity = 0.35f;
+            globalLight.color = new Color(0.70f, 0.75f, 1f);
+        }
         CameraFollow follow = camera.gameObject.AddComponent<CameraFollow>();
         follow.target = hero.transform;
         follow.arena = arena;
@@ -99,6 +111,7 @@ public static class ArenaSceneBuilder
         damageNumbers.font = UIFont;
         DeathBursts deathBursts = new GameObject("Death Bursts").AddComponent<DeathBursts>();
         deathBursts.pieceSprite = a.square;
+        deathBursts.material = a.unlit;
         arena.damageNumbers = damageNumbers;
         arena.deathBursts = deathBursts;
 
@@ -146,6 +159,7 @@ public static class ArenaSceneBuilder
         RectTransform buttonRow = NewRow("Buttons", panel.transform, new Vector2(0, -140), new Vector2(900, 90), 40);
         Button primaryButton = NewButton("Primary", buttonRow, new Vector2(320, 80));
         Button secondaryButton = NewButton("Secondary", buttonRow, new Vector2(320, 80));
+        AddPopIn(panel);
         panel.gameObject.SetActive(false);
 
         // Bottom: XP bar + level (hidden if Leveling Enabled is unticked)
@@ -173,6 +187,7 @@ public static class ArenaSceneBuilder
             cardDescriptions[i] = NewText("Description", card.transform, new Vector2(0, -40), new Vector2(350, 200), 24, TextAnchor.MiddleCenter);
             StyleButton(cardButtons[i], card, cardTitles[i]); // highlights on hover
         }
+        AddPopIn(cardPanel);
         cardPanel.gameObject.SetActive(false);
 
         // Esc pause menu, with How to play and Settings on top of it (last: drawn above everything)
@@ -180,6 +195,7 @@ public static class ArenaSceneBuilder
         pauseMenu.howToPlay = MenuBuilder.HowToPlayPopup(canvas);
         pauseMenu.settings = MenuBuilder.Settings(canvas);
         arena.pauseMenu = pauseMenu;
+        arena.debugKeys = MenuBuilder.DebugKeysUI(canvas, arena, null, new Vector2(1f, 1f)); // hint top-right
 
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();
@@ -221,6 +237,7 @@ public static class ArenaSceneBuilder
         arena.oreScale = pillar != null ? 1f : 1.2f;
         arena.whiteSquare = a.square;
         arena.rockSprite = a.circle;
+        arena.unlitMaterial = a.unlit;
         Relics relics = arena.gameObject.AddComponent<Relics>();
         relics.arena = arena;
         relics.circleSprite = a.circle;
@@ -317,10 +334,15 @@ public static class ArenaSceneBuilder
     {
         float halfWidth = size.x / 2f, halfHeight = size.y / 2f;
 
+        // Torches on the north wall, each with a warm flickering light
         Sprite torch = PropSprite("Prop_Torch");
         if (torch != null)
             for (float x = -halfWidth + 4f; x < halfWidth; x += 8f)
-                NewSprite("Torch", torch, new Vector2(x, halfHeight + 0.5f), Vector2.one, Color.white, -4);
+            {
+                SpriteRenderer torchSprite = NewSprite("Torch", torch, new Vector2(x, halfHeight + 0.5f), Vector2.one, Color.white, -4);
+                Light2D torchLight = NewLight("Torch Light", torchSprite.transform, new Color(1f, 0.60f, 0.25f), 6f, 1.2f);
+                torchSprite.gameObject.AddComponent<Flicker>().torchLight = torchLight;
+            }
 
         Sprite barrel = PropSprite("Prop_Barrel");
         if (barrel == null) return;
@@ -349,11 +371,27 @@ public static class ArenaSceneBuilder
     }
 
     // Invisible child sprite a weapon flashes on each attack (the weapon sets its alpha, size and rotation).
-    static SpriteRenderer NewFlashSprite(string name, Sprite sprite, Transform hero)
+    // `material`: unlit, so the flash stays bright in the dark cave (null = the default lit one).
+    static SpriteRenderer NewFlashSprite(string name, Sprite sprite, Transform hero, Material material)
     {
         SpriteRenderer renderer = NewSprite(name, sprite, Vector2.zero, Vector2.one, new Color(1f, 1f, 1f, 0f), 4);
         renderer.transform.SetParent(hero, false);
+        if (material != null) renderer.sharedMaterial = material;
         return renderer;
+    }
+
+    // A 2D point light (lights every sorting layer by default), a child of `parent`.
+    static Light2D NewLight(string name, Transform parent, Color color, float radius, float intensity)
+    {
+        Light2D light = new GameObject(name).AddComponent<Light2D>();
+        light.transform.SetParent(parent, false);
+        light.lightType = Light2D.LightType.Point;
+        light.color = color;
+        light.pointLightOuterRadius = radius;
+        light.pointLightInnerRadius = radius * 0.2f;
+        light.intensity = intensity;
+        light.falloffIntensity = 0.6f;
+        return light;
     }
 
     static T SetWeapon<T>(T weapon, WeaponId id, string description, string bonusText,

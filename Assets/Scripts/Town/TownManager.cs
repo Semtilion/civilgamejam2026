@@ -32,6 +32,8 @@ public class TownManager : MonoBehaviour
     [Tooltip("The \"?\" button: opens How to play.")]
     public Button helpButton;
     public HowToPlay howToPlay;
+    [Tooltip("Shakes and flashes the town once after an earthquake.")]
+    public UIShake quakeShake;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
@@ -41,6 +43,7 @@ public class TownManager : MonoBehaviour
 
     Campaign campaign;
     int selected;
+    Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
 
     // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
@@ -50,6 +53,9 @@ public class TownManager : MonoBehaviour
     {
         Time.timeScale = 1f;
         campaign = Campaign.Current ?? Campaign.StartNew(config); // a new game when the game starts here
+        materialsShown = new Ticker(campaign.shownMaterials); // from what you saw when you left
+        crystalsShown = new Ticker(campaign.shownCrystals);
+        goldShown = new Ticker(campaign.shownGold);
 
         for (int i = 0; i < npcButtons.Length; i++)
         {
@@ -63,13 +69,13 @@ public class TownManager : MonoBehaviour
             int slot = i; // copy for the lambda
             buildingButtons[i].onClick.AddListener(() => { campaign.Build(shownBuildings[slot]); Refresh(); });
         }
-        diveButton.onClick.AddListener(() => SceneManager.LoadScene(arenaScene)); // the arena runs the horde on day 15
+        diveButton.onClick.AddListener(() => Leave(arenaScene)); // the arena runs the horde on day 15
         newGameButton.onClick.AddListener(() =>
         {
             Campaign.StartNew(config);
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         });
-        titleButton.onClick.AddListener(() => SceneManager.LoadScene(titleScene));
+        titleButton.onClick.AddListener(() => Leave(titleScene));
         helpButton.onClick.AddListener(howToPlay.Open);
 
         Refresh();
@@ -78,12 +84,38 @@ public class TownManager : MonoBehaviour
             campaign.howToPlayShown = true;
             howToPlay.Open();
         }
+        if (campaign.quakeSinceTown) // the quake hit while you were away
+        {
+            campaign.quakeSinceTown = false;
+            quakeShake.Play(0.9f, 24f);
+        }
     }
 
-    void Refresh()
+    void Update()
     {
-        statusText.text = $"Day {campaign.day}    Materials {campaign.materials}    Crystals {campaign.crystals}    " +
-                          $"Gold {campaign.gold}    Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
+        statusText.text = StatusLine(Time.unscaledDeltaTime); // the counters roll
+    }
+
+    // Remembers the counters (so they roll from here next time), then loads the scene.
+    void Leave(string scene)
+    {
+        campaign.shownMaterials = campaign.materials;
+        campaign.shownCrystals = campaign.crystals;
+        campaign.shownGold = campaign.gold;
+        SceneManager.LoadScene(scene);
+    }
+
+    string StatusLine(float deltaTime)
+    {
+        return $"Day {campaign.day}    Materials {materialsShown.Next(campaign.materials, deltaTime)}    " +
+               $"Crystals {crystalsShown.Next(campaign.crystals, deltaTime)}    Gold {goldShown.Next(campaign.gold, deltaTime)}    " +
+               $"Population {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
+    }
+
+    // Redraws everything from Campaign.Current (also called by the debug keys).
+    public void Refresh()
+    {
+        statusText.text = StatusLine(0f);
 
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));

@@ -8,7 +8,7 @@ public class FallingRock : MonoBehaviour
     public static readonly List<FallingRock> All = new List<FallingRock>();
 
     const float LandedTime = 0.3f;
-    static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.45f);
+    static readonly Color ShadowColor = new Color(0.30f, 0.04f, 0.04f, 0.6f); // dark red: reads as danger on the dark floor
     static readonly Color RockColor = new Color(0.50f, 0.45f, 0.40f);
 
     SpriteRenderer sprite;
@@ -28,6 +28,7 @@ public class FallingRock : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = ShadowColor;
         renderer.sortingOrder = -1; // on the floor, under everyone
+        Fx.Unlit(renderer); // the warning must stay visible in the dark
 
         FallingRock rock = go.AddComponent<FallingRock>();
         rock.sprite = renderer;

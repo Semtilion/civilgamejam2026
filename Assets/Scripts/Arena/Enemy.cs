@@ -3,6 +3,8 @@ using UnityEngine;
 
 // One enemy in the arena. Moves in code, no physics: enemies overlap freely and are kept inside the cave walls.
 // Hits the hero by touch (distance check).
+// Look: pops in with a dust puff, wobbles (squash and stretch) while moving, Spitters breathe and swell before a shot,
+// bosses tremble while winding up, and everything squishes when hit. Only the look: hits use data.radius.
 public class Enemy : MonoBehaviour
 {
     enum BossState { Chase, WindUp, Charge }
@@ -11,6 +13,8 @@ public class Enemy : MonoBehaviour
 
     const float KnockbackTime = 0.15f;
     const float FlashTime = 0.08f;
+    const float SpawnTime = 0.3f;  // grows in
+    const float SquishTime = 0.15f; // flattens when hit, then springs back
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
 
@@ -29,6 +33,8 @@ public class Enemy : MonoBehaviour
     Vector2 chargeDirection;
     bool aiming;          // shooter is flashing red, about to fire
     Vector2 aimDirection; // locked when the flash starts
+    Vector3 baseScale;    // the size from data.radius
+    float age, animTime, squishTimer, wobblePhase;
 
     public bool IsDead => hp <= 0;
 
@@ -61,6 +67,11 @@ public class Enemy : MonoBehaviour
         projectileDamage = Mathf.RoundToInt(data.projectileDamage * statScale);
         fireTimer = Mathf.Max(0f, data.fireInterval - data.fireWarning);
         stateTimer = data.chargeInterval;
+
+        baseScale = transform.localScale;
+        transform.localScale = Vector3.zero; // grows in (Animate)
+        wobblePhase = Random.value * 10f;
+        arena.deathBursts.Puff(transform.position, data.radius);
         All.Add(this);
     }
 
@@ -88,6 +99,53 @@ public class Enemy : MonoBehaviour
         bool warning = aiming || bossState == BossState.WindUp;
         Color normal = slowTimer > 0f ? Color.Lerp(data.color, IceColor, 0.6f) : data.color; // icy while chilled
         sprite.color = flashTimer > 0f ? Color.white : warning ? WarningColor : normal;
+        Animate();
+    }
+
+    // The look only (scale and tilt of this object; the size used for hits is data.radius).
+    void Animate()
+    {
+        age += Time.deltaTime;
+        animTime += delta; // slower while chilled
+        if (squishTimer > 0f) squishTimer -= Time.deltaTime;
+
+        float sx = 1f, sy = 1f, angle = 0f;
+        bool windingUp = data.behavior == EnemyBehavior.Boss && bossState == BossState.WindUp;
+        if (windingUp)
+        {
+            angle = Random.Range(-6f, 6f); // trembles, swollen, before the charge
+            sx = sy = 1.1f;
+        }
+        else if (data.behavior == EnemyBehavior.Chaser || data.behavior == EnemyBehavior.Boss)
+        {
+            // Bouncy walk: squash and stretch plus a tilt, faster for faster enemies.
+            float bounce = Mathf.Sin(animTime * (6f + data.moveSpeed * 2f) + wobblePhase);
+            sx += 0.12f * bounce;
+            sy -= 0.12f * bounce;
+            angle = 7f * Mathf.Sin(animTime * (3f + data.moveSpeed) + wobblePhase);
+        }
+        else if (data.behavior == EnemyBehavior.Shooter)
+        {
+            float breath = 0.06f * Mathf.Sin(animTime * 3f + wobblePhase);
+            sx -= breath * 0.5f;
+            sy += breath;
+            if (aiming)
+            {
+                sx *= 1.15f; // swells before it fires
+                sy *= 1.15f;
+            }
+        }
+
+        if (squishTimer > 0f)
+        {
+            float squish = squishTimer / SquishTime;
+            sx += 0.35f * squish;
+            sy -= 0.3f * squish;
+        }
+
+        float grow = Fx.EaseOutBack(age / SpawnTime);
+        transform.localScale = new Vector3(baseScale.x * sx * grow, baseScale.y * sy * grow, 1f);
+        transform.localRotation = Quaternion.Euler(0f, 0f, angle);
     }
 
     void Move()
@@ -180,6 +238,7 @@ public class Enemy : MonoBehaviour
 
         hp -= amount;
         flashTimer = FlashTime;
+        squishTimer = SquishTime;
         if (amount > 0) arena.damageNumbers.Show(transform.position, amount, weaponHit);
         if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)

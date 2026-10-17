@@ -33,6 +33,7 @@ public class FadeEffect : MonoBehaviour
         renderer.sprite = sprite;
         renderer.color = color;
         renderer.sortingOrder = 4;
+        Fx.Unlit(renderer); // bright in the dark cave
 
         FadeEffect effect = go.AddComponent<FadeEffect>();
         effect.sprite = renderer;

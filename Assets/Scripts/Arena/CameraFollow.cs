@@ -44,9 +44,10 @@ public class CameraFollow : MonoBehaviour
         transform.position = follow + shakeOffset;
     }
 
-    // Shakes the view for `duration` seconds, up to `strength` units off.
+    // Shakes the view for `duration` seconds, up to `strength` units off. A weaker shake doesn't cut a stronger one short.
     public void Shake(float duration, float strength)
     {
+        if (shakeLeft > 0f && shakeStrength * shakeLeft / shakeTime > strength) return;
         shakeTime = duration;
         shakeLeft = duration;
         shakeStrength = strength;
