@@ -156,6 +156,11 @@ public class TownConfig : ScriptableObject
              "untreated this many days after the quake die.")]
     public int injuredDays = 2;
 
+    [Header("Relics")]
+    [Tooltip("Off: Glass Cannon is never found (bosses, variants) and isn't counted in the town's relic total. The F1 " +
+             "debug list can still give it.")]
+    public bool glassCannonEnabled;
+
     public Quest NewQuest()
     {
         if (killQuests.Length == 0 || Random.value < materialQuestChance)

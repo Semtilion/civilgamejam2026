@@ -337,15 +337,16 @@ public class TownManager : MonoBehaviour
     string RelicsSummary()
     {
         string list = "";
-        int owned = 0;
+        int owned = 0, total = 0;
         for (int i = 0; i < campaign.relicOwned.Length; i++)
         {
+            if (Relics.Findable((RelicId)i, campaign.config)) total++;
             if (!campaign.relicOwned[i]) continue;
             owned++;
             list += "\n" + Relics.Names[i];
         }
         if (owned == 0) list = "\nNone yet";
-        return $"RELICS {owned}/{campaign.relicOwned.Length}{list}";
+        return $"RELICS {owned}/{total}{list}";
     }
 
     string QuestProgress(Quest quest)

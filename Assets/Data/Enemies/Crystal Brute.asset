@@ -20,6 +20,8 @@ MonoBehaviour:
   artFacesLeft: 1
   color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.6
+  shadowSize: {x: 1.05, y: 0.34}
+  shadowOffset: {x: 0.12, y: -0.88}
   maxHp: 60
   moveSpeed: 1.4
   contactDamage: 15
@@ -48,3 +50,4 @@ MonoBehaviour:
   chargeWindup: 0.8
   chargeSpeed: 12
   chargeDuration: 0.6
+  chargeRest: 0.5

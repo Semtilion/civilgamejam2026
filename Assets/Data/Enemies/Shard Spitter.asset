@@ -14,8 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Shard Spitter
   sprite: {fileID: 21300000, guid: d4349bea61d76b042a6f44cdab36d3a8, type: 3}
+  walkFrames: []
+  artFacesLeft: 0
   color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.4
+  shadowSize: {x: 1.3, y: 0.42}
+  shadowOffset: {x: 0, y: -1.1}
   maxHp: 20
   moveSpeed: 2.2
   contactDamage: 5
@@ -44,3 +48,4 @@ MonoBehaviour:
   chargeWindup: 0.8
   chargeSpeed: 12
   chargeDuration: 0.6
+  chargeRest: 0.5

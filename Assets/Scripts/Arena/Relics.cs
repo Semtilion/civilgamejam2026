@@ -72,7 +72,19 @@ public class Relics : MonoBehaviour
     bool secondWindUsed;
 
     public bool Has(RelicId id) => active[(int)id];
-    public bool AnyMissing => System.Array.IndexOf(active, false) >= 0; // a relic could still be found
+
+    // A relic the game can drop: all of them, but Glass Cannon only while the Town Config has it on.
+    public static bool Findable(RelicId id, TownConfig config) => id != RelicId.GlassCannon || config.glassCannonEnabled;
+
+    public bool AnyMissing // a relic could still be found
+    {
+        get
+        {
+            for (int i = 0; i < active.Length; i++)
+                if (!active[i] && Findable((RelicId)i, arena.config)) return true;
+            return false;
+        }
+    }
     public IReadOnlyList<RelicId> FoundThisDive => foundThisDive;
 
     // Start of a dive or the horde, after the town loadout: the relics you own (weapons at Lv 1).
@@ -87,12 +99,12 @@ public class Relics : MonoBehaviour
         }
     }
 
-    // A boss died: one random relic you don't have yet, working right away. False if you have them all.
+    // A boss died: one random relic you don't have yet (and can be found), working right away. False if there's none.
     public bool TryFind(out RelicId found)
     {
         List<int> missing = new List<int>();
         for (int i = 0; i < active.Length; i++)
-            if (!active[i]) missing.Add(i);
+            if (!active[i] && Findable((RelicId)i, arena.config)) missing.Add(i);
 
         found = default;
         if (missing.Count == 0) return false;
