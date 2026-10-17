@@ -152,6 +152,12 @@ public static class ArenaSceneBuilder
         }
         cardPanel.gameObject.SetActive(false);
 
+        // Esc pause menu, with How to play and Settings on top of it (last: drawn above everything)
+        PauseMenu pauseMenu = MenuBuilder.Pause(canvas, arena);
+        pauseMenu.howToPlay = MenuBuilder.HowToPlayPopup(canvas);
+        pauseMenu.settings = MenuBuilder.Settings(canvas);
+        arena.pauseMenu = pauseMenu;
+
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();
         leveling.weapons = new Weapon[] { sword, dagger, whip, orbit, hammer, staff, bomb, axe };

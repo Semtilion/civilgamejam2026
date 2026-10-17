@@ -47,6 +47,7 @@ public class ArenaManager : MonoBehaviour
     [Header("Game")]
     public TownConfig config;
     public string townScene = "Town";
+    public string titleScene = "Title";
 
     [Header("Arena")]
     public Vector2 arenaSize = new Vector2(64f, 40f);
@@ -148,6 +149,8 @@ public class ArenaManager : MonoBehaviour
     public LevelUp leveling;
     [Tooltip("On this object: the relics owned and found, and their effects.")]
     public Relics relics;
+    [Tooltip("The Esc menu (Resume / How to play / Settings / Quit to title).")]
+    public PauseMenu pauseMenu;
     public Sprite xpSprite;
     public Sprite materialSprite;
     public Sprite crystalSprite;
@@ -175,7 +178,7 @@ public class ArenaManager : MonoBehaviour
     public Rect Bounds { get; private set; }
     public bool PanelOpen => panel.activeSelf;
     // False = paused (or the scene is out of date and this component switched itself off): nothing should act.
-    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing;
+    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen;
 
     Campaign campaign;
     bool horde;     // this run is the final horde, not a dive
@@ -225,7 +228,7 @@ public class ArenaManager : MonoBehaviour
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
             hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null ||
-            rockSprite == null || relics == null || goldSprite == null)
+            rockSprite == null || relics == null || goldSprite == null || pauseMenu == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -625,21 +628,29 @@ public class ArenaManager : MonoBehaviour
     }
 
     // Back to town: the campaign takes the loot (or not), the day passes, and the Town scene loads.
-    void EndDive(bool survived)
+    void EndDive(bool survived, string nextScene = null)
     {
         campaign.RecordDive(kills, depth, diveOres);
         campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveGold, diveOres, relics.FoundThisDive);
         Time.timeScale = 1f;
-        SceneManager.LoadScene(townScene);
+        SceneManager.LoadScene(nextScene ?? townScene);
     }
 
     // The game is over (won or lost): record this fight's stats, then the Town scene shows the epilogue.
-    void FinishGame(bool won, string reason)
+    void FinishGame(bool won, string reason, string nextScene = null)
     {
         campaign.RecordDive(kills, depth, diveOres);
         campaign.EndGame(won, reason);
         Time.timeScale = 1f;
-        SceneManager.LoadScene(townScene);
+        SceneManager.LoadScene(nextScene ?? townScene);
+    }
+
+    // Pause menu > Quit to title. Counts as dying, so it can't be used to retry a bad dive: the dive's loot is lost and
+    // a day passes. During the horde, the town falls.
+    public void QuitToTitle()
+    {
+        if (horde) FinishGame(false, "You abandoned the town on the last night.", titleScene);
+        else EndDive(false, titleScene);
     }
 
     // ---------- Final horde ----------

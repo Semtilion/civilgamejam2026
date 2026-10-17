@@ -5,14 +5,16 @@ using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
 // selected leader (their faction's people, their request, Give button, and their district's buildings), the relics you
-// own, and Dive ("Defend the town" on the horde day). State lives in Campaign.Current. When the game has ended (won or
-// lost), the epilogue covers the screen.
+// own, a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on the horde
+// day). State lives in Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen
+// (New game / Title screen).
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
 
     public TownConfig config;
     public string arenaScene = "Arena";
+    public string titleScene = "Title";
 
     [Header("Scene references")]
     public Text statusText;
@@ -27,11 +29,15 @@ public class TownManager : MonoBehaviour
     public Button diveButton;
     [Tooltip("Lists the relics you own.")]
     public Text relicsText;
+    [Tooltip("The \"?\" button: opens How to play.")]
+    public Button helpButton;
+    public HowToPlay howToPlay;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
     public Text epilogueBody;
     public Button newGameButton;
+    public Button titleButton;
 
     Campaign campaign;
     int selected;
@@ -63,8 +69,15 @@ public class TownManager : MonoBehaviour
             Campaign.StartNew(config);
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         });
+        titleButton.onClick.AddListener(() => SceneManager.LoadScene(titleScene));
+        helpButton.onClick.AddListener(howToPlay.Open);
 
         Refresh();
+        if (!campaign.howToPlayShown) // a new game: explain it once
+        {
+            campaign.howToPlayShown = true;
+            howToPlay.Open();
+        }
     }
 
     void Refresh()

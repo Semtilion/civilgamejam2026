@@ -20,7 +20,8 @@ public class GameAssets
 }
 
 // Menu: Jam > Build Game Scenes. Creates the placeholder sprites, enemy data and Town Config (existing ones are kept,
-// so tuned values are safe), then builds Assets/Scenes/Town.unity and Arena.unity. Also holds the shared helpers.
+// so tuned values are safe), then builds Assets/Scenes/Title.unity, Town.unity and Arena.unity. Also holds the shared
+// helpers (the shared menu panels are in MenuBuilder).
 public static class GameBuilder
 {
     const string TemplatePath = "Assets/Settings/Scenes/URP2DSceneTemplate.unity";
@@ -38,9 +39,10 @@ public static class GameBuilder
     [MenuItem("Jam/Build Game Scenes")]
     static void BuildAll()
     {
-        bool exists = File.Exists(ArenaSceneBuilder.ScenePath) || File.Exists(TownSceneBuilder.ScenePath);
+        bool exists = File.Exists(ArenaSceneBuilder.ScenePath) || File.Exists(TownSceneBuilder.ScenePath) ||
+                      File.Exists(TitleSceneBuilder.ScenePath);
         if (exists && !EditorUtility.DisplayDialog("Build Game Scenes",
-                "Rebuild Town.unity and Arena.unity?\n(Sprites, enemy data and the Town Config are kept.)", "Rebuild", "Cancel"))
+                "Rebuild Title.unity, Town.unity and Arena.unity?\n(Sprites, enemy data and the Town Config are kept.)", "Rebuild", "Cancel"))
             return;
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             return;
@@ -54,9 +56,10 @@ public static class GameBuilder
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         GameAssets assets = EnsureAssets();
         ArenaSceneBuilder.Build(assets);
-        TownSceneBuilder.Build(assets); // built last, so it's the open scene: press Play to start the game
-        SetBuildList(TownSceneBuilder.ScenePath, ArenaSceneBuilder.ScenePath);
-        Debug.Log("Built Town and Arena. Press Play in the Town scene to start a new game.");
+        TownSceneBuilder.Build(assets);
+        TitleSceneBuilder.Build(assets); // built last, so it's the open scene: press Play to start the game
+        SetBuildList(TitleSceneBuilder.ScenePath, TownSceneBuilder.ScenePath, ArenaSceneBuilder.ScenePath);
+        Debug.Log("Built Title, Town and Arena. Press Play in the Title scene to start (Town or Arena also work for testing).");
     }
 
     // ---------- Assets ----------
@@ -323,6 +326,12 @@ public static class GameBuilder
         rect.anchorMax = anchor;
         rect.pivot = anchor;
         rect.anchoredPosition = position;
+    }
+
+    // Moves a UI element (e.g. a button made by NewButton) within its parent.
+    public static void Place(Component element, Vector2 position)
+    {
+        ((RectTransform)element.transform).anchoredPosition = position;
     }
 
     public static void Stretch(RectTransform rect)

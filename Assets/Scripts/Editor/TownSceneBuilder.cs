@@ -5,8 +5,8 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the detail panel (Give button, district buildings), the relics box, the Dive button
-// and the epilogue screen.
+// news, one button per faction leader, the detail panel (Give button, district buildings), the relics box, the Dive button,
+// the "?" button, the epilogue screen and the How to play popup.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -58,14 +58,24 @@ public static class TownSceneBuilder
         diveRect.anchoredPosition = new Vector2(-40, 40);
         Pin(diveRect, new Vector2(1f, 0f));
 
-        // Epilogue: covers everything once the game has ended (last child, so it draws on top and blocks clicks)
+        // Top-right: "?" opens How to play
+        Button help = NewButton("?", canvas, new Vector2(70, 70), 44);
+        RectTransform helpRect = (RectTransform)help.transform;
+        helpRect.anchoredPosition = new Vector2(-20, -20);
+        Pin(helpRect, new Vector2(1f, 1f));
+
+        // Epilogue: covers everything once the game has ended (draws over the town and blocks its clicks)
         Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.04f, 0.96f));
         Stretch(epilogue.rectTransform);
         Text epilogueTitle = NewText("Title", epilogue.transform, new Vector2(0, 330), new Vector2(1600, 100), 72, TextAnchor.MiddleCenter);
         Text epilogueBody = NewText("Body", epilogue.transform, new Vector2(0, 20), new Vector2(1500, 460), 30, TextAnchor.MiddleCenter);
         Button newGame = NewButton("New game", epilogue.transform, new Vector2(360, 100), 36);
-        ((RectTransform)newGame.transform).anchoredPosition = new Vector2(0, -350);
+        Place(newGame, new Vector2(-220, -350));
+        Button titleScreen = NewButton("Title screen", epilogue.transform, new Vector2(360, 100), 36);
+        Place(titleScreen, new Vector2(220, -350));
         epilogue.gameObject.SetActive(false);
+
+        HowToPlay howToPlay = MenuBuilder.HowToPlayPopup(canvas); // last: on top of everything
 
         TownManager town = new GameObject("Town Manager").AddComponent<TownManager>();
         town.config = a.townConfig;
@@ -83,6 +93,9 @@ public static class TownSceneBuilder
         town.epilogueTitle = epilogueTitle;
         town.epilogueBody = epilogueBody;
         town.newGameButton = newGame;
+        town.titleButton = titleScreen;
+        town.helpButton = help;
+        town.howToPlay = howToPlay;
 
         EditorSceneManager.SaveScene(scene);
     }

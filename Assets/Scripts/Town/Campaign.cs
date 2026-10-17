@@ -52,6 +52,7 @@ public class Campaign
     public int gold;
     public float quakeMeter; // %
     float passiveRise;       // all the passive quake rise so far (never undone by quakes)
+    public bool howToPlayShown; // the town pops up How to play once per new game
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
