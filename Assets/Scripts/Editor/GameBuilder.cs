@@ -23,6 +23,7 @@ public class GameAssets
     public Sprite[] heroWalk;
     public EnemyData crawler, brute, spitter, colossus, crate, crystalCluster;
     public TownConfig townConfig;
+    public string[] evolutionTexts; // what each evolution does (WeaponId order): set by ArenaSceneBuilder, the town's popup shows them
 }
 
 // Menu: Jam > Build Game Scenes. Creates the placeholder sprites, enemy data and Town Config (existing ones are kept,

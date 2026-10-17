@@ -51,6 +51,7 @@ public class Campaign
     public readonly TownConfig config;
     public readonly NpcState[] npcs;
     public readonly bool[] evolutionUnlocked = new bool[Weapon.Names.Length]; // by WeaponId (leaders teach them)
+    public readonly List<int> newEvolutions = new List<int>(); // leaders who just taught you theirs (the town pops each up once)
     public readonly bool[] relicOwned = new bool[Relics.Names.Length];     // by RelicId
     public readonly int[] buildingLevels;                                  // by TownConfig.buildings index
     public int day = 1;
@@ -513,7 +514,9 @@ public class Campaign
 
         if (npc.everCompleted) return;
         npc.everCompleted = true;
-        if (definition.unlocksEvolution) evolutionUnlocked[(int)definition.weapon] = true;
+        if (!definition.unlocksEvolution) return;
+        evolutionUnlocked[(int)definition.weapon] = true;
+        newEvolutions.Add(npcIndex);
     }
 
     // ---------- District buildings ----------

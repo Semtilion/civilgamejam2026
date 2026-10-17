@@ -83,6 +83,8 @@ public static class ArenaSceneBuilder
         dagger.evolutionText = $"{dagger.bounceChance * 100f:0}% chance to bounce (up to {dagger.maxBounces}x)";
         spear.evolutionText = $"pins enemies for {spear.pinTime:0.#} s";
         orbit.evolutionText = $"{orbit.shatterChance * 100f:0}% chance to burst on hit";
+        a.evolutionTexts = new string[Weapon.Names.Length]; // the town's evolution popup shows them too
+        foreach (Weapon weapon in new Weapon[] { sword, dagger, spear, orbit }) a.evolutionTexts[(int)weapon.id] = weapon.evolutionText;
         hammer.radius = 3.5f;
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;

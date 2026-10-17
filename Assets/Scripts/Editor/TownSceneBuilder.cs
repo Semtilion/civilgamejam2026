@@ -163,6 +163,29 @@ public static class TownSceneBuilder
         AddPopIn(reportWindow);
         report.gameObject.SetActive(false);
 
+        // The evolution popup (a leader's first finished request taught you their weapon's evolution): its name in the
+        // leader's color, what it does, and leader-colored + white sparkles popping off the name; the frame takes the
+        // leader's color too. Continue, Esc or a click anywhere closes it.
+        Image evolution = NewImage("Evolution", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
+        Stretch(evolution.rectTransform);
+        Button evolutionBackdrop = evolution.gameObject.AddComponent<Button>();
+        evolutionBackdrop.transition = Selectable.Transition.None;
+        Image evolutionWindow = NewPanel("Window", evolution.transform, Vector2.zero, new Vector2(1000, 460));
+        Title(NewText("Title", evolutionWindow.transform, new Vector2(0, 160), new Vector2(900, 60), 40, TextAnchor.MiddleCenter)).text = "EVOLUTION UNLOCKED";
+        Text evolutionName = Title(NewText("Name", evolutionWindow.transform, new Vector2(0, 75), new Vector2(900, 100), 72, TextAnchor.MiddleCenter));
+        Text evolutionText = NewText("Effect", evolutionWindow.transform, new Vector2(0, -15), new Vector2(900, 50), 30, TextAnchor.MiddleCenter);
+        Button evolutionClose = NewButton("Continue", evolutionWindow.transform, new Vector2(320, 80), 32);
+        Place(evolutionClose, new Vector2(0, -120));
+        UIBurst evolutionBurst = NewUI("Burst", evolutionWindow.transform, new Vector2(0, 75), new Vector2(700, 160)).gameObject.AddComponent<UIBurst>();
+        evolutionBurst.sprite = a.circle;
+        evolutionBurst.count = 48;
+        evolutionBurst.speed = 750f;
+        evolutionBurst.upward = 350f;
+        evolutionBurst.lifetime = 1.1f;
+        evolutionBurst.size = 18f;
+        AddPopIn(evolutionWindow);
+        evolution.gameObject.SetActive(false);
+
         // The result screen after a dive or raid (before the report): lines appear one by one, numbers roll up.
         Image resultsPanel = NewImage("Results", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
         Stretch(resultsPanel.rectTransform);
@@ -253,6 +276,14 @@ public static class TownSceneBuilder
         town.reportHeading = reportHeading;
         town.reportText = reportText;
         town.reportClose = reportClose;
+        town.evolutionPanel = evolution.gameObject;
+        town.evolutionFrame = PanelFrame(evolutionWindow);
+        town.evolutionName = evolutionName;
+        town.evolutionText = evolutionText;
+        town.evolutionClose = evolutionClose;
+        town.evolutionBackdrop = evolutionBackdrop;
+        town.evolutionBurst = evolutionBurst;
+        town.evolutionTexts = a.evolutionTexts;
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);

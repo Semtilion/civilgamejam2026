@@ -3,8 +3,8 @@ using UnityEngine.UI;
 
 // A burst of small round pieces for the UI (a ParticleSystem doesn't draw on an overlay canvas, so these are
 // pooled Images moved here). Burst(): they pop out of random points in this object's rect, away from its center and
-// up, then arc down with gravity, shrink and fade (unscaled time). The town's leader window: a violet + gold burst
-// around the portrait after a purchase.
+// up, then arc down with gravity, shrink and fade (unscaled time). The town: a violet + gold burst around the leader's
+// portrait after a purchase, and one in the leader's color + white off the name in the evolution popup.
 public class UIBurst : MonoBehaviour
 {
     const int PoolSize = 60;

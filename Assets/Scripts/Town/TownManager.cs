@@ -10,9 +10,9 @@ using UnityEngine.UI;
 // preparedness, request; their thanks typed out above them after a purchase or turn-in), their daily order, their
 // district's buildings and the turn-in button below (closes with X, Esc or a click outside).
 // A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive or raid shows the result
-// screen, then the report (after a quake, or while the injured wait for care). State lives in
-// Campaign.Current. When the run has ended (every faction wiped out), the end screen covers the town (New game /
-// Title screen).
+// screen, then the report (after a quake, or while the injured wait for care), then a popup for each evolution a leader
+// taught you (also right after you turn in their first request). State lives in Campaign.Current. When the run has
+// ended (every faction wiped out), the end screen covers the town (New game / Title screen).
 public class TownManager : MonoBehaviour
 {
     static readonly Color GoneTint = new Color(0.55f, 0.55f, 0.55f); // a wiped-out leader's portrait: grey and dark
@@ -79,6 +79,21 @@ public class TownManager : MonoBehaviour
     public Text reportHeading;
     public Text reportText;
     public Button reportClose;
+    [Header("Evolution popup (a leader taught you their weapon's evolution)")]
+    public GameObject evolutionPanel;
+    [Tooltip("Takes the leader's color.")]
+    public OrnateFrame evolutionFrame;
+    [Tooltip("The evolution's name (in the leader's color).")]
+    public Text evolutionName;
+    [Tooltip("\"Spear: pins enemies for 1 s\".")]
+    public Text evolutionText;
+    public Button evolutionClose;
+    [Tooltip("The dark backdrop: a click anywhere closes the popup too.")]
+    public Button evolutionBackdrop;
+    [Tooltip("Pops off the name in the leader's color + white when the popup opens.")]
+    public UIBurst evolutionBurst;
+    [Tooltip("What each evolution does, in WeaponId order (copied from the arena weapons by the builder).")]
+    public string[] evolutionTexts;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
@@ -123,7 +138,9 @@ public class TownManager : MonoBehaviour
                 Refresh();
             });
         }
-        reportClose.onClick.AddListener(() => reportPanel.SetActive(false));
+        reportClose.onClick.AddListener(CloseReport);
+        evolutionClose.onClick.AddListener(CloseEvolution);
+        evolutionBackdrop.onClick.AddListener(CloseEvolution);
         for (int i = 0; i < buildingButtons.Length; i++)
         {
             int slot = i; // copy for the lambda
@@ -156,10 +173,12 @@ public class TownManager : MonoBehaviour
         else ShowReport();
     }
 
-    // What happened to the people while you were away (the epilogue covers it if the game has ended), shown once.
+    // What happened to the people while you were away (the epilogue covers it if the game has ended), shown once;
+    // then (or right away if there's nothing to report) the evolutions leaders taught you.
     void ShowReport()
     {
-        if (campaign.report.Count > 0 && !campaign.Ended)
+        bool show = campaign.report.Count > 0 && !campaign.Ended;
+        if (show)
         {
             reportHeading.text = campaign.reportTitle ?? $"DAY {campaign.day}";
             reportText.text = string.Join("\n", campaign.report);
@@ -167,6 +186,40 @@ public class TownManager : MonoBehaviour
         }
         campaign.report.Clear();
         campaign.reportTitle = null;
+        if (!show) ShowEvolution();
+    }
+
+    void CloseReport()
+    {
+        reportPanel.SetActive(false);
+        ShowEvolution();
+    }
+
+    // The next evolution a leader just taught you (one popup each): its name, what it does, the frame and a burst of
+    // sparkles in the leader's color. Nothing once the game has ended (the end screen covers the town).
+    void ShowEvolution()
+    {
+        if (campaign.Ended) campaign.newEvolutions.Clear();
+        if (campaign.newEvolutions.Count == 0) return;
+        int i = campaign.newEvolutions[0];
+        campaign.newEvolutions.RemoveAt(0);
+
+        int weapon = (int)config.npcs[i].weapon;
+        Color color = config.npcs[i].color;
+        evolutionName.text = Weapon.EvolutionNames[weapon];
+        evolutionName.color = color;
+        evolutionText.text = $"{Weapon.Names[weapon]}: {evolutionTexts[weapon]}";
+        if (evolutionFrame != null) evolutionFrame.Color = color;
+        evolutionBurst.colors = new[] { color, Color.white };
+        evolutionPanel.SetActive(true);
+        evolutionBurst.Burst();
+    }
+
+    // Continue, Esc or a click: closed, and the next one shows if two leaders taught you at once.
+    void CloseEvolution()
+    {
+        evolutionPanel.SetActive(false);
+        ShowEvolution();
     }
 
     void Update()
@@ -181,7 +234,8 @@ public class TownManager : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (howToPlay.IsOpen || keyboard == null || !keyboard.escapeKey.wasPressedThisFrame) return;
         if (results.IsOpen) results.Continue();
-        else if (reportPanel.activeSelf) reportPanel.SetActive(false);
+        else if (reportPanel.activeSelf) CloseReport();
+        else if (evolutionPanel.activeSelf) CloseEvolution();
         else if (LeaderOpen) CloseLeader();
     }
 
@@ -203,6 +257,7 @@ public class TownManager : MonoBehaviour
         bool teaches = definition.unlocksEvolution && !campaign.npcs[selected].everCompleted;
         if (!campaign.TurnIn(selected)) return;
         Thank($"+{config.questGold} gold{(teaches ? $" · learned {Weapon.EvolutionNames[(int)definition.weapon]}" : "")}");
+        ShowEvolution(); // their first request: the evolution popup over the window
     }
 
     // After buying a building level or turning in a request: the leader hops in a burst of sparkles, and their thanks
