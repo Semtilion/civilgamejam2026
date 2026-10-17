@@ -39,6 +39,7 @@ public static class GameBuilder
     const string NpcFolder = "Assets/Art/NPCs";
     const string EnemyArtFolder = "Assets/Art/Enemies";
     const string DungeonArtFolder = "Assets/Art/Dungeon";
+    const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
@@ -328,6 +329,10 @@ public static class GameBuilder
     // pickup 1 unit tall (Pickup sizes it). Return null if the file isn't there.
     public static Sprite OreSprite() => SizedSprite($"{DungeonArtFolder}/Ore.png", OreHeight);
     public static Sprite CrystalSprite() => SizedSprite($"{DungeonArtFolder}/Crystal.png", 1f);
+
+    // A weapon effect texture (Assets/Art/Effects/<name>.png), 1 unit wide like the placeholders it replaces.
+    // Returns null if the file isn't there.
+    public static Sprite EffectSprite(string name) => SizedSprite($"{EffectsFolder}/{name}.png", 1f, byWidth: true);
 
     // Painted art imported so its whole image is `units` tall (or wide, `byWidth`). Returns null if the file isn't there.
     static Sprite SizedSprite(string path, float units, bool byWidth = false)

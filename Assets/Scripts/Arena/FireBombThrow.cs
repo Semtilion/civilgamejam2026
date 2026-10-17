@@ -14,7 +14,11 @@ public class FireBombThrow : Weapon
     public float tickInterval = 0.5f;
     [Tooltip("Seconds the bomb flies before it bursts.")]
     public float flightTime = 0.4f;
+    [Tooltip("The bomb in flight (a glowing orb).")]
     public Sprite bombSprite;
+    [Tooltip("The burning patch: flames, over a scorch mark.")]
+    public Sprite fireSprite;
+    public Sprite scorchSprite;
     public Color bombColor = new Color(1f, 0.5f, 0.15f);
 
     protected override bool Attack()
@@ -23,8 +27,8 @@ public class FireBombThrow : Weapon
         if (target == null) return false;
 
         float radius = (patchRadius + bonusRadius * BonusCount) * player.areaMultiplier;
-        FireBomb.Throw(bombSprite, bombColor, transform.position, target.transform.position, flightTime, radius,
-            burnTime, tickInterval, Damage, player);
+        FireBomb.Throw(bombSprite, fireSprite, scorchSprite, bombColor, transform.position, target.transform.position,
+            flightTime, radius, burnTime, tickInterval, Damage, player);
         return true;
     }
 }

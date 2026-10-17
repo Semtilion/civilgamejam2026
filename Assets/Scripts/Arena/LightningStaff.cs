@@ -6,11 +6,13 @@ using UnityEngine;
 public class LightningStaff : Weapon
 {
     [Header("Lightning Staff")]
-    public float boltWidth = 0.15f;
-    [Tooltip("Plain square, stretched into the bolt.")]
+    [Tooltip("Height of the bolt art across the bolt (its art is a wide strip, so the visible bolt is thinner).")]
+    public float boltWidth = 1.2f;
+    [Tooltip("A horizontal jagged bolt, stretched from the sky down to the enemy.")]
     public Sprite boltSprite;
-    [Tooltip("Circle flashed where the bolt hits.")]
+    [Tooltip("Crackle flashed where the bolt hits.")]
     public Sprite impactSprite;
+    public float impactRadius = 0.9f;
     public Color boltColor = new Color(1f, 0.95f, 0.5f);
 
     readonly List<Enemy> targets = new List<Enemy>();
@@ -32,7 +34,7 @@ public class LightningStaff : Weapon
 
             Vector2 at = target.transform.position;
             FadeEffect.Line(boltSprite, at + Vector2.up * 8f, at, boltWidth, boltColor, 0.15f); // straight down from the sky
-            FadeEffect.Circle(impactSprite, at, 0.5f, boltColor, 0.2f);
+            FadeEffect.Circle(impactSprite, at, impactRadius, boltColor, 0.2f);
             target.TakeDamage(Damage, at, 0f);
         }
         return true;

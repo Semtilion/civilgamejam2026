@@ -21,11 +21,22 @@ public class DeathBursts : MonoBehaviour
     public float bossSpeed = 3.5f;
     public float bossPieceSize = 0.32f;
 
+    [Header("Impact sparks (every hit)")]
+    public float sparkSize = 0.7f;
+    public float sparkTime = 0.12f;
+
     [Header("Scene references")]
     [Tooltip("Plain square, tinted per piece.")]
     public Sprite pieceSprite;
+    [Tooltip("The impact spark (a 4-point star).")]
+    public Sprite sparkSprite;
     [Tooltip("Unlit sprite material, so the pieces stay bright in the dark cave (empty = lit).")]
     public Material material;
+
+    const int MaxSparks = 60;
+    SpriteRenderer[] sparks;
+    readonly float[] sparkAges = new float[MaxSparks];
+    int nextSpark;
 
     SpriteRenderer[] renderers;
     Vector2[] velocities;
@@ -51,6 +62,32 @@ public class DeathBursts : MonoBehaviour
             piece.enabled = false;
             renderers[i] = piece;
         }
+
+        sparks = new SpriteRenderer[MaxSparks];
+        for (int i = 0; i < MaxSparks; i++)
+        {
+            SpriteRenderer spark = new GameObject("Spark").AddComponent<SpriteRenderer>();
+            spark.transform.SetParent(transform, false);
+            spark.sprite = sparkSprite;
+            if (material != null) spark.sharedMaterial = material;
+            spark.sortingOrder = 4; // over enemies and weapon flashes
+            spark.enabled = false;
+            sparks[i] = spark;
+        }
+    }
+
+    // An enemy is hit: a quick white star at `position` that pops up and fades (sparkTime).
+    public void Spark(Vector2 position)
+    {
+        if (sparkSprite == null) return;
+        SpriteRenderer spark = sparks[nextSpark];
+        sparkAges[nextSpark] = 0f;
+        nextSpark = (nextSpark + 1) % MaxSparks;
+        spark.transform.position = position;
+        spark.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 90f));
+        spark.transform.localScale = Vector3.one * sparkSize * 0.5f;
+        spark.color = Color.white;
+        spark.enabled = true;
     }
 
     // An enemy or crate dies. `radius`: its size, so big ones spread their pieces wider.
@@ -122,12 +159,28 @@ public class DeathBursts : MonoBehaviour
     public void Clear()
     {
         foreach (SpriteRenderer piece in renderers) piece.enabled = false;
+        foreach (SpriteRenderer spark in sparks) spark.enabled = false;
     }
 
     void Update()
     {
         float dt = Time.deltaTime;
         if (dt <= 0f) return; // paused
+
+        for (int s = 0; s < MaxSparks; s++)
+        {
+            SpriteRenderer spark = sparks[s];
+            if (!spark.enabled) continue;
+            sparkAges[s] += dt;
+            float t = sparkAges[s] / sparkTime;
+            if (t >= 1f)
+            {
+                spark.enabled = false;
+                continue;
+            }
+            spark.transform.localScale = Vector3.one * sparkSize * (0.5f + 0.5f * Mathf.Sqrt(t)); // pops open
+            spark.color = new Color(1f, 1f, 1f, 1f - t * t);                                     // then fades
+        }
 
         for (int p = 0; p < MaxPieces; p++)
         {

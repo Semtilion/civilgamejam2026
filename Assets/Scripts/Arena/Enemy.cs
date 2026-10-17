@@ -324,7 +324,14 @@ public class Enemy : MonoBehaviour
         hp -= amount;
         flashTimer = FlashTime;
         squishTimer = SquishTime;
-        if (amount > 0) arena.damageNumbers.Show(transform.position, amount, weaponHit);
+        if (amount > 0)
+        {
+            arena.damageNumbers.Show(transform.position, amount, weaponHit);
+            // The impact spark, on the side the hit came from
+            Vector2 toHit = hitFrom - (Vector2)transform.position;
+            Vector2 at = toHit.sqrMagnitude > 0.0001f ? (Vector2)transform.position + toHit.normalized * data.radius * 0.7f : (Vector2)transform.position;
+            arena.deathBursts.Spark(at);
+        }
         if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)
         {

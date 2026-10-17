@@ -23,7 +23,7 @@ public class Axe : MonoBehaviour
     {
         GameObject go = new GameObject("Axe");
         go.transform.position = from;
-        go.transform.localScale = new Vector3(radius * 2f, radius, 1f); // placeholder: a spinning blade-shaped bar
+        go.transform.localScale = Vector3.one * radius * 2.4f; // the whirl art (1 unit), a bit bigger than what it hits
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;

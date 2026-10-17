@@ -3,12 +3,13 @@ using UnityEngine;
 // Thrusts a spear in a straight line toward the nearest enemy (a bit longer than the sword's reach), hitting
 // everything in it. Only thrusts when an enemy is within reach. Bonus: longer reach.
 // Evolution (Impale, from the Guard): walking enemies hit are pinned in place for `pinTime` (bosses aren't).
-// Look: the spear shoots out from the hero to its full length, then thins and fades.
+// Look: a bright streak shoots out from the hero to its full length with a glint at its tip, then thins and fades.
 public class SpearThrust : Weapon
 {
     const float SnapTime = 0.07f;
     const float FlashTime = 0.22f;
     const float FlashAlpha = 0.85f;
+    const float TipSize = 0.9f; // the glint at the tip (world units)
 
     [Header("Spear")]
     public float length = 3.2f;
@@ -18,8 +19,10 @@ public class SpearThrust : Weapon
     public float knockback = 5f;
     [Tooltip("Impale (evolved): seconds a walking enemy hit stays pinned.")]
     public float pinTime = 1f;
-    [Tooltip("Bar that flashes along the thrust (placeholder visual).")]
+    [Tooltip("The streak that flashes along the thrust (a child of the hero).")]
     public SpriteRenderer thrustVisual;
+    [Tooltip("The glint at the tip of the thrust (a child of the hero).")]
+    public SpriteRenderer tipVisual;
 
     float sinceThrust = 99f;
     Vector2 thrustDirection = Vector2.right;
@@ -64,15 +67,19 @@ public class SpearThrust : Weapon
         sinceThrust += Time.deltaTime;
         FadeFlash(thrustVisual, sinceThrust, FlashTime, FlashAlpha);
 
-        // Placeholder visual: a bar from the hero that shoots out to the end of the thrust, then thins.
+        // The streak shoots out from the hero to the end of the thrust, then thins; the glint rides its tip.
         float length = thrustReach * Mathf.Clamp01(sinceThrust / SnapTime);
         float thin = 1f - 0.5f * Mathf.Clamp01(sinceThrust / FlashTime);
         thrustVisual.transform.localPosition = thrustDirection * (length / 2f);
         thrustVisual.transform.localScale = new Vector3(length, Width * thin, 1f);
+        FadeFlash(tipVisual, sinceThrust, FlashTime, 1f);
+        tipVisual.transform.localPosition = thrustDirection * length;
+        tipVisual.transform.localScale = Vector3.one * TipSize;
     }
 
     void OnDisable()
     {
         if (thrustVisual != null) FadeFlash(thrustVisual, FlashTime, FlashTime, FlashAlpha); // hide
+        if (tipVisual != null) FadeFlash(tipVisual, FlashTime, FlashTime, 1f);
     }
 }

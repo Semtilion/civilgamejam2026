@@ -24,7 +24,7 @@ public class Dagger : MonoBehaviour
     {
         GameObject go = new GameObject("Dagger");
         go.transform.position = from;
-        go.transform.localScale = new Vector3(0.6f, 0.15f, 1f); // placeholder: thin bar pointing where it flies
+        go.transform.localScale = Vector3.one; // the blade streak art: 1 unit long, pointing where it flies
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;

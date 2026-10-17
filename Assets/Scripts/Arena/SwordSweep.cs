@@ -3,8 +3,8 @@ using UnityEngine;
 // Starting weapon: hits every enemy within the radius around the hero and knocks them back. Bonus: bigger radius.
 // Evolution (Twin Strike, available from the start): a back-swing follows every swing, hitting everything again.
 // The Quake Hammer relic is a second one of these with bigger, slower numbers (set by the scene builder).
-// Look: the sword spins an arc slash once around the hero (from the way he faces; the back-swing turns the other
-// way); the hammer sends out an expanding shockwave ring and jolts the camera.
+// Look: the sword spins a swirl slash once around the hero (from the way he faces; the back-swing turns the other
+// way); the hammer sends out an expanding shockwave ring, throws up dirt and jolts the camera.
 public class SwordSweep : Weapon
 {
     public enum SweepStyle { Spin, Shockwave }
@@ -13,6 +13,7 @@ public class SwordSweep : Weapon
     const float FlashTime = 0.25f;    // fade
     const float FlashAlpha = 0.8f;
     const float BackSwingDelay = 0.15f; // Twin Strike
+    static readonly Color DirtColor = new Color(0.75f, 0.58f, 0.40f, 0.9f);
 
     [Header("Sword")]
     public float radius = 2.2f;
@@ -22,6 +23,8 @@ public class SwordSweep : Weapon
     public SweepStyle style = SweepStyle.Spin;
     [Tooltip("The slash (an arc sprite) or the shockwave (a ring sprite); placeholder visual, a child of the hero.")]
     public SpriteRenderer sweepVisual;
+    [Tooltip("Shockwave style only: dirt thrown up around the hero on every slam (empty = none).")]
+    public Sprite dirtSprite;
 
     float sinceSweep = 99f;
     float startAngle;
@@ -52,7 +55,11 @@ public class SwordSweep : Weapon
         sinceSweep = 0f;
         turn = direction;
         startAngle = player.sprite.flipX ? 180f : 0f; // the slash starts where he faces
-        if (style == SweepStyle.Shockwave) player.arena.ShakeCamera(0.15f, 0.15f);
+        if (style == SweepStyle.Shockwave)
+        {
+            player.arena.ShakeCamera(0.15f, 0.15f);
+            if (dirtSprite != null) FadeEffect.Circle(dirtSprite, center, reachBase * 0.8f, DirtColor, 0.4f);
+        }
     }
 
     protected override void Update()

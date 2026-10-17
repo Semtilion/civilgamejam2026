@@ -16,13 +16,19 @@ public class CrystalOrbit : Weapon
     public float orbitTime = 2f;
     public float crystalRadius = 0.3f;
     public float knockback = 3f;
+    [Tooltip("The artist's crystal (1 unit tall), drawn crystalRadius x 2 tall.")]
     public Sprite crystalSprite;
-    public Color crystalColor = new Color(0.75f, 0.45f, 1f);
+    [Tooltip("Tint (white = the art's own colors).")]
+    public Color crystalColor = Color.white;
+    public Color glowColor = new Color(0.75f, 0.45f, 1f);
     [Header("Shatter (evolved)")]
     [Tooltip("Chance per crystal hit to burst.")]
     [Range(0f, 1f)] public float shatterChance = 0.25f;
     [Tooltip("The burst hits every enemy this close to the crystal (times area), for the orbit's damage.")]
     public float shatterRadius = 1.5f;
+    [Tooltip("The burst's flash and its ring (white, tinted violet).")]
+    public Sprite burstSprite;
+    public Sprite burstRingSprite;
 
     readonly List<Transform> crystals = new List<Transform>();
     readonly Dictionary<Enemy, float> nextHitTime = new Dictionary<Enemy, float>();
@@ -76,7 +82,8 @@ public class CrystalOrbit : Weapon
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, 0f, false);
         }
-        FadeEffect.Circle(crystalSprite, center, radius, ShatterColor, 0.25f);
+        FadeEffect.Circle(burstSprite, center, radius, ShatterColor, 0.3f);
+        FadeEffect.Circle(burstRingSprite, center, radius, ShatterColor, 0.25f);
     }
 
     // One crystal object per crystal; more are added when the level bonus kicks in.
@@ -90,7 +97,7 @@ public class CrystalOrbit : Weapon
             crystal.color = crystalColor;
             crystal.sortingOrder = 4;
             Fx.Unlit(crystal);
-            Glow.Add(crystal.gameObject, crystalColor, 1.6f, 0.7f);
+            Glow.Add(crystal.gameObject, glowColor, 1.6f, 0.7f);
             crystal.transform.localScale = Vector3.one * crystalRadius * 2f; // placeholder circle is 1 unit wide
             crystals.Add(crystal.transform);
         }

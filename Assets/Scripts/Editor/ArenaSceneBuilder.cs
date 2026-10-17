@@ -68,10 +68,16 @@ public static class ArenaSceneBuilder
         LightningStaff staff = SetWeapon(hero.AddComponent<LightningStaff>(), WeaponId.LightningStaff, "A lightning bolt strikes a random enemy on screen.",                     "+1 bolt",     15, 3, 1.2f);
         FireBombThrow bomb   = SetWeapon(hero.AddComponent<FireBombThrow>(),  WeaponId.FireBomb,       "Lobs a fire bomb that leaves a burning patch.",                           "+bigger fire", 6, 2, 2.0f);
         AxeThrow axe         = SetWeapon(hero.AddComponent<AxeThrow>(),       WeaponId.Axe,            "Throws a heavy axe that spins out and flies back, hitting everything.",   "+1 axe",      18, 4, 2.0f);
-        sword.sweepVisual = NewFlashSprite("Slash", a.arc, hero.transform, a.unlit); // spins once around the hero
-        dagger.daggerSprite = a.square;
-        spear.thrustVisual = NewFlashSprite("Thrust", a.square, hero.transform, a.unlit);
-        orbit.crystalSprite = a.circle;
+        // Weapon looks: Kenney Particle Pack textures (Assets/Art/Effects, white, tinted here or by the weapon); the old
+        // placeholder shapes if a file is missing.
+        Sprite Fx(string name, Sprite fallback) => EffectSprite(name) ?? fallback;
+        sword.sweepVisual = NewFlashSprite("Slash", Fx("FX_Swirl", a.arc), hero.transform, a.unlit); // spins once around the hero
+        dagger.daggerSprite = Fx("FX_Blade", a.square);
+        spear.thrustVisual = NewFlashSprite("Thrust", Fx("FX_Streak", a.square), hero.transform, a.unlit);
+        spear.tipVisual = NewFlashSprite("Thrust Tip", Fx("FX_Glint", a.circle), hero.transform, a.unlit);
+        orbit.crystalSprite = CrystalSprite() ?? a.circle;
+        orbit.burstSprite = Fx("FX_Burst", a.circle);
+        orbit.burstRingSprite = Fx("FX_Ring", a.ring);
         // Evolution cards (after Lv 5; the names are Weapon.EvolutionNames)
         sword.evolutionText = "every swing is followed by a quick back-swing that hits everything again.";
         dagger.evolutionText = $"after every hit, a {dagger.bounceChance * 100f:0}% chance to bounce to a nearby enemy " +
@@ -83,15 +89,18 @@ public static class ArenaSceneBuilder
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;
         hammer.style = SwordSweep.SweepStyle.Shockwave;
-        hammer.sweepVisual = NewFlashSprite("Shockwave", a.ring, hero.transform, a.unlit);
+        hammer.sweepVisual = NewFlashSprite("Shockwave", Fx("FX_Shockwave", a.ring), hero.transform, a.unlit);
+        hammer.dirtSprite = EffectSprite("FX_Dirt");
         hammer.sweepVisual.color = new Color(0.95f, 0.70f, 0.40f, 0f); // dusty orange (the alpha is set by the weapon)
 
         // The cave is dark: a soft light follows the hero
         NewLight("Hero Light", hero.transform, new Color(1f, 0.92f, 0.80f), 9f, 0.75f);
-        staff.boltSprite = a.square;
-        staff.impactSprite = a.circle;
-        bomb.bombSprite = a.circle;
-        axe.axeSprite = a.square;
+        staff.boltSprite = Fx("FX_Bolt", a.square);
+        staff.impactSprite = Fx("FX_Crackle", a.circle);
+        bomb.bombSprite = Fx("FX_Orb", a.circle);
+        bomb.fireSprite = Fx("FX_Fire", a.circle);
+        bomb.scorchSprite = EffectSprite("FX_Scorch");
+        axe.axeSprite = Fx("FX_Whirl", a.square);
         foreach (Weapon weapon in new Weapon[] { dagger, spear, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
 
         // Camera from the template
@@ -119,6 +128,7 @@ public static class ArenaSceneBuilder
         damageNumbers.font = TitleFont;
         DeathBursts deathBursts = new GameObject("Death Bursts").AddComponent<DeathBursts>();
         deathBursts.pieceSprite = a.square;
+        deathBursts.sparkSprite = EffectSprite("FX_Glint"); // the impact spark on every hit
         deathBursts.material = a.unlit;
         arena.damageNumbers = damageNumbers;
         arena.deathBursts = deathBursts;
