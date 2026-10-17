@@ -1,10 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // A black outline around this object's sprite: 8 black copies of it, pushed `Width` world units out in 8 directions
-// and drawn just behind it (same sorting order, a little further from the camera). They follow the sprite, flip,
-// visibility and alpha, and keep the width the same in the world however the sprite is scaled (squash, grow-in).
-// The copies are only touched when something changed (there can be hundreds of these).
-// On the hero, enemies (and a Spitter's flower), ores, the teleporter stairs and pickups.
+// and drawn just behind it (same sorting order, a little further from the camera). They follow the sprite, flip (by
+// their scale), visibility and alpha, and keep the width the same in the world however the sprite is scaled (squash,
+// grow-in). The copies are only touched when something changed (there can be hundreds of these).
+// On the hero, enemies (and a Spitter's flower), ores, the teleporter stairs and pickups. SetColor makes it a solid
+// color instead (variant enemies).
 [RequireComponent(typeof(SpriteRenderer))]
 public class SpriteOutline : MonoBehaviour
 {
@@ -15,6 +17,8 @@ public class SpriteOutline : MonoBehaviour
         new Vector2(1f, 0f), new Vector2(-1f, 0f), new Vector2(0f, 1f), new Vector2(0f, -1f),
         new Vector2(0.7071f, 0.7071f), new Vector2(-0.7071f, 0.7071f), new Vector2(0.7071f, -0.7071f), new Vector2(-0.7071f, -0.7071f),
     };
+
+    static readonly Dictionary<Color, Material> SolidMaterials = new Dictionary<Color, Material>(); // one per color, made once
 
     SpriteRenderer source;
     readonly SpriteRenderer[] copies = new SpriteRenderer[8];
@@ -39,6 +43,19 @@ public class SpriteOutline : MonoBehaviour
         LateUpdate();
     }
 
+    // The outline in `color`, solid and unlit (a copy of the hit flash's silhouette material in that color; the alpha
+    // no longer follows the sprite's). Stays black if there's no silhouette material.
+    public void SetColor(Color color)
+    {
+        if (HitFlash.Material == null) return;
+        if (!SolidMaterials.TryGetValue(color, out Material material))
+        {
+            material = new Material(HitFlash.Material) { color = color };
+            SolidMaterials[color] = material;
+        }
+        foreach (SpriteRenderer copy in copies) copy.sharedMaterial = material;
+    }
+
     void LateUpdate()
     {
         Vector3 newScale = transform.lossyScale;
@@ -57,11 +74,11 @@ public class SpriteOutline : MonoBehaviour
             flipX = source.flipX;
             flipY = source.flipY;
             alpha = newAlpha;
+            Vector3 flip = new Vector3(flipX ? -1f : 1f, flipY ? -1f : 1f, 1f); // (the silhouette shader ignores flipX)
             foreach (SpriteRenderer copy in copies)
             {
                 copy.sprite = sprite;
-                copy.flipX = flipX;
-                copy.flipY = flipY;
+                copy.transform.localScale = flip;
                 copy.color = new Color(0f, 0f, 0f, alpha);
             }
         }

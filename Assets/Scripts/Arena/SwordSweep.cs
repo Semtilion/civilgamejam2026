@@ -48,7 +48,7 @@ public class SwordSweep : Weapon
         // Killed enemies are only destroyed at the end of the frame, so the list doesn't change during this loop.
         foreach (Enemy enemy in Enemy.All)
         {
-            float reach = reachBase + enemy.data.radius;
+            float reach = reachBase + enemy.radius;
             if (((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, knockback);
         }

@@ -17,6 +17,7 @@ public class GameAssets
     public Sprite shard;      // generated: the Spitter's shots if the artist's are missing
     public Sprite arrow;      // generated: the teleporter arrow (a triangle pointing up)
     public Sprite glow;       // generated: soft-edged, 9-sliced (the glow around the leader portrait)
+    public Sprite roundEnd;   // generated: a bar with a round right end, 9-sliced (the boss's dash warning)
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Material flash;    // the hit flash (Assets/Shaders/SpriteSilhouette.shader): a sprite's shape in white
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
@@ -158,6 +159,7 @@ public static class GameBuilder
             return Mathf.Min(aboveBase, insideSides) / 0.06f;
         });
         a.glow = GlowSprite();
+        a.roundEnd = RoundEndSprite();
         a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
         if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
         a.flash = FlashMaterial();
@@ -168,7 +170,7 @@ public static class GameBuilder
         a.crawler  = EnemyAsset("Crystal Crawler",  EnemyBehavior.Chaser,  new Color(0.60f, 0.30f, 0.70f), 0.3f,   10, 3.2f,  5,   1, 0.05f,  1, a.circle, goldChance: 0.10f, gold: 2);
         a.brute    = EnemyAsset("Crystal Brute",    EnemyBehavior.Chaser,  new Color(0.70f, 0.30f, 0.30f), 0.6f,   60, 1.4f, 15,   3, 0.25f,  1, a.circle, goldChance: 0.25f, gold: 5);
         a.spitter  = EnemyAsset("Shard Spitter",    EnemyBehavior.Shooter, new Color(0.30f, 0.70f, 0.70f), 0.4f,   20, 2.2f,  5,   2, 0.15f,  1, a.circle, goldChance: 0.15f, gold: 3);
-        a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle, goldChance: 1f, gold: 50);
+        a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.2f,  300, 1.6f, 25,  20, 1f,    10, a.circle, goldChance: 1f, gold: 50);
         a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square, supplies: 1);
         a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
 
@@ -181,8 +183,10 @@ public static class GameBuilder
             EditorUtility.SetDirty(a.crate);
         }
         // The artist's Brute (a crystal-backed hulk) and Crawler (a crystal-backed slug): 2-pose walk cycles, facing left.
+        // The boss is the Brute recolored gold (Boss_1/_2.png, made from Brute_1/_2) at twice its size (radius 1.2).
         WalkArt(a.brute, "Brute", BrutePixelsPerUnit);
-        WalkArt(a.crawler, "Crawler", CrawlerPixelsPerUnit, turnsToFace: true);
+        WalkArt(a.crawler, "Crawler", CrawlerPixelsPerUnit);
+        WalkArt(a.colossus, "Boss", BrutePixelsPerUnit);
         // The artist's Spitter (a crystal flower on a stem) replaces its placeholder circle and fires from the flower's 5 tips.
         Sprite spitterStem = EnemySprite("Spitter_Stem", SpitterPixelsPerUnit);
         Sprite spitterFlower = EnemySprite("Spitter_Flower", SpitterPixelsPerUnit);
@@ -194,6 +198,11 @@ public static class GameBuilder
             a.spitter.shotAngles = new[] { 13f, 79f, 148f, 216f, 305f };
             EditorUtility.SetDirty(a.spitter);
         }
+        // Shadows under the creatures' feet, measured on their art (the boss uses the Brute's). Crates have none.
+        Shadow(a.brute, new Vector2(1.05f, 0.34f), new Vector2(0.12f, -0.88f));
+        Shadow(a.colossus, new Vector2(1.05f, 0.34f), new Vector2(0.12f, -0.88f));
+        Shadow(a.crawler, new Vector2(1.9f, 0.5f), new Vector2(-0.05f, -0.37f));
+        Shadow(a.spitter, new Vector2(1.3f, 0.42f), new Vector2(0f, -1.1f));
         // Its shots: the artist's crystal shard (ShotLength long; Projectile draws a sprite at its radius x 2), else the
         // generated one. A sprite picked by hand in the Inspector is kept.
         Sprite shotArt = SizedSprite($"{EnemyArtFolder}/Spitter_Shot.png", ShotLength / (Projectile.Radius * 2f), byWidth: true);
@@ -334,15 +343,23 @@ public static class GameBuilder
 
     // An enemy's 2-pose walk cycle (Assets/Art/Enemies/<name>_1.png and _2.png, drawn facing left) replaces its
     // placeholder: sprite = pose 1, walkFrames = both, untinted. Nothing changes once pose 1 is its sprite.
-    static void WalkArt(EnemyData enemy, string name, float pixelsPerUnit, bool turnsToFace = false)
+    static void WalkArt(EnemyData enemy, string name, float pixelsPerUnit)
     {
         Sprite pose1 = EnemySprite(name + "_1", pixelsPerUnit), pose2 = EnemySprite(name + "_2", pixelsPerUnit);
         if (pose1 == null || pose2 == null || enemy.sprite == pose1) return;
         enemy.sprite = pose1;
         enemy.walkFrames = new[] { pose1, pose2 };
         enemy.artFacesLeft = true;
-        enemy.turnsToFace = turnsToFace;
         enemy.color = Color.white;
+        EditorUtility.SetDirty(enemy);
+    }
+
+    // An enemy's shadow (EnemyData.shadowSize / shadowOffset), set once: values tuned in the asset are kept.
+    static void Shadow(EnemyData enemy, Vector2 size, Vector2 offset)
+    {
+        if (enemy.shadowSize != Vector2.zero) return;
+        enemy.shadowSize = size;
+        enemy.shadowOffset = offset;
         EditorUtility.SetDirty(enemy);
     }
 
@@ -460,6 +477,44 @@ public static class GameBuilder
             importer.spriteBorder = new Vector4(Border, Border, Border, Border);
             importer.mipmapEnabled = false;
             importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // A white bar whose right end is a half circle, 1 unit tall, 9-sliced so only that end keeps its shape: drawn Sliced
+    // and stretched, a strip with a flat start and a round tip (the boss's dash warning). Made once (delete the file to
+    // remake it).
+    static Sprite RoundEndSprite()
+    {
+        const int Size = 64, Half = Size / 2;
+        string path = $"{ArtFolder}/RoundEnd.png";
+        if (!File.Exists(path))
+        {
+            Texture2D texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < Size; y++)
+            for (int x = 0; x < Size; x++)
+            {
+                // Left half: the bar. Right half: a half circle around the middle of the left half's right edge.
+                float dx = Mathf.Max(0f, x + 0.5f - Half), dy = y + 0.5f - Half;
+                float inside = Mathf.Clamp01(Half - Mathf.Sqrt(dx * dx + dy * dy)); // a 1 px soft edge
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, inside));
+            }
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = Size;
+            importer.spriteBorder = new Vector4(0, 0, Half, 0); // left, bottom, right, top: only the round end is kept
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            TextureImporterSettings settings = new TextureImporterSettings();
+            importer.ReadTextureSettings(settings);
+            settings.spriteMeshType = SpriteMeshType.FullRect; // needed for Sliced drawing
+            importer.SetTextureSettings(settings);
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);

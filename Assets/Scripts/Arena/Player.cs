@@ -170,7 +170,7 @@ public class Player : MonoBehaviour
     // "+10 max HP", "+5% damage", ... (same units as AddStat).
     public static string StatText(StatType stat, float amount)
     {
-        return stat == StatType.MaxHp ? $"+{amount:0} {StatLabels[(int)stat]}" : $"+{amount * 100f:0}% {StatLabels[(int)stat]}";
+        return stat == StatType.MaxHp ? $"+{amount:0} {StatLabels[(int)stat]}" : $"+{amount * 100f:0.#}% {StatLabels[(int)stat]}";
     }
 
     // Back to base stats and full HP, in the middle of the cave.

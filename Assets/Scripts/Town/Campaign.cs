@@ -572,6 +572,7 @@ public class Campaign
         {
             weapon.level = 1;
             weapon.evolved = false;
+            weapon.bonusDamage = 0;
             weapon.enabled = weapon.id == WeaponId.Sword;
         }
 

@@ -37,6 +37,8 @@ public abstract class Weapon : MonoBehaviour
     [Header("Live (this dive)")]
     [Range(1, MaxLevel)] public int level = 1;
     public bool evolved;
+    [Tooltip("Extra damage from Blue / Gold level-up cards.")]
+    public int bonusDamage;
 
     protected Player player;
     float timer;
@@ -44,7 +46,7 @@ public abstract class Weapon : MonoBehaviour
     public string DisplayName => Names[(int)id];
     public string EvolutionName => EvolutionNames[(int)id];
     protected int BonusCount => (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
-    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1)) * player.damageMultiplier * player.arena.relics.DamageMultiplier);
+    protected int Damage => Mathf.RoundToInt((baseDamage + damagePerLevel * (level - 1) + bonusDamage) * player.damageMultiplier * player.arena.relics.DamageMultiplier);
 
     protected virtual void Awake()
     {

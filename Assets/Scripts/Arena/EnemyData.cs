@@ -4,7 +4,7 @@ public enum EnemyBehavior
 {
     Chaser,  // runs straight at the hero
     Shooter, // never moves; warns (swells, red), then fires a volley in fixed directions (shotAngles)
-    Boss,    // chases, and every few seconds winds up and charges
+    Boss,    // chases; every few seconds walks in place while a red strip shows its path, dashes along it, then rests
     Crate    // a breakable prop (supply crate, crystal cluster): never moves, harmless, weapons break it for its loot (not a kill)
 }
 
@@ -19,12 +19,14 @@ public class EnemyData : ScriptableObject
     public Sprite[] walkFrames;
     [Tooltip("The art faces left: mirrored while walking right (off: faces right, mirrored walking left). Only with walk frames.")]
     public bool artFacesLeft;
-    [Tooltip("Walk cycle only: also turns its head toward where it walks (smoothly, up to straight up or down), still " +
-             "mirrored left/right so its back stays up. The Crawler.")]
-    public bool turnsToFace;
     public Color color = Color.white;
     [Tooltip("Size in world units (hit size and sprite size).")]
     public float radius = 0.4f;
+    [Tooltip("A flat black ellipse (35%, like the hero's) under its feet, in its own size (radius x 2 = 1): how wide and " +
+             "tall it is (0 = no shadow: crates).")]
+    public Vector2 shadowSize;
+    [Tooltip("Where the shadow's center is from the enemy's center, in its own size, as drawn (x mirrors with the art).")]
+    public Vector2 shadowOffset;
 
     [Header("Stats (depth 1, scaled up on deeper levels)")]
     public int maxHp = 10;
@@ -65,8 +67,13 @@ public class EnemyData : ScriptableObject
     public int projectileDamage = 8;
 
     [Header("Boss only")]
+    [Tooltip("Seconds of chasing between dashes.")]
     public float chargeInterval = 5f;
-    public float chargeWindup = 0.8f;
+    [Tooltip("Seconds it walks in place (trembling) before a dash, while a red strip fades in over the dash's path.")]
+    public float chargeWindup = 2f;
     public float chargeSpeed = 12f;
+    [Tooltip("The dash's length, in seconds at Charge Speed (it stops sooner at a wall).")]
     public float chargeDuration = 0.6f;
+    [Tooltip("Seconds it stands still after a dash.")]
+    public float chargeRest = 0.5f;
 }

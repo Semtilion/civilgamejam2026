@@ -13,23 +13,39 @@ MonoBehaviour:
   m_Name: Crystal Colossus
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Crystal Colossus
-  sprite: {fileID: 21300000, guid: c2d52d951f7131b45b14ba1ff771a34f, type: 3}
-  color: {r: 0.9, g: 0.45, b: 0.2, a: 1}
-  radius: 1.5
+  sprite: {fileID: 21300000, guid: 765d4d06c62c5cc4c93d6367ca7bd24b, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: 765d4d06c62c5cc4c93d6367ca7bd24b, type: 3}
+  - {fileID: 21300000, guid: 27592f0ed063c79459f340b6f2c51a4f, type: 3}
+  artFacesLeft: 1
+  color: {r: 1, g: 1, b: 1, a: 1}
+  radius: 1.2
   maxHp: 300
   moveSpeed: 1.6
   contactDamage: 25
   behavior: 2
-  preferredDistance: 6
+  xp: 20
+  materialChance: 1
+  materialAmount: 10
+  crystalAmount: 0
+  supplyAmount: 0
+  goldChance: 1
+  goldAmount: 50
+  flower: {fileID: 0}
+  shotAngles:
+  - 18
+  - 90
+  - 162
+  - 234
+  - 306
+  projectileSprite: {fileID: 0}
+  fireRange: 10
+  fireWarning: 0.5
   fireInterval: 2.5
   projectileSpeed: 4
   projectileDamage: 8
   chargeInterval: 5
-  chargeWindup: 0.8
+  chargeWindup: 2
   chargeSpeed: 12
   chargeDuration: 0.6
-  xp: 20
-  materialChance: 1
-  materialAmount: 10
-  goldChance: 1
-  goldAmount: 50
+  chargeRest: 0.5

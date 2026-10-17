@@ -210,6 +210,7 @@ public class TownManager : MonoBehaviour
         evolutionName.color = color;
         evolutionText.text = $"{Weapon.Names[weapon]}: {evolutionTexts[weapon]}";
         if (evolutionFrame != null) evolutionFrame.Color = color;
+        FrameIn(evolutionClose, color); // Continue too, like the leader window's buttons
         evolutionBurst.colors = new[] { color, Color.white };
         evolutionPanel.SetActive(true);
         evolutionBurst.Burst();

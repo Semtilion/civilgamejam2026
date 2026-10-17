@@ -61,7 +61,7 @@ public class CrystalOrbit : Weapon
         foreach (Enemy enemy in Enemy.All)
         {
             if (enemy.IsDead) continue;
-            float reach = crystalRadius + enemy.data.radius;
+            float reach = crystalRadius + enemy.radius;
             if (((Vector2)enemy.transform.position - position).sqrMagnitude > reach * reach) continue;
             if (nextHitTime.TryGetValue(enemy, out float time) && Time.time < time) continue;
 
@@ -78,7 +78,7 @@ public class CrystalOrbit : Weapon
         float radius = shatterRadius * player.areaMultiplier;
         foreach (Enemy enemy in Enemy.All)
         {
-            float reach = radius + enemy.data.radius;
+            float reach = radius + enemy.radius;
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, 0f, false);
         }

@@ -66,7 +66,7 @@ public class Dagger : MonoBehaviour
         foreach (Enemy enemy in Enemy.All)
         {
             if (enemy.IsDead || enemy == lastHit) continue;
-            float reach = Radius + enemy.data.radius;
+            float reach = Radius + enemy.radius;
             if (((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude <= reach * reach)
             {
                 enemy.TakeDamage(damage, (Vector2)transform.position - velocity, knockback); // pushed along the flight

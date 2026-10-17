@@ -229,6 +229,7 @@ public static class ArenaSceneBuilder
         leveling.xpFill = xpFill;
         leveling.levelText = levelText;
         leveling.cardPanel = cardPanel.gameObject;
+        leveling.panelTitle = levelUpTitle;
         leveling.cardButtons = cardButtons;
         leveling.cardTitles = cardTitles;
         leveling.cardDescriptions = cardDescriptions;
@@ -269,6 +270,12 @@ public static class ArenaSceneBuilder
         arena.materialSprite = a.square;
         arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
         arena.goldSprite = a.circle;    // tinted yellow by Pickup
+        arena.relicSprite = Fx("FX_Glint", a.circle); // a star, tinted pale gold by Pickup
+        arena.fireTrailSprite = Fx("FX_Fire", a.circle);
+        arena.blastCoreSprite = a.circle;
+        arena.blastRingSprite = a.ring;
+        arena.shadowSprite = a.circle;
+        arena.dangerZoneSprite = a.roundEnd;
         arena.cam = camera;
         arena.hpFill = hpFill;
         arena.hpText = hpText;

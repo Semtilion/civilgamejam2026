@@ -20,7 +20,9 @@ public class SpawnEntry
 // teleporter. Once the teleporter is open, spawning stops; stepping in clears the depth: go deeper or return to town.
 // Kills, materials, crystals, gold, supplies, ores and relics go back to the town.
 // Ores and shrines (MineSpot) are used by standing next to them; every mined ore shakes the cave and may set off a trap.
-// Every boss drops a relic (Relics, on this object).
+// Every boss drops a relic (Relics, on this object). A few normal enemies spawn as variants (`variants`, EnemyVariant:
+// blue tough, red fire trail, purple blast after death) worth more XP, with a small chance to drop a relic pickup
+// (collecting it shows a relic card).
 // Raid: the same cave, crystal monsters keep pouring in; hold out until the timer runs out (bigger and longer every
 // raid, a Colossus at the halfway mark from raid `raidBossFrom`). Held: like a dive's return. Lost: the town is hurt
 // (Campaign.RaidLost).
@@ -145,7 +147,7 @@ public class ArenaManager : MonoBehaviour
     public PauseMenu pauseMenu;
     public DamageNumbers damageNumbers;
     public DeathBursts deathBursts;
-    [Tooltip("F1-F4 test keys (editor and Development builds only).")]
+    [Tooltip("F1-F5 test keys (editor and Development builds only).")]
     public DebugKeys debugKeys;
     [Tooltip("Unlit sprite material: effects, shots and pickups use it to stay bright in the dark cave.")]
     public Material unlitMaterial;
@@ -155,6 +157,20 @@ public class ArenaManager : MonoBehaviour
     public Sprite materialSprite;
     public Sprite crystalSprite;
     public Sprite goldSprite;
+    [Tooltip("A variant's relic drop (a star, tinted by Pickup).")]
+    public Sprite relicSprite;
+    [Tooltip("Enemy shadows (a circle, squashed and darkened by Enemy).")]
+    public Sprite shadowSprite;
+    [Tooltip("The boss's dash warning: a white bar with a round right end, 9-sliced (Enemy stretches it).")]
+    public Sprite dangerZoneSprite;
+
+    [Header("Variant enemies")]
+    public VariantSettings variants = new VariantSettings();
+    [Tooltip("A red variant's fire patches (white, tinted).")]
+    public Sprite fireTrailSprite;
+    [Tooltip("A purple variant's blast: the pulsing core (circle) and its area / fuse (ring), white, tinted.")]
+    public Sprite blastCoreSprite;
+    public Sprite blastRingSprite;
     [Tooltip("Plain white square, used for simple bars (ore mining progress).")]
     public Sprite whiteSquare;
     public Camera cam;
@@ -390,7 +406,7 @@ public class ArenaManager : MonoBehaviour
     public void OnEnemyKilled(Enemy enemy)
     {
         bool isBoss = enemy.data.behavior == EnemyBehavior.Boss;
-        deathBursts.Burst(enemy.transform.position, enemy.data.color, enemy.data.radius, isBoss);
+        deathBursts.Burst(enemy.transform.position, enemy.Tint, enemy.radius, isBoss);
         if (isBoss) cameraFollow.Shake(0.4f, 0.3f);
 
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
@@ -423,7 +439,7 @@ public class ArenaManager : MonoBehaviour
 
         if (enemy == currentBoss)
         {
-            OpenTeleporter();
+            if (teleporter == null) OpenTeleporter(); // (already open: a boss summoned with the debug key)
             relicDue = true; // every boss drops a relic
         }
         else if (!bossSpawned && teleporter == null && depthKills >= KillsNeeded)
@@ -459,14 +475,26 @@ public class ArenaManager : MonoBehaviour
         GoalReached();
     }
 
+    // Debug (F5): the boss walks in now (boss bar), as on a boss depth: killing it on a dive opens the teleporter (if it
+    // isn't open yet) and drops a relic. The depth's own goal and boss are unchanged.
+    public void DebugSummonBoss()
+    {
+        SpawnBoss();
+    }
+
+    // A variant's XP gem is worth variants.xpMultiplier x, and it may drop a relic (while one can still be found).
     void DropLoot(Enemy enemy)
     {
+        bool variant = enemy.variant != EnemyVariant.None;
+        if (variant && Random.value < variants.relicChance && relics.AnyMissing)
+            Pickup.Drop(PickupKind.Relic, relicSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, 1, this);
         if (Random.value < enemy.data.materialChance)
             Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount + materialBonus, this);
         if (Random.value < enemy.data.goldChance)
             Pickup.Drop(PickupKind.Gold, goldSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, enemy.data.goldAmount, this);
         if (leveling.levelingEnabled && enemy.data.xp > 0)
-            Pickup.Drop(PickupKind.Xp, xpSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, enemy.data.xp, this);
+            Pickup.Drop(PickupKind.Xp, xpSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f,
+                enemy.data.xp * (variant ? variants.xpMultiplier : 1), this);
     }
 
     // The depth's goal is done: spawning stops, Spitters off-screen vanish (no kill, no loot), and a teleporter opens
@@ -521,6 +549,7 @@ public class ArenaManager : MonoBehaviour
             else if (pickup.kind == PickupKind.Crystal) foundCrystals += pickup.amount;
             else if (pickup.kind == PickupKind.Gold) foundGold += pickup.amount;
             else if (pickup.kind == PickupKind.Supplies) foundSupplies += pickup.amount;
+            else if (pickup.kind == PickupKind.Relic) relics.TryFind(out _); // listed with the relics found below
             else xp += pickup.amount;
         }
         diveMaterials += foundMaterials;
@@ -569,6 +598,11 @@ public class ArenaManager : MonoBehaviour
         else if (kind == PickupKind.Crystal) diveCrystals += amount;
         else if (kind == PickupKind.Gold) diveGold += amount;
         else if (kind == PickupKind.Supplies) diveSupplies += amount;
+        else if (kind == PickupKind.Relic)
+        {
+            // A relic you don't have yet, working right away, shown as a card (pauses the game)
+            if (relics.TryFind(out RelicId relic)) leveling.ShowRelic(Relics.Names[(int)relic], relics.Describe(relic));
+        }
         else leveling.AddXp(amount);
     }
 
@@ -774,7 +808,10 @@ public class ArenaManager : MonoBehaviour
     void RaidHeld()
     {
         foreach (Pickup pickup in Pickup.All)
-            if (pickup.kind != PickupKind.Xp) Collect(pickup.kind, pickup.amount);
+        {
+            if (pickup.kind == PickupKind.Relic) relics.TryFind(out _); // no card: the raid is over
+            else if (pickup.kind != PickupKind.Xp) Collect(pickup.kind, pickup.amount);
+        }
         ShowPanel("THE TOWN HOLDS", $"Raid {campaign.RaidNumber} held.", "Return to town", () => EndRaid(true));
     }
 
@@ -822,7 +859,17 @@ public class ArenaManager : MonoBehaviour
                 break;
             }
         }
-        if (pick != null) Enemy.Spawn(pick, position, StatScale, player, this);
+        if (pick != null) Enemy.Spawn(pick, position, StatScale, player, this, RollVariant(pick));
+    }
+
+    // Maybe a variant (variants.ChanceAt(depth)): blue, red or purple, equally likely; Spitters (they never move, so no
+    // trail) are never red. Never crates or bosses.
+    EnemyVariant RollVariant(EnemyData data)
+    {
+        if (data.behavior == EnemyBehavior.Crate || data.behavior == EnemyBehavior.Boss) return EnemyVariant.None;
+        if (Random.value >= variants.ChanceAt(depth)) return EnemyVariant.None;
+        if (data.behavior == EnemyBehavior.Shooter) return Random.value < 0.5f ? EnemyVariant.Tough : EnemyVariant.Volatile;
+        return (EnemyVariant)Random.Range(1, 4); // Tough, Burning or Volatile
     }
 
     // The cave minus a 1-unit margin along the walls (where enemies and rocks may appear).
@@ -848,8 +895,8 @@ public class ArenaManager : MonoBehaviour
         return new Vector2(Random.Range(inside.xMin, inside.xMax), Random.Range(inside.yMin, inside.yMax));
     }
 
-    // Destroy every enemy, crate, shot, dagger, axe, fire bomb, pickup, ore, shrine, falling rock and the teleporter
-    // (lists empty at the end of the frame), and hide the damage numbers and death bursts.
+    // Destroy every enemy, crate, shot, dagger, axe, fire bomb, variant hazard, pickup, ore, shrine, falling rock and the
+    // teleporter (lists empty at the end of the frame), and hide the damage numbers and death bursts.
     void ClearField()
     {
         if (teleporter != null) Destroy(teleporter);
@@ -859,6 +906,7 @@ public class ArenaManager : MonoBehaviour
         foreach (Dagger dagger in Dagger.All) Destroy(dagger.gameObject);
         foreach (Axe axe in Axe.All) Destroy(axe.gameObject);
         foreach (FireBomb bomb in FireBomb.All) Destroy(bomb.gameObject);
+        foreach (Hazard hazard in Hazard.All) Destroy(hazard.gameObject);
         foreach (Pickup pickup in Pickup.All) Destroy(pickup.gameObject);
         foreach (MineSpot spot in MineSpot.All) Destroy(spot.gameObject);
         foreach (FallingRock rock in FallingRock.All) Destroy(rock.gameObject);

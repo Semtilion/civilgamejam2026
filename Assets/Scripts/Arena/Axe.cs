@@ -78,7 +78,7 @@ public class Axe : MonoBehaviour
         foreach (Enemy enemy in Enemy.All)
         {
             if (enemy.IsDead || hit.Contains(enemy)) continue;
-            float reach = radius + enemy.data.radius;
+            float reach = radius + enemy.radius;
             if (((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude <= reach * reach)
             {
                 hit.Add(enemy);

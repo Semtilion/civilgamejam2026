@@ -47,7 +47,7 @@ public class SpearThrust : Weapon
             Vector2 offset = (Vector2)enemy.transform.position - origin;
             float along = Vector2.Dot(offset, direction);
             float across = Mathf.Abs(offset.x * direction.y - offset.y * direction.x);
-            float r = enemy.data.radius;
+            float r = enemy.radius;
             if (along < -r || along > reach + r || across > halfWidth + r) continue;
 
             enemy.TakeDamage(Damage, origin, knockback);

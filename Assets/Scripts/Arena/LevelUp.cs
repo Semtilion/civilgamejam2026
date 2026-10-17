@@ -5,18 +5,24 @@ using UnityEngine.UI;
 
 // In-dive leveling (on by default, resets every dive): XP gems -> level up -> pause and pick 1 of 3 random cards,
 // by clicking or pressing 1 / 2 / 3. Cards: a new weapon (Sword, Dagger, Spear or Crystal Orbit; arrives at Lv 1), a
-// level-up for a weapon you have (damage, plus its bonus at Lv 3 and 5), a small stat boost, or, for a Lv 5 weapon
-// whose evolution the town has unlocked, its evolution (gold title; always one of the 3 when there is one; at most
-// maxEvolutions per dive).
+// level-up for a weapon you have (damage, plus its bonus at Lv 3 and 5), a stat boost, or, for a Lv 5 weapon whose
+// evolution the town has unlocked, its evolution (gold title; always one of the 3 when there is one; at most
+// maxEvolutions per dive). Stat and weapon level-up cards can come Blue (x1.5 the boost) or Gold (x2): title, frame
+// and a tint in that color. The same panel shows a single relic card when a relic pickup is collected.
 public class LevelUp : MonoBehaviour
 {
     // Stat cards: what each one raises and by how much per pick (units as in Player.AddStat).
     static readonly StatType[] CardStats = { StatType.MaxHp, StatType.MoveSpeed, StatType.Damage, StatType.AttackSpeed, StatType.Area, StatType.PickupRange };
-    static readonly float[] CardAmounts = { 4f, 0.02f, 0.02f, 0.02f, 0.02f, 0.05f };
+    static readonly float[] CardAmounts = { 10f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f };
     static readonly string[] CardNames = { "Max HP", "Move Speed", "Damage", "Attack Speed", "Area", "Pickup Range" };
     static readonly Key[] PickKeys = { Key.Digit1, Key.Digit2, Key.Digit3 };
     static readonly Key[] PickKeysNumpad = { Key.Numpad1, Key.Numpad2, Key.Numpad3 };
     const int MaxStatRank = 5;
+    // Rarities: common, Blue, Gold (index = Card.rarity): how much more the card gives, its color, and the chances.
+    static readonly float[] RarityScale = { 1f, 1.5f, 2f };
+    static readonly Color[] RarityColors = { Color.white, new Color(0.30f, 0.65f, 1f), new Color(1f, 0.80f, 0.30f) };
+    const float BlueChance = 0.25f, GoldChance = 0.10f;
+    const float RarityTint = 0.3f; // how far the card's background leans toward its rarity color
 
     class Card
     {
@@ -24,6 +30,8 @@ public class LevelUp : MonoBehaviour
         public string description;
         public System.Action apply;
         public bool evolution;
+        public int rarity; // 0 common, 1 Blue, 2 Gold
+        public bool relic; // a relic card: taking it doesn't use up a level-up pick
     }
 
     [Tooltip("XP gems and level-up cards during dives. Off = the Sword only, all other power from the town.")]
@@ -44,6 +52,8 @@ public class LevelUp : MonoBehaviour
     public RectTransform xpFill;
     public Text levelText;
     public GameObject cardPanel;
+    [Tooltip("The panel's title: LEVEL UP! or RELIC FOUND.")]
+    public Text panelTitle;
     public Button[] cardButtons;
     public Text[] cardTitles;
     public Text[] cardDescriptions;
@@ -60,8 +70,16 @@ public class LevelUp : MonoBehaviour
     readonly List<Card> shownCards = new List<Card>();
     bool[] evolutionUnlocked = new bool[0]; // by WeaponId, from the town
     int evolutionsTaken;
+    Color cardColor, frameColor; // a common card's background and frame (as built)
 
     int XpToNext => xpBase + xpPerLevel * level;
+
+    void Awake()
+    {
+        cardColor = cardButtons[0].colors.normalColor;
+        ButtonLabelDim dim = cardButtons[0].GetComponent<ButtonLabelDim>();
+        frameColor = dim != null ? dim.frameColor : Color.white;
+    }
 
     // Level 1, no XP, no stat cards, no evolutions. `evolutions` = the ones the town has unlocked
     // (Campaign.evolutionUnlocked).
@@ -156,9 +174,21 @@ public class LevelUp : MonoBehaviour
         Shuffle(cards);
         int evolution = cards.FindIndex(c => c.evolution); // an evolution always gets the first slot
         if (evolution > 0) (cards[0], cards[evolution]) = (cards[evolution], cards[0]);
+        Show("LEVEL UP!", cards);
+    }
 
+    // A relic pickup was collected (the relic already works): one Gold card with it; taking it just closes the panel.
+    public void ShowRelic(string name, string description)
+    {
+        Show("RELIC FOUND", new List<Card> { new Card { title = name, description = description, apply = () => { }, rarity = 2, relic = true } });
+    }
+
+    // Pauses and shows the first 3 `cards`, each in its rarity's colors.
+    void Show(string heading, List<Card> cards)
+    {
         shownCards.Clear();
         Time.timeScale = 0f;
+        panelTitle.text = heading;
         cardPanel.SetActive(true);
         for (int i = 0; i < cardButtons.Length; i++)
         {
@@ -168,8 +198,16 @@ public class LevelUp : MonoBehaviour
 
             Card card = cards[i];
             shownCards.Add(card);
-            cardTitles[i].text = $"[{i + 1}] {card.title}";
+            string title = card.rarity == 0 ? card.title
+                : $"<color=#{ColorUtility.ToHtmlStringRGB(RarityColors[card.rarity])}>{card.title}</color>";
+            cardTitles[i].text = $"[{i + 1}] {title}";
             cardDescriptions[i].text = card.description;
+            ButtonLabelDim dim = cardButtons[i].GetComponent<ButtonLabelDim>();
+            if (dim != null) dim.frameColor = card.rarity == 0 ? frameColor : RarityColors[card.rarity];
+            ColorBlock colors = cardButtons[i].colors;
+            colors.normalColor = card.rarity == 0 ? cardColor : Color.Lerp(cardColor, RarityColors[card.rarity], RarityTint);
+            colors.selectedColor = colors.normalColor;
+            cardButtons[i].colors = colors;
             cardButtons[i].onClick.RemoveAllListeners();
             cardButtons[i].onClick.AddListener(() => Pick(card));
         }
@@ -178,7 +216,7 @@ public class LevelUp : MonoBehaviour
     void Pick(Card card)
     {
         card.apply();
-        pendingPicks--;
+        if (!card.relic) pendingPicks--;
         shownCards.Clear();
         cardPanel.SetActive(false);
         Time.timeScale = 1f;
@@ -204,11 +242,18 @@ public class LevelUp : MonoBehaviour
             {
                 int next = weapon.level + 1;
                 string bonus = next == 3 || next == 5 ? "\n" + weapon.bonusText : "";
+                int rarity = RollRarity();
+                int gain = Mathf.CeilToInt(weapon.damagePerLevel * RarityScale[rarity]); // Blue / Gold: more damage, still one level
                 cards.Add(new Card
                 {
                     title = $"{weapon.DisplayName} Lv {next}",
-                    description = $"+{weapon.damagePerLevel} damage{bonus}",
-                    apply = () => weapon.level++,
+                    description = $"+{gain} damage{bonus}",
+                    rarity = rarity,
+                    apply = () =>
+                    {
+                        weapon.level++;
+                        weapon.bonusDamage += gain - weapon.damagePerLevel;
+                    },
                 });
             }
             else if (weapon.enabled && CanEvolve(weapon))
@@ -231,18 +276,28 @@ public class LevelUp : MonoBehaviour
         {
             if (statRanks[i] >= MaxStatRank) continue;
             int index = i;
+            int rarity = RollRarity();
+            float amount = CardAmounts[i] * RarityScale[rarity]; // a Blue / Gold one still counts as one rank
             cards.Add(new Card
             {
                 title = $"{CardNames[i]} {statRanks[i] + 1}/{MaxStatRank}",
-                description = Player.StatText(CardStats[i], CardAmounts[i]),
+                description = Player.StatText(CardStats[i], amount),
+                rarity = rarity,
                 apply = () =>
                 {
                     statRanks[index]++;
-                    player.AddStat(CardStats[index], CardAmounts[index]);
+                    player.AddStat(CardStats[index], amount);
                 },
             });
         }
         return cards;
+    }
+
+    // Gold (GoldChance), Blue (BlueChance) or common.
+    static int RollRarity()
+    {
+        float roll = Random.value;
+        return roll < GoldChance ? 2 : roll < GoldChance + BlueChance ? 1 : 0;
     }
 
     // At Lv 5, not evolved yet, its evolution unlocked by the town, and this dive's evolutions not used up.

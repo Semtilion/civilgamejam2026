@@ -7,6 +7,7 @@ using UnityEngine.UI;
 //   F2  dungeon: level up once
 //   F3  town or dungeon: +200 gold, +100 materials, +10 crystals, +50 supplies (the town's stock)
 //   F4  dungeon: the depth's kill goal is met (teleporter, or the boss on a boss depth); a raid: its timer ends
+//   F5  dungeon: the boss walks in (as on a boss depth)
 // A small hint in the corner lists the keys and the last one used.
 public class DebugKeys : MonoBehaviour
 {
@@ -14,7 +15,7 @@ public class DebugKeys : MonoBehaviour
     const int Materials = 100;
     const int Crystals = 10;
     const int Supplies = 50;
-    const string Keys = "DEBUG  F1 relics  F2 level up  F3 resources  F4 clear depth";
+    const string Keys = "DEBUG  F1 relics  F2 level up  F3 resources  F4 clear depth  F5 boss";
 
     [Header("Scene references (one of these)")]
     public ArenaManager arena;
@@ -71,6 +72,11 @@ public class DebugKeys : MonoBehaviour
         {
             arena.DebugClearDepth();
             Report("depth cleared");
+        }
+        if (keyboard.f5Key.wasPressedThisFrame)
+        {
+            arena.DebugSummonBoss();
+            Report("boss summoned");
         }
     }
 

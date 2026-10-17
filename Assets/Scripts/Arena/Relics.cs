@@ -72,6 +72,7 @@ public class Relics : MonoBehaviour
     bool secondWindUsed;
 
     public bool Has(RelicId id) => active[(int)id];
+    public bool AnyMissing => System.Array.IndexOf(active, false) >= 0; // a relic could still be found
     public IReadOnlyList<RelicId> FoundThisDive => foundThisDive;
 
     // Start of a dive or the horde, after the town loadout: the relics you own (weapons at Lv 1).
@@ -189,7 +190,7 @@ public class Relics : MonoBehaviour
         Vector2 center = player.transform.position;
         foreach (Enemy enemy in Enemy.All)
         {
-            float reach = secondWindRadius + enemy.data.radius;
+            float reach = secondWindRadius + enemy.radius;
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(0, center, secondWindPush, false); // a push, no damage (only chasers get pushed)
         }
@@ -215,7 +216,7 @@ public class Relics : MonoBehaviour
     {
         foreach (Enemy enemy in Enemy.All)
         {
-            float reach = explosionRadius + enemy.data.radius;
+            float reach = explosionRadius + enemy.radius;
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(damage, center, 0f, false);
         }

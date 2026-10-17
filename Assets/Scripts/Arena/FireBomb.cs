@@ -110,7 +110,7 @@ public class FireBomb : MonoBehaviour
         Vector2 center = transform.position;
         foreach (Enemy enemy in Enemy.All)
         {
-            float reach = radius + enemy.data.radius;
+            float reach = radius + enemy.radius;
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(damage, center, 0f);
         }

@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum PickupKind { Xp, Materials, Crystal, Gold, Supplies }
+public enum PickupKind { Xp, Materials, Crystal, Gold, Supplies, Relic }
 
-// Something an enemy dropped: an XP gem, materials, a crystal, gold or supplies. Once the hero comes within pickup range
+// Something an enemy dropped: an XP gem, materials, a crystal, gold, supplies or a relic (a variant's rare drop: a
+// big glowing star; collecting it shows a relic card). Once the hero comes within pickup range
 // it flies to the hero; touching it collects it (ArenaManager.Collect) with a little sparkle.
 // Look: a child sprite (unlit, so it shines in the dark cave) that bobs and spins; crystals also glow. Crystals use the
 // artist's crystal (the same art as the crystal clusters they come from), drawn bigger and only bobbing (a painted
@@ -20,6 +21,7 @@ public class Pickup : MonoBehaviour
     static readonly Color CrystalColor = new Color(0.85f, 0.55f, 1f);
     static readonly Color GoldColor = new Color(1f, 0.85f, 0.15f);
     static readonly Color SuppliesColor = new Color(0.55f, 0.95f, 0.55f);
+    static readonly Color RelicColor = new Color(1f, 0.90f, 0.60f);
 
     public PickupKind kind;
     public int amount;
@@ -37,10 +39,11 @@ public class Pickup : MonoBehaviour
         go.transform.position = position;
 
         Color color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor :
-            kind == PickupKind.Crystal ? CrystalColor : kind == PickupKind.Supplies ? SuppliesColor : GoldColor;
+            kind == PickupKind.Crystal ? CrystalColor : kind == PickupKind.Supplies ? SuppliesColor :
+            kind == PickupKind.Relic ? RelicColor : GoldColor;
         bool crystalArt = kind == PickupKind.Crystal;
         // World size (the sprites are 1 unit): bigger = worth more.
-        float size = crystalArt ? 0.5f : amount >= 3 ? 0.35f : 0.25f;
+        float size = crystalArt ? 0.5f : kind == PickupKind.Relic ? 0.9f : amount >= 3 ? 0.35f : 0.25f;
         SpriteRenderer renderer = new GameObject("Sprite").AddComponent<SpriteRenderer>();
         renderer.transform.SetParent(go.transform, false);
         renderer.transform.localScale = Vector3.one * size;
@@ -48,8 +51,9 @@ public class Pickup : MonoBehaviour
         renderer.color = kind == PickupKind.Crystal ? Color.white : color; // the crystal art keeps its own colors
         renderer.sortingOrder = 0;
         Fx.Unlit(renderer);
-        renderer.gameObject.AddComponent<SpriteOutline>();
+        if (kind != PickupKind.Relic) renderer.gameObject.AddComponent<SpriteOutline>(); // (the relic star is all soft glow)
         if (kind == PickupKind.Crystal) Glow.Add(go, CrystalColor, 1.8f, 0.8f);
+        if (kind == PickupKind.Relic) Glow.Add(go, RelicColor, 2.2f, 1f);
 
         Pickup pickup = go.AddComponent<Pickup>();
         pickup.kind = kind;

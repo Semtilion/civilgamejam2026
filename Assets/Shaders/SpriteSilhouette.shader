@@ -1,11 +1,12 @@
-// The sprite's shape in plain white (alpha = the sprite's alpha x _Strength), unlit: the enemies' hit flash
-// (HitFlash draws one over a sprite while it flashes). Flipping is done by the HitFlash object's scale.
+// The sprite's shape in one plain color (_Color; alpha = the sprite's alpha x _Color's), unlit: the enemies' hit flash
+// (HitFlash draws one over a sprite while it flashes: 80% white) and the variants' colored outlines (SpriteOutline
+// makes a copy of the material per color). Flipping is done by the object's scale.
 Shader "Jam/Sprite Silhouette"
 {
     Properties
     {
         [PerRendererData] _MainTex ("Sprite", 2D) = "white" {}
-        _Strength ("Strength", Range(0, 1)) = 0.8
+        _Color ("Color", Color) = (1, 1, 1, 0.8)
     }
 
     SubShader
@@ -36,7 +37,7 @@ Shader "Jam/Sprite Silhouette"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
-            half _Strength;
+            half4 _Color;
 
             Varyings vert(Attributes input)
             {
@@ -49,7 +50,7 @@ Shader "Jam/Sprite Silhouette"
             half4 frag(Varyings input) : SV_Target
             {
                 half alpha = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).a;
-                return half4(1, 1, 1, alpha * _Strength);
+                return half4(_Color.rgb, alpha * _Color.a);
             }
             ENDHLSL
         }
