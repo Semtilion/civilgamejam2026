@@ -13,7 +13,7 @@ public class PortraitMotion : MonoBehaviour
     [Tooltip("How much taller at the top of a breath (0.015 = 1.5%). The width changes by a third of that.")]
     public float breath = 0.015f;
     [Tooltip("How high the hop goes (UI units).")]
-    public float hopHeight = 30f;
+    public float hopHeight = 22f;
 
     RectTransform rect;
     Vector2 restPosition;
@@ -54,17 +54,17 @@ public class PortraitMotion : MonoBehaviour
             float t = hopAge / HopTime;
             if (t < 0.2f)
             {
-                stretch = -0.10f * Mathf.Sin(Mathf.PI * t / 0.2f); // crouch
+                stretch = -0.075f * Mathf.Sin(Mathf.PI * t / 0.2f); // crouch
             }
             else if (t < 0.7f)
             {
                 float air = Mathf.Sin(Mathf.PI * (t - 0.2f) / 0.5f); // up and down
-                stretch = 0.06f * air;
+                stretch = 0.045f * air;
                 height = hopHeight * air;
             }
             else
             {
-                stretch = -0.06f * Mathf.Sin(Mathf.PI * (t - 0.7f) / 0.3f); // landing
+                stretch = -0.045f * Mathf.Sin(Mathf.PI * (t - 0.7f) / 0.3f); // landing
             }
         }
         rect.localScale = new Vector3((1f + breathNow / 3f) * (1f - stretch * 0.6f), (1f + breathNow) * (1f + stretch), 1f);

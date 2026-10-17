@@ -40,6 +40,8 @@ public class TownManager : MonoBehaviour
     public Image portrait;
     [Tooltip("Breathes, and hops after a purchase.")]
     public PortraitMotion portraitMotion;
+    [Tooltip("Violet + gold pieces burst around the portrait after a purchase.")]
+    public UIBurst purchaseBurst;
     [Tooltip("The name on the bar across the bottom of the portrait.")]
     public Text nameplate;
     public Text leaderTitle;
@@ -126,14 +128,15 @@ public class TownManager : MonoBehaviour
         ShowLeader(true);
     }
 
-    // After buying a building level or finishing a materials request: the leader hops and the dialogue retypes with
-    // their thanks line.
+    // After buying a building level or finishing a materials request: the leader hops in a burst of sparkles, and the
+    // dialogue retypes with their thanks line.
     void Thank()
     {
         spokenLine = config.npcs[selected].thanks;
         Refresh();
         dialogue.Play(Dialogue(selected));
         portraitMotion.Hop();
+        purchaseBurst.Burst();
     }
 
     void CloseLeader()

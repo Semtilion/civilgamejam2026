@@ -71,7 +71,7 @@ public static class TownSceneBuilder
         Image window = NewPanel("Window", leaderWindow, Vector2.zero, new Vector2(1620, 720));
 
         // Portrait frame: a soft violet glow behind a thick violet border. The bust hangs 30 below the frame's bottom edge
-        // (clipped there, so it can hop up 30) and breathes; the nameplate covers its painted, uneven bottom.
+        // (clipped there, so it can hop up without showing it) and breathes; the nameplate covers its painted, uneven bottom.
         Vector2 framePosition = new Vector2(-490, 0), frameSize = new Vector2(540, 620);
         Image glow = NewImage("Portrait Glow", window.transform, framePosition, frameSize + Vector2.one * 62,
             new Color(BorderColor.r, BorderColor.g, BorderColor.b, 0.7f)); // 31 out on every side (the sprite's border)
@@ -91,12 +91,16 @@ public static class TownSceneBuilder
         portrait.raycastTarget = false;
         PortraitMotion portraitMotion = portrait.gameObject.AddComponent<PortraitMotion>();
         // 90 tall: covers the uneven bottom (up to ~14% of a bust's height = 80 of 580, so 50 above the frame's edge at rest
-        // and 80 at the top of the hop)
+        // and ~75 at the top of the hop)
         Image plate = NewImage("Nameplate", frame.transform, Vector2.zero, new Vector2(540, 90), new Color(0.07f, 0.05f, 0.10f));
         Pin(plate.rectTransform, new Vector2(0.5f, 0f));
         NewImage("Line", plate.transform, new Vector2(0, 45), new Vector2(540, 4), BorderColor);
         Text nameplate = NewText("Name", plate.transform, Vector2.zero, new Vector2(520, 80), 32, TextAnchor.MiddleCenter);
         nameplate.color = TitleColor;
+        // After a purchase: violet + gold diamonds burst out from the leader's head and shoulders, over the frame
+        UIBurst purchaseBurst = NewUI("Purchase Burst", window.transform, framePosition + new Vector2(0, 60), new Vector2(420, 360))
+            .gameObject.AddComponent<UIBurst>();
+        purchaseBurst.sprite = a.square;
 
         Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
         leaderTitle.color = TitleColor;
@@ -157,6 +161,7 @@ public static class TownSceneBuilder
         town.closeButton = close;
         town.portrait = portrait;
         town.portraitMotion = portraitMotion;
+        town.purchaseBurst = purchaseBurst;
         town.nameplate = nameplate;
         town.leaderTitle = leaderTitle;
         town.dialogue = dialogue;
