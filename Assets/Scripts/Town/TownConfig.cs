@@ -16,6 +16,8 @@ public class NpcDefinition
     public Sprite portrait;
     [Tooltip("What they say first in the leader window (shown in quotes).")]
     public string greeting;
+    [Tooltip("What they say after you buy a building level in their district or finish their materials request.")]
+    public string thanks;
 }
 
 // What a district building does per level (see Building.amountPerLevel for the units).

@@ -38,6 +38,10 @@ public class TownManager : MonoBehaviour
     public Button backdrop;
     public Button closeButton;
     public Image portrait;
+    [Tooltip("Breathes, and hops after a purchase.")]
+    public PortraitMotion portraitMotion;
+    [Tooltip("The name on the bar across the bottom of the portrait.")]
+    public Text nameplate;
     public Text leaderTitle;
     public Typewriter dialogue;
     [Tooltip("One button per building in the leader's district.")]
@@ -51,7 +55,8 @@ public class TownManager : MonoBehaviour
     public Button titleButton;
 
     Campaign campaign;
-    int selected; // whose window is open
+    int selected;       // whose window is open
+    string spokenLine;  // what they say on top of the dialogue: their greeting, or their thanks after a purchase
     Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
@@ -75,11 +80,11 @@ public class TownManager : MonoBehaviour
         }
         backdrop.onClick.AddListener(CloseLeader);
         closeButton.onClick.AddListener(CloseLeader);
-        giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
+        giveButton.onClick.AddListener(() => { if (campaign.GiveMaterials(selected)) Thank(); });
         for (int i = 0; i < buildingButtons.Length; i++)
         {
             int slot = i; // copy for the lambda
-            buildingButtons[i].onClick.AddListener(() => { campaign.Build(shownBuildings[slot]); Refresh(); });
+            buildingButtons[i].onClick.AddListener(() => { if (campaign.Build(shownBuildings[slot])) Thank(); });
         }
         diveButton.onClick.AddListener(() => Leave(arenaScene)); // the arena runs the horde on day 15
         newGameButton.onClick.AddListener(() =>
@@ -116,8 +121,19 @@ public class TownManager : MonoBehaviour
     void OpenLeader(int i)
     {
         selected = i;
+        spokenLine = config.npcs[i].greeting;
         leaderWindow.SetActive(true);
         ShowLeader(true);
+    }
+
+    // After buying a building level or finishing a materials request: the leader hops and the dialogue retypes with
+    // their thanks line.
+    void Thank()
+    {
+        spokenLine = config.npcs[selected].thanks;
+        Refresh();
+        dialogue.Play(Dialogue(selected));
+        portraitMotion.Hop();
     }
 
     void CloseLeader()
@@ -231,6 +247,7 @@ public class TownManager : MonoBehaviour
         portrait.enabled = definition.portrait != null;
         portrait.sprite = npc.Alive ? definition.portrait : GreyPortrait(definition.portrait);
         portrait.color = npc.Alive ? Color.white : GoneTint;
+        nameplate.text = definition.name.ToUpper();
 
         string text = Dialogue(i);
         if (retype) dialogue.Play(text);
@@ -247,7 +264,7 @@ public class TownManager : MonoBehaviour
         }
     }
 
-    // The leader's greeting (in quotes), then their faction, request, weapon and quake risk.
+    // What the leader says (spokenLine, in quotes), then their faction, request, weapon and quake risk.
     string Dialogue(int i)
     {
         NpcDefinition definition = config.npcs[i];
@@ -262,7 +279,7 @@ public class TownManager : MonoBehaviour
         else
         {
             int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
-            body = string.IsNullOrEmpty(definition.greeting) ? "" : $"\"{definition.greeting}\"\n\n";
+            body = string.IsNullOrEmpty(spokenLine) ? "" : $"\"{spokenLine}\"\n\n";
             body += $"{definition.faction}: {npc.population}/{definition.startPopulation} people (lost ones never come back). " +
                     $"Under {halfLine}: district at half strength. At 0: wiped out.";
             body += npc.quest != null

@@ -68,11 +68,36 @@ public static class TownSceneBuilder
         backdrop.transition = Selectable.Transition.None;
         backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
 
-        Image window = NewPanel("Window", leaderWindow, Vector2.zero, new Vector2(1560, 680));
-        Image frame = NewImage("Portrait Frame", window.transform, new Vector2(-490, 0), new Vector2(540, 620), new Color(0.04f, 0.03f, 0.06f));
-        Image portrait = NewImage("Portrait", frame.transform, Vector2.zero, new Vector2(520, 600), Color.white);
-        portrait.preserveAspect = true; // wider box than the busts, so each one fills the height
+        Image window = NewPanel("Window", leaderWindow, Vector2.zero, new Vector2(1620, 720));
+
+        // Portrait frame: a soft violet glow behind a thick violet border. The bust hangs 30 below the frame's bottom edge
+        // (clipped there, so it can hop up 30) and breathes; the nameplate covers its painted, uneven bottom.
+        Vector2 framePosition = new Vector2(-490, 0), frameSize = new Vector2(540, 620);
+        Image glow = NewImage("Portrait Glow", window.transform, framePosition, frameSize + Vector2.one * 62,
+            new Color(BorderColor.r, BorderColor.g, BorderColor.b, 0.7f)); // 31 out on every side (the sprite's border)
+        glow.sprite = a.glow;
+        glow.type = Image.Type.Sliced;
+        glow.raycastTarget = false;
+        Image frame = NewImage("Portrait Frame", window.transform, framePosition, frameSize, new Color(0.04f, 0.03f, 0.06f));
+        Outline frameBorder = frame.gameObject.AddComponent<Outline>();
+        frameBorder.effectColor = BorderColor;
+        frameBorder.effectDistance = new Vector2(6f, -6f);
+        RectTransform portraitClip = NewUI("Portrait Clip", frame.transform, Vector2.zero, Vector2.zero);
+        Stretch(portraitClip);
+        portraitClip.gameObject.AddComponent<RectMask2D>();
+        Image portrait = NewImage("Portrait", portraitClip, new Vector2(0, -30), new Vector2(540, 580), Color.white);
+        Pin(portrait.rectTransform, new Vector2(0.5f, 0f)); // bottom center
+        portrait.preserveAspect = true; // the busts are narrower than this box, so each one fills its height
         portrait.raycastTarget = false;
+        PortraitMotion portraitMotion = portrait.gameObject.AddComponent<PortraitMotion>();
+        // 90 tall: covers the uneven bottom (up to ~14% of a bust's height = 80 of 580, so 50 above the frame's edge at rest
+        // and 80 at the top of the hop)
+        Image plate = NewImage("Nameplate", frame.transform, Vector2.zero, new Vector2(540, 90), new Color(0.07f, 0.05f, 0.10f));
+        Pin(plate.rectTransform, new Vector2(0.5f, 0f));
+        NewImage("Line", plate.transform, new Vector2(0, 45), new Vector2(540, 4), BorderColor);
+        Text nameplate = NewText("Name", plate.transform, Vector2.zero, new Vector2(520, 80), 32, TextAnchor.MiddleCenter);
+        nameplate.color = TitleColor;
+
         Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
         leaderTitle.color = TitleColor;
         Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 100), new Vector2(940, 300), 22, TextAnchor.UpperLeft);
@@ -84,7 +109,7 @@ public static class TownSceneBuilder
         Button giveButton = NewButton("Give", window.transform, new Vector2(380, 56), 22);
         Place(giveButton, new Vector2(280, -250));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
-        Place(close, new Vector2(732, 292));
+        Place(close, new Vector2(762, 312));
         AddPopIn(window);
         leaderWindow.gameObject.SetActive(false);
 
@@ -131,6 +156,8 @@ public static class TownSceneBuilder
         town.backdrop = backdrop;
         town.closeButton = close;
         town.portrait = portrait;
+        town.portraitMotion = portraitMotion;
+        town.nameplate = nameplate;
         town.leaderTitle = leaderTitle;
         town.dialogue = dialogue;
         town.buildingButtons = buildingButtons;

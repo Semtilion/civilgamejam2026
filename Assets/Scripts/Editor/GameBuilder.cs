@@ -14,6 +14,7 @@ public class GameAssets
 {
     public Sprite circle, square;
     public Sprite ring, arc;  // generated: the hammer's shockwave, the sword's slash
+    public Sprite glow;       // generated: soft-edged, 9-sliced (the glow around the leader portrait)
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
     public Sprite[] heroWalk;
@@ -83,6 +84,7 @@ public static class GameBuilder
         a.ring = GeneratedSprite("Ring", 128, (r, angle) => Mathf.Clamp01((r - 0.80f) / 0.06f) * Mathf.Clamp01((0.99f - r) / 0.04f));
         a.arc = GeneratedSprite("Arc", 128, (r, angle) =>
             Mathf.Clamp01((r - 0.55f) / 0.12f) * Mathf.Clamp01((0.99f - r) / 0.05f) * Mathf.Clamp01(1f - angle / 220f));
+        a.glow = GlowSprite();
         a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
         if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
         a.heroIdle = HeroSprite("Hero_Idle");
@@ -236,6 +238,39 @@ public static class GameBuilder
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
+    // A white square whose edges fade out, with rounded corners, 9-sliced with a 31 px border: as a Sliced UI image it
+    // makes an even, soft halo 31 units wide around whatever it's stretched behind. Made once (delete the file to remake it).
+    static Sprite GlowSprite()
+    {
+        const int Size = 64, Border = 31;
+        string path = $"{ArtFolder}/Glow.png";
+        if (!File.Exists(path))
+        {
+            Texture2D texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < Size; y++)
+            for (int x = 0; x < Size; x++)
+            {
+                // Distance outside the 2x2 px middle: 0 inside it, Border at the edge.
+                float dx = Mathf.Max(0f, Border - x, x - (Size - 1 - Border));
+                float dy = Mathf.Max(0f, Border - y, y - (Size - 1 - Border));
+                float inside = 1f - Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy) / Border);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, inside * inside));
+            }
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(path);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spriteBorder = new Vector4(Border, Border, Border, Border);
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     // A piece of the pixel-art tileset (Assets/Art/Tiles or Props), imported crisp: 16 px = 1 world unit,
     // point filtering, no compression, no mipmaps, center pivot. Returns null if the file isn't there.
     public static Sprite PixelSprite(string path)
@@ -321,11 +356,14 @@ public static class GameBuilder
         config.npcs = new[]
         {
             new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksWeapon = true, weapon = WeaponId.Whip,
-                                greeting = "Steel holds. Stone doesn't." },
+                                greeting = "Steel holds. Stone doesn't.",
+                                thanks = "Good. My soldiers will put it to use." },
             new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksWeapon = true, weapon = WeaponId.CrystalOrbit,
-                                greeting = "The crystals sing louder every day. Every vein you break, the island hears it." },
+                                greeting = "The crystals sing louder every day. Every vein you break, the island hears it.",
+                                thanks = "The crystals approve. So do I." },
             new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksWeapon = true, weapon = WeaponId.Dagger,
-                                greeting = "My old bones feel the quakes before the ground does. Build us something that stands." },
+                                greeting = "My old bones feel the quakes before the ground does. Build us something that stands.",
+                                thanks = "Bless you. That will hold a while longer." },
         }; // their district buildings are TownConfig.buildings (code defaults); portraits are filled in by EnsureAssets
         config.killQuests = new[]
         {

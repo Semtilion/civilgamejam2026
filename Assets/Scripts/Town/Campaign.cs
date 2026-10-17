@@ -302,11 +302,13 @@ public class Campaign
         return npc.Alive && npc.quest != null && !npc.quest.IsKill && materials >= npc.quest.needed;
     }
 
-    public void GiveMaterials(int npcIndex)
+    // False if you can't (nothing happens).
+    public bool GiveMaterials(int npcIndex)
     {
-        if (!CanGive(npcIndex)) return;
+        if (!CanGive(npcIndex)) return false;
         materials -= npcs[npcIndex].quest.needed;
         CompleteQuest(npcIndex);
+        return true;
     }
 
     // A finished request pays gold and braces the faction's homes; the first one also unlocks the leader's weapon.
@@ -341,15 +343,17 @@ public class Campaign
                materials >= BuildingMaterialCost(b) && gold >= BuildingGoldCost(b) && crystals >= BuildingCrystalCost(b);
     }
 
-    public void Build(int b)
+    // False if you can't (nothing happens).
+    public bool Build(int b)
     {
-        if (!CanBuild(b)) return;
+        if (!CanBuild(b)) return false;
         materials -= BuildingMaterialCost(b);
         gold -= BuildingGoldCost(b);
         crystals -= BuildingCrystalCost(b);
         buildingLevels[b]++;
         Building building = config.buildings[b];
         news.Add($"Built: {building.name} level {buildingLevels[b]} ({building.EffectText(building.amountPerLevel * buildingLevels[b])} in total).");
+        return true;
     }
 
     // What one building gives right now: level x amount per level x its district's strength.
