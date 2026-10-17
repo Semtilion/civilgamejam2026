@@ -5,8 +5,8 @@ using UnityEngine.UI;
 using static GameBuilder;
 
 // Builds Assets/Scenes/Town.unity (called from Jam > Build Game Scenes): the hamlet-style hub with a status bar,
-// news, one button per faction leader, the detail panel (Give button, district buildings), the relics box, the Dive button,
-// the "?" button, the epilogue screen and the How to play popup.
+// news, one button per faction leader, the relics box, the Dive button, the "?" button, the leader window (portrait,
+// dialogue, district buildings, Give button), the epilogue screen and the How to play popup.
 public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
@@ -42,18 +42,7 @@ public static class TownSceneBuilder
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
         }
 
-        // Bottom: detail panel for the selected leader, with their district's buildings
-        Image detail = NewPanel("Detail Panel", canvas, new Vector2(-100, -230), new Vector2(1200, 400));
-        Text detailTitle = NewText("Title", detail.transform, new Vector2(0, 160), new Vector2(1100, 60), 36, TextAnchor.MiddleCenter);
-        detailTitle.color = TitleColor;
-        Text detailBody = NewText("Body", detail.transform, new Vector2(0, 40), new Vector2(1100, 180), 20, TextAnchor.UpperLeft);
-        RectTransform buildingRow = NewRow("District", detail.transform, new Vector2(0, -100), new Vector2(1160, 80), 15);
-        Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
-        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(360, 80), 17);
-        Button giveButton = NewButton("Give", detail.transform, new Vector2(380, 48), 22);
-        ((RectTransform)giveButton.transform).anchoredPosition = new Vector2(0, -170);
-
-        // Right of the detail panel: the relics you own
+        // Bottom right: the relics you own
         Image relicsPanel = NewPanel("Relics Panel", canvas, new Vector2(720, -210), new Vector2(400, 340));
         Text relicsText = NewText("Relics", relicsPanel.transform, Vector2.zero, new Vector2(360, 310), 22, TextAnchor.UpperLeft);
 
@@ -68,6 +57,36 @@ public static class TownSceneBuilder
         RectTransform helpRect = (RectTransform)help.transform;
         helpRect.anchoredPosition = new Vector2(-20, -20);
         Pin(helpRect, new Vector2(1f, 1f));
+
+        // Leader window: a dark backdrop over the town (click it to close) and, beside it rather than on it (so clicks in
+        // the window don't reach it), the window: portrait on the left; name, dialogue, buildings and Give on the right.
+        RectTransform leaderWindow = NewUI("Leader Window", canvas, Vector2.zero, Vector2.zero);
+        Stretch(leaderWindow);
+        Image backdropImage = NewImage("Backdrop", leaderWindow, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
+        Stretch(backdropImage.rectTransform);
+        Button backdrop = backdropImage.gameObject.AddComponent<Button>();
+        backdrop.transition = Selectable.Transition.None;
+        backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        Image window = NewPanel("Window", leaderWindow, Vector2.zero, new Vector2(1560, 680));
+        Image frame = NewImage("Portrait Frame", window.transform, new Vector2(-490, 0), new Vector2(540, 620), new Color(0.04f, 0.03f, 0.06f));
+        Image portrait = NewImage("Portrait", frame.transform, Vector2.zero, new Vector2(520, 600), Color.white);
+        portrait.preserveAspect = true; // wider box than the busts, so each one fills the height
+        portrait.raycastTarget = false;
+        Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
+        leaderTitle.color = TitleColor;
+        Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 100), new Vector2(940, 300), 22, TextAnchor.UpperLeft);
+        dialogueText.raycastTarget = true; // click to show it all at once
+        Typewriter dialogue = dialogueText.gameObject.AddComponent<Typewriter>();
+        RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -130), new Vector2(940, 100), 12);
+        Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
+        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17);
+        Button giveButton = NewButton("Give", window.transform, new Vector2(380, 56), 22);
+        Place(giveButton, new Vector2(280, -250));
+        Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
+        Place(close, new Vector2(732, 292));
+        AddPopIn(window);
+        leaderWindow.gameObject.SetActive(false);
 
         // Epilogue: covers everything once the game has ended (draws over the town and blocks its clicks)
         Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.07f, 0.97f));
@@ -98,10 +117,6 @@ public static class TownSceneBuilder
         town.newsText = news;
         town.npcButtons = npcButtons;
         town.npcLabels = npcLabels;
-        town.detailTitle = detailTitle;
-        town.detailBody = detailBody;
-        town.giveButton = giveButton;
-        town.buildingButtons = buildingButtons;
         town.diveButton = dive;
         town.relicsText = relicsText;
         town.epiloguePanel = epilogue.gameObject;
@@ -112,6 +127,14 @@ public static class TownSceneBuilder
         town.helpButton = help;
         town.howToPlay = howToPlay;
         town.quakeShake = quakeShake;
+        town.leaderWindow = leaderWindow.gameObject;
+        town.backdrop = backdrop;
+        town.closeButton = close;
+        town.portrait = portrait;
+        town.leaderTitle = leaderTitle;
+        town.dialogue = dialogue;
+        town.buildingButtons = buildingButtons;
+        town.giveButton = giveButton;
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);

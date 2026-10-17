@@ -15,6 +15,11 @@ public class Enemy : MonoBehaviour
     const float FlashTime = 0.08f;
     const float SpawnTime = 0.3f;  // grows in
     const float SquishTime = 0.15f; // flattens when hit, then springs back
+    // The walk wobble: how much it squashes/stretches (0.05 = 5%), how far it tilts, and how fast (faster enemies bounce faster).
+    const float WobbleSquash = 0.05f;
+    const float WobbleTilt = 2.5f; // degrees
+    const float WobbleSpeed = 4f;  // + 1.2 x move speed, radians per second
+    const float BreathAmount = 0.04f; // Spitters
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
 
@@ -119,14 +124,15 @@ public class Enemy : MonoBehaviour
         else if (data.behavior == EnemyBehavior.Chaser || data.behavior == EnemyBehavior.Boss)
         {
             // Bouncy walk: squash and stretch plus a tilt, faster for faster enemies.
-            float bounce = Mathf.Sin(animTime * (6f + data.moveSpeed * 2f) + wobblePhase);
-            sx += 0.12f * bounce;
-            sy -= 0.12f * bounce;
-            angle = 7f * Mathf.Sin(animTime * (3f + data.moveSpeed) + wobblePhase);
+            float speed = WobbleSpeed + data.moveSpeed * 1.2f;
+            float bounce = Mathf.Sin(animTime * speed + wobblePhase);
+            sx += WobbleSquash * bounce;
+            sy -= WobbleSquash * bounce;
+            angle = WobbleTilt * Mathf.Sin(animTime * speed * 0.5f + wobblePhase);
         }
         else if (data.behavior == EnemyBehavior.Shooter)
         {
-            float breath = 0.06f * Mathf.Sin(animTime * 3f + wobblePhase);
+            float breath = BreathAmount * Mathf.Sin(animTime * 3f + wobblePhase);
             sx -= breath * 0.5f;
             sy += breath;
             if (aiming)

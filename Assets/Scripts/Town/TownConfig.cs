@@ -12,6 +12,10 @@ public class NpcDefinition
     [Tooltip("Their first completed request unlocks this weapon (it can then appear on level-up cards in the dungeon).")]
     public bool unlocksWeapon;
     public WeaponId weapon;
+    [Tooltip("Their bust in the leader window. Jam > Build Game Scenes fills in Assets/Art/NPCs/Portrait_<name>.png when empty.")]
+    public Sprite portrait;
+    [Tooltip("What they say first in the leader window (shown in quotes).")]
+    public string greeting;
 }
 
 // What a district building does per level (see Building.amountPerLevel for the units).

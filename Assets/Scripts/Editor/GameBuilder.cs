@@ -32,6 +32,7 @@ public static class GameBuilder
     public const float HeroHeight = 2.2f; // world units
     const string TilesFolder = "Assets/Art/Tiles";
     const string PropsFolder = "Assets/Art/Props";
+    const string NpcFolder = "Assets/Art/NPCs";
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
@@ -105,6 +106,13 @@ public static class GameBuilder
             EditorUtility.SetDirty(a.crate);
         }
         a.townConfig = TownConfigAsset(a);
+        // The artist's portraits go on the leaders that don't have one yet.
+        foreach (NpcDefinition npc in a.townConfig.npcs)
+        {
+            if (npc.portrait != null) continue;
+            npc.portrait = PortraitSprite(npc.name);
+            if (npc.portrait != null) EditorUtility.SetDirty(a.townConfig);
+        }
         AssetDatabase.SaveAssets();
         return a;
     }
@@ -168,6 +176,31 @@ public static class GameBuilder
             importer.ReadTextureSettings(settings); // re-read: the lines above changed the importer
             settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
             importer.SetTextureSettings(settings);
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // A leader's bust for the leader window (Assets/Art/NPCs/Portrait_<name>.png): smooth (painted art), no mipmaps, and
+    // uncompressed with Read/Write on, so the town can make a grey copy once the faction is wiped out.
+    // Returns null if the file isn't there.
+    static Sprite PortraitSprite(string name)
+    {
+        string path = $"{NpcFolder}/Portrait_{name}.png";
+        if (!File.Exists(path)) return null;
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+            !importer.isReadable || importer.mipmapEnabled || importer.textureCompression != TextureImporterCompression.Uncompressed)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.isReadable = true;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.alphaIsTransparency = true;
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -287,10 +320,13 @@ public static class GameBuilder
         config = ScriptableObject.CreateInstance<TownConfig>();
         config.npcs = new[]
         {
-            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksWeapon = true, weapon = WeaponId.Whip },
-            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksWeapon = true, weapon = WeaponId.CrystalOrbit },
-            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksWeapon = true, weapon = WeaponId.Dagger },
-        }; // their district buildings are TownConfig.buildings (code defaults)
+            new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksWeapon = true, weapon = WeaponId.Whip,
+                                greeting = "Steel holds. Stone doesn't." },
+            new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksWeapon = true, weapon = WeaponId.CrystalOrbit,
+                                greeting = "The crystals sing louder every day. Every vein you break, the island hears it." },
+            new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksWeapon = true, weapon = WeaponId.Dagger,
+                                greeting = "My old bones feel the quakes before the ground does. Build us something that stands." },
+        }; // their district buildings are TownConfig.buildings (code defaults); portraits are filled in by EnsureAssets
         config.killQuests = new[]
         {
             new KillQuestOption { enemy = a.crawler, count = 40 },

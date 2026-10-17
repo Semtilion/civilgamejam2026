@@ -20,6 +20,7 @@ MonoBehaviour:
     amountPerTier: 10
     unlocksWeapon: 1
     weapon: 2
+    greeting: "Steel holds. Stone doesn't."
   - name: Shaman
     faction: Mages
     startPopulation: 50
@@ -27,6 +28,7 @@ MonoBehaviour:
     amountPerTier: 0.08
     unlocksWeapon: 1
     weapon: 3
+    greeting: "The crystals sing louder every day. Every vein you break, the island hears it."
     hasShop: 1
   - name: Elder
     faction: Peasants
@@ -35,6 +37,7 @@ MonoBehaviour:
     amountPerTier: 0.05
     unlocksWeapon: 1
     weapon: 1
+    greeting: "My old bones feel the quakes before the ground does. Build us something that stands."
   questInterval: 3
   maxTier: 5
   killQuests:

@@ -1,16 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, a detail panel for the
-// selected leader (their faction's people, their request, Give button, and their district's buildings), the relics you
-// own, a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on the horde
-// day). State lives in Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen
-// (New game / Title screen).
+// The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, the relics you own,
+// a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on the horde day).
+// Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
+// their district's buildings and the Give button below (closes with X, Esc or a click outside). State lives in
+// Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen (New game / Title screen).
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
+    static readonly Color GoneTint = new Color(0.55f, 0.55f, 0.55f); // a wiped-out leader's portrait: grey and dark
 
     public TownConfig config;
     public string arenaScene = "Arena";
@@ -21,11 +23,6 @@ public class TownManager : MonoBehaviour
     public Text newsText;
     public Button[] npcButtons;
     public Text[] npcLabels;
-    public Text detailTitle;
-    public Text detailBody;
-    public Button giveButton;
-    [Tooltip("The selected leader's district: one button per building in it.")]
-    public Button[] buildingButtons;
     public Button diveButton;
     [Tooltip("Lists the relics you own.")]
     public Text relicsText;
@@ -34,6 +31,18 @@ public class TownManager : MonoBehaviour
     public HowToPlay howToPlay;
     [Tooltip("Shakes and flashes the town once after an earthquake.")]
     public UIShake quakeShake;
+    [Header("Leader window (opens when a leader is clicked)")]
+    [Tooltip("Holds the backdrop and the window (siblings, so clicks in the window don't reach the backdrop).")]
+    public GameObject leaderWindow;
+    [Tooltip("The dark see-through backdrop over the town: clicking it (outside the window) closes the window.")]
+    public Button backdrop;
+    public Button closeButton;
+    public Image portrait;
+    public Text leaderTitle;
+    public Typewriter dialogue;
+    [Tooltip("One button per building in the leader's district.")]
+    public Button[] buildingButtons;
+    public Button giveButton;
     [Header("Epilogue (shown when the game has ended)")]
     public GameObject epiloguePanel;
     public Text epilogueTitle;
@@ -42,9 +51,10 @@ public class TownManager : MonoBehaviour
     public Button titleButton;
 
     Campaign campaign;
-    int selected;
+    int selected; // whose window is open
     Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
+    readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
 
     // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
     int NpcCount => Mathf.Min(npcButtons.Length, config.npcs.Length);
@@ -60,9 +70,11 @@ public class TownManager : MonoBehaviour
         for (int i = 0; i < npcButtons.Length; i++)
         {
             int index = i; // copy for the lambda
-            npcButtons[i].onClick.AddListener(() => { selected = index; Refresh(); });
+            npcButtons[i].onClick.AddListener(() => OpenLeader(index));
             npcButtons[i].gameObject.SetActive(i < NpcCount);
         }
+        backdrop.onClick.AddListener(CloseLeader);
+        closeButton.onClick.AddListener(CloseLeader);
         giveButton.onClick.AddListener(() => { campaign.GiveMaterials(selected); Refresh(); });
         for (int i = 0; i < buildingButtons.Length; i++)
         {
@@ -94,6 +106,23 @@ public class TownManager : MonoBehaviour
     void Update()
     {
         statusText.text = StatusLine(Time.unscaledDeltaTime); // the counters roll
+
+        Keyboard keyboard = Keyboard.current;
+        if (LeaderOpen && !howToPlay.IsOpen && keyboard != null && keyboard.escapeKey.wasPressedThisFrame) CloseLeader();
+    }
+
+    bool LeaderOpen => leaderWindow.activeSelf;
+
+    void OpenLeader(int i)
+    {
+        selected = i;
+        leaderWindow.SetActive(true);
+        ShowLeader(true);
+    }
+
+    void CloseLeader()
+    {
+        leaderWindow.SetActive(false);
     }
 
     // Remembers the counters (so they roll from here next time), then loads the scene.
@@ -121,7 +150,7 @@ public class TownManager : MonoBehaviour
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
 
         for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
-        ShowDetail(selected);
+        if (LeaderOpen) ShowLeader(false); // e.g. after building: new prices, no retyping
         relicsText.text = RelicsSummary();
 
         SetLabel(diveButton, campaign.IsHordeDay ? "DEFEND\nTHE TOWN" : "DIVE");
@@ -190,12 +219,40 @@ public class TownManager : MonoBehaviour
         return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}\n{request}";
     }
 
-    void ShowDetail(int i)
+    // Fills the leader window for `selected`. `retype` starts the dialogue over (opening the window); otherwise the new
+    // text just replaces the old (e.g. after building, the numbers change).
+    void ShowLeader(bool retype)
+    {
+        int i = selected;
+        NpcDefinition definition = config.npcs[i];
+        NpcState npc = campaign.npcs[i];
+
+        leaderTitle.text = $"{definition.name}, leader of the {definition.faction}";
+        portrait.enabled = definition.portrait != null;
+        portrait.sprite = npc.Alive ? definition.portrait : GreyPortrait(definition.portrait);
+        portrait.color = npc.Alive ? Color.white : GoneTint;
+
+        string text = Dialogue(i);
+        if (retype) dialogue.Play(text);
+        else dialogue.Set(text);
+
+        ShowBuildings(i);
+
+        bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
+        giveButton.gameObject.SetActive(materialsRequest);
+        if (materialsRequest)
+        {
+            SetLabel(giveButton, $"Give {npc.quest.needed} materials");
+            giveButton.interactable = campaign.CanGive(i);
+        }
+    }
+
+    // The leader's greeting (in quotes), then their faction, request, weapon and quake risk.
+    string Dialogue(int i)
     {
         NpcDefinition definition = config.npcs[i];
         NpcState npc = campaign.npcs[i];
 
-        detailTitle.text = $"{definition.name}, leader of the {definition.faction}";
         string body;
         if (!npc.Alive)
         {
@@ -205,8 +262,9 @@ public class TownManager : MonoBehaviour
         else
         {
             int halfLine = Mathf.CeilToInt(definition.startPopulation * config.halfHelpBelow);
-            body = $"{definition.faction}: {npc.population}/{definition.startPopulation} people (lost ones never come back). " +
-                   $"Under {halfLine}: district at half strength. At 0: wiped out.";
+            body = string.IsNullOrEmpty(definition.greeting) ? "" : $"\"{definition.greeting}\"\n\n";
+            body += $"{definition.faction}: {npc.population}/{definition.startPopulation} people (lost ones never come back). " +
+                    $"Under {halfLine}: district at half strength. At 0: wiped out.";
             body += npc.quest != null
                 ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}). Due before day {campaign.NextQuestDay}. Pays {config.questGold} gold."
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
@@ -221,17 +279,29 @@ public class TownManager : MonoBehaviour
                 ? $"\nHomes braced: the next quake can't hurt the {definition.faction} or their district."
                 : $"\nAt risk: a harmful quake costs the {definition.faction} people and a building level. Finish the request to brace them.";
         }
-        detailBody.text = body;
+        return body;
+    }
 
-        ShowBuildings(i);
+    // A grey copy of a portrait (made once; the builder imports portraits with Read/Write on so the pixels can be read).
+    // The window also tints it dark (GoneTint), so it still reads as gone if the copy can't be made.
+    Sprite GreyPortrait(Sprite colored)
+    {
+        if (colored == null || !colored.texture.isReadable) return colored;
+        if (greyPortraits.TryGetValue(colored, out Sprite grey)) return grey;
 
-        bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
-        giveButton.gameObject.SetActive(materialsRequest);
-        if (materialsRequest)
+        Texture2D source = colored.texture;
+        Color32[] pixels = source.GetPixels32();
+        for (int p = 0; p < pixels.Length; p++)
         {
-            SetLabel(giveButton, $"Give {npc.quest.needed} materials");
-            giveButton.interactable = campaign.CanGive(i);
+            byte value = (byte)(pixels[p].r * 0.30f + pixels[p].g * 0.59f + pixels[p].b * 0.11f);
+            pixels[p] = new Color32(value, value, value, pixels[p].a);
         }
+        Texture2D texture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+        texture.SetPixels32(pixels);
+        texture.Apply();
+        grey = Sprite.Create(texture, colored.rect, new Vector2(0.5f, 0.5f));
+        greyPortraits[colored] = grey;
+        return grey;
     }
 
     // One button per building in this leader's district: name, level, effect per level and the next level's price.
