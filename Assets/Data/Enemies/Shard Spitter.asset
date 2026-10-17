@@ -24,6 +24,7 @@ MonoBehaviour:
   materialChance: 0.15
   materialAmount: 1
   crystalAmount: 0
+  supplyAmount: 0
   goldChance: 0.15
   goldAmount: 3
   flower: {fileID: 21300000, guid: a1a26fe28c1f3db43a37435d66e39d02, type: 3}
@@ -33,7 +34,7 @@ MonoBehaviour:
   - 148
   - 216
   - 305
-  projectileSprite: {fileID: 21300000, guid: 81b151a05621a3140be6625e76b91bf8, type: 3}
+  projectileSprite: {fileID: 21300000, guid: e6c1df6f39692524c86058ffec76fae3, type: 3}
   fireRange: 10
   fireWarning: 0.5
   fireInterval: 2.5

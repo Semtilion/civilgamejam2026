@@ -14,7 +14,8 @@ public class GameAssets
 {
     public Sprite circle, square;
     public Sprite ring, arc;  // generated: the hammer's shockwave, the sword's slash
-    public Sprite shard;      // generated: the Spitter's shots until the artist's arrive
+    public Sprite shard;      // generated: the Spitter's shots if the artist's are missing
+    public Sprite arrow;      // generated: the teleporter arrow (a triangle pointing up)
     public Sprite glow;       // generated: soft-edged, 9-sliced (the glow around the leader portrait)
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
@@ -36,8 +37,9 @@ public static class GameBuilder
     const string PropsFolder = "Assets/Art/Props";
     const string NpcFolder = "Assets/Art/NPCs";
     const string EnemyArtFolder = "Assets/Art/Enemies";
-    const string OrePath = "Assets/Art/Dungeon/Ore.png";
-    const float OreHeight = 1.8f; // world units (the whole image, a few px of padding included)
+    const string DungeonArtFolder = "Assets/Art/Dungeon";
+    const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
+    const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     // The Spitter's stem and flower share one canvas centered on the flower's core (its hit center). 210 px = 1 unit,
     // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
@@ -123,6 +125,14 @@ public static class GameBuilder
             float x = r * Mathf.Cos(angle * Mathf.Deg2Rad), y = r * Mathf.Sin(angle * Mathf.Deg2Rad);
             return (0.95f - Mathf.Abs(x) - Mathf.Abs(y) / 0.45f) / 0.08f;
         });
+        // A triangle pointing up, centered (it turns around its middle), corners inside the circle: the teleporter arrow.
+        a.arrow = GeneratedSprite("Arrow", 64, (r, angle) =>
+        {
+            float x = r * Mathf.Cos(angle * Mathf.Deg2Rad), y = r * Mathf.Sin(angle * Mathf.Deg2Rad);
+            float aboveBase = y + 0.7f;                       // the flat bottom at -0.7
+            float insideSides = 0.5f * (0.7f - y) - Mathf.Abs(x); // the slanted sides: (+-0.7, -0.7) up to (0, 0.7)
+            return Mathf.Min(aboveBase, insideSides) / 0.06f;
+        });
         a.glow = GlowSprite();
         a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
         if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
@@ -157,9 +167,13 @@ public static class GameBuilder
             a.spitter.shotAngles = new[] { 13f, 79f, 148f, 216f, 305f };
             EditorUtility.SetDirty(a.spitter);
         }
-        if (a.spitter.projectileSprite == null)
+        // Its shots: the artist's crystal shard (ShotLength long; Projectile draws a sprite at its radius x 2), else the
+        // generated one. A sprite picked by hand in the Inspector is kept.
+        Sprite shotArt = SizedSprite($"{EnemyArtFolder}/Spitter_Shot.png", ShotLength / (Projectile.Radius * 2f), byWidth: true);
+        Sprite shot = shotArt != null ? shotArt : a.shard;
+        if (a.spitter.projectileSprite != shot && (a.spitter.projectileSprite == null || a.spitter.projectileSprite == a.shard))
         {
-            a.spitter.projectileSprite = a.shard;
+            a.spitter.projectileSprite = shot;
             EditorUtility.SetDirty(a.spitter);
         }
         a.townConfig = TownConfigAsset(a);
@@ -267,15 +281,21 @@ public static class GameBuilder
     // it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
     static Sprite EnemySprite(string name, float pixelsPerUnit) => PaintedSprite($"{EnemyArtFolder}/{name}.png", pixelsPerUnit);
 
-    // The artist's ore vein (Assets/Art/Dungeon/Ore.png), OreHeight units tall. Returns null if the file isn't there.
-    public static Sprite OreSprite()
+    // The artist's dungeon pieces (Assets/Art/Dungeon/<name>.png): the ore vein OreHeight units tall; the crystal and
+    // the XP gem (its grey copy) 1 unit tall (Pickup sizes them). Return null if the file isn't there.
+    public static Sprite OreSprite() => SizedSprite($"{DungeonArtFolder}/Ore.png", OreHeight);
+    public static Sprite CrystalSprite() => SizedSprite($"{DungeonArtFolder}/Crystal.png", 1f);
+    public static Sprite XpGemSprite() => SizedSprite($"{DungeonArtFolder}/XpGem.png", 1f);
+
+    // Painted art imported so its whole image is `units` tall (or wide, `byWidth`). Returns null if the file isn't there.
+    static Sprite SizedSprite(string path, float units, bool byWidth = false)
     {
-        if (!File.Exists(OrePath)) return null;
-        AssetDatabase.ImportAsset(OrePath); // in case Unity hasn't picked up a freshly dropped file yet
-        TextureImporter importer = AssetImporter.GetAtPath(OrePath) as TextureImporter;
+        if (!File.Exists(path)) return null;
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
         if (importer == null) return null;
         importer.GetSourceTextureWidthAndHeight(out int width, out int height);
-        return PaintedSprite(OrePath, height / OreHeight);
+        return PaintedSprite(path, (byWidth ? width : height) / units);
     }
 
     // Painted art (not pixel art): smooth, no mipmaps, center pivot, `pixelsPerUnit` px = 1 unit.

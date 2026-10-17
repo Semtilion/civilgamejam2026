@@ -5,7 +5,9 @@ public enum PickupKind { Xp, Materials, Crystal, Gold, Supplies }
 
 // Something an enemy dropped: an XP gem, materials, a crystal, gold or supplies. Once the hero comes within pickup range
 // it flies to the hero; touching it collects it (ArenaManager.Collect) with a little sparkle.
-// Look: a child sprite (unlit, so it shines in the dark cave) that bobs and spins; crystals also glow.
+// Look: a child sprite (unlit, so it shines in the dark cave) that bobs and spins; crystals also glow. Crystals and XP
+// gems use the artist's crystal (XP: a grey copy tinted cyan), drawn bigger and only bobbing (a painted crystal
+// spinning flat looks odd).
 public class Pickup : MonoBehaviour
 {
     public static readonly List<Pickup> All = new List<Pickup>();
@@ -27,6 +29,7 @@ public class Pickup : MonoBehaviour
     Color color;
     float phase;
     bool pulled;
+    bool spins;
 
     public static void Drop(PickupKind kind, Sprite sprite, Vector2 position, int amount, ArenaManager arena)
     {
@@ -35,11 +38,14 @@ public class Pickup : MonoBehaviour
 
         Color color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor :
             kind == PickupKind.Crystal ? CrystalColor : kind == PickupKind.Supplies ? SuppliesColor : GoldColor;
+        bool crystalArt = kind == PickupKind.Crystal || kind == PickupKind.Xp;
+        // World size (the sprites are 1 unit): bigger = worth more.
+        float size = kind == PickupKind.Crystal ? 0.5f : kind == PickupKind.Xp ? (amount >= 3 ? 0.45f : 0.35f) : (amount >= 3 ? 0.35f : 0.25f);
         SpriteRenderer renderer = new GameObject("Sprite").AddComponent<SpriteRenderer>();
         renderer.transform.SetParent(go.transform, false);
-        renderer.transform.localScale = Vector3.one * (amount >= 3 || kind == PickupKind.Crystal ? 0.35f : 0.25f); // bigger = worth more
+        renderer.transform.localScale = Vector3.one * size;
         renderer.sprite = sprite;
-        renderer.color = color;
+        renderer.color = kind == PickupKind.Crystal ? Color.white : color; // the crystal art keeps its own colors
         renderer.sortingOrder = 0;
         Fx.Unlit(renderer);
         renderer.gameObject.AddComponent<SpriteOutline>();
@@ -51,6 +57,7 @@ public class Pickup : MonoBehaviour
         pickup.arena = arena;
         pickup.look = renderer.transform;
         pickup.color = color;
+        pickup.spins = !crystalArt;
         pickup.phase = Random.value * Mathf.PI * 2f;
         All.Add(pickup);
     }
@@ -67,7 +74,7 @@ public class Pickup : MonoBehaviour
         // Bob and spin (the look only; the pickup itself stays put until it's pulled).
         phase += Time.deltaTime * 4f;
         look.localPosition = new Vector3(0f, BobHeight * Mathf.Sin(phase), 0f);
-        look.Rotate(0f, 0f, SpinSpeed * Time.deltaTime);
+        if (spins) look.Rotate(0f, 0f, SpinSpeed * Time.deltaTime);
 
         Player player = arena.player;
         Vector2 toPlayer = player.transform.position - transform.position;

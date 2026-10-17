@@ -7,7 +7,7 @@ public class Projectile : MonoBehaviour
 {
     public static readonly List<Projectile> All = new List<Projectile>();
 
-    const float Radius = 0.2f;
+    public const float Radius = 0.2f; // hit size; the sprite is drawn Radius x 2 per unit of its size
     const float Lifetime = 5f;
 
     Vector2 velocity;

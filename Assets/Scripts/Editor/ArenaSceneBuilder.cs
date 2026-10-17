@@ -154,9 +154,13 @@ public static class ArenaSceneBuilder
         Text bossName = InTitleFont(Shadowed(NewText("Boss Name", bossBar, new Vector2(0, 26), new Vector2(800, 30), 24, TextAnchor.MiddleCenter)));
 
         // Edge arrow pointing at the teleporter while it's off-screen (ArenaManager moves and rotates it)
-        Text arrow = NewText("Teleporter Arrow", canvas, Vector2.zero, new Vector2(60, 60), 48, TextAnchor.MiddleCenter);
-        arrow.text = "▲";
-        arrow.color = new Color(0.4f, 0.9f, 1f);
+        // (a drawn triangle, not a text glyph: the "▲" didn't show in the game's font)
+        Image arrow = NewImage("Teleporter Arrow", canvas, Vector2.zero, new Vector2(56, 56), new Color(0.4f, 0.9f, 1f));
+        arrow.sprite = a.arrow;
+        arrow.raycastTarget = false;
+        Outline arrowEdge = arrow.gameObject.AddComponent<Outline>();
+        arrowEdge.effectColor = Color.black;
+        arrowEdge.effectDistance = new Vector2(2f, -2f);
         arrow.gameObject.SetActive(false);
 
         // Center: pause panel (depth cleared / defeat / victory)
@@ -256,9 +260,11 @@ public static class ArenaSceneBuilder
         arena.quakeText = quakeText;
         arena.player = player;
         arena.leveling = leveling;
-        arena.xpSprite = a.circle;
+        // Crystals and XP gems: the artist's crystal (XP: its grey copy, tinted cyan by Pickup), else placeholder circles.
+        Sprite crystalArt = CrystalSprite(), gemArt = XpGemSprite();
+        arena.xpSprite = gemArt != null ? gemArt : a.circle;
         arena.materialSprite = a.square;
-        arena.crystalSprite = a.circle; // tinted violet by Pickup
+        arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
         arena.goldSprite = a.circle;    // tinted yellow by Pickup
         arena.cam = camera;
         arena.hpFill = hpFill;

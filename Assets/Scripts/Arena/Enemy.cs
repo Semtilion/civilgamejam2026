@@ -28,6 +28,7 @@ public class Enemy : MonoBehaviour
     const float ShakeOffset = 0.05f;
     const float PopTime = 0.2f;
     const float FlowerDepth = -0.01f;
+    const float SpawnTurn = 20f; // a shooter's flower (and its volley) is turned by up to this many degrees, random per spawn
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
 
@@ -49,6 +50,7 @@ public class Enemy : MonoBehaviour
     bool aiming;          // shooter is warning (swelling, red), about to fire
     Vector3 baseScale;    // the size from data.radius
     float age, animTime, squishTimer, popTimer, wobblePhase;
+    float turn; // shooters: SpawnTurn, picked at spawn
 
     public bool IsDead => hp <= 0;
 
@@ -95,6 +97,7 @@ public class Enemy : MonoBehaviour
         baseScale = transform.localScale;
         transform.localScale = Vector3.zero; // grows in (Animate)
         wobblePhase = Random.value * 10f;
+        if (data.behavior == EnemyBehavior.Shooter) turn = Random.Range(-SpawnTurn, SpawnTurn);
         arena.deathBursts.Puff(transform.position, data.radius);
         All.Add(this);
     }
@@ -171,7 +174,7 @@ public class Enemy : MonoBehaviour
             if (flower != null)
             {
                 flower.transform.localScale = new Vector3(headX, headY, 1f);
-                flower.transform.localRotation = Quaternion.Euler(0f, 0f, tilt);
+                flower.transform.localRotation = Quaternion.Euler(0f, 0f, turn + tilt);
                 flower.transform.localPosition = new Vector3(shake.x, shake.y, FlowerDepth);
             }
             else // the placeholder moves as a whole (but doesn't jitter: its position is where it is)
@@ -259,8 +262,9 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    // Reload -> (hero in range) warning -> a volley: one shot per data.shotAngles, all at once, starting at the edge of
-    // its hit circle (by the flower's tips) -> reload. Once the warning starts, the volley always comes.
+    // Reload -> (hero in range) warning -> a volley: one shot per data.shotAngles (+ this Spitter's turn), all at once,
+    // starting at the edge of its hit circle (by the flower's tips) -> reload. Once the warning starts, the volley
+    // always comes.
     void UpdateShooter()
     {
         fireTimer -= delta;
@@ -279,8 +283,9 @@ public class Enemy : MonoBehaviour
             popTimer = PopTime;
             fireTimer = Mathf.Max(0f, data.fireInterval - data.fireWarning);
             Sprite shot = data.projectileSprite != null ? data.projectileSprite : data.sprite;
-            foreach (float degrees in data.shotAngles)
+            foreach (float tip in data.shotAngles)
             {
+                float degrees = tip + turn; // the flower's tips, turned with it
                 Vector2 direction = new Vector2(Mathf.Cos(degrees * Mathf.Deg2Rad), Mathf.Sin(degrees * Mathf.Deg2Rad));
                 Vector2 from = (Vector2)transform.position + direction * data.radius;
                 Projectile.Fire(shot, data.color, from, direction, data.projectileSpeed, projectileDamage, player);

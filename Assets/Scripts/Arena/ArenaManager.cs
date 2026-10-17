@@ -943,7 +943,7 @@ public class ArenaManager : MonoBehaviour
         float reachX = direction.x != 0f ? (center.x - margin) / Mathf.Abs(direction.x) : float.MaxValue;
         float reachY = direction.y != 0f ? (center.y - margin) / Mathf.Abs(direction.y) : float.MaxValue;
         teleporterArrow.position = center + direction * Mathf.Min(reachX, reachY);
-        teleporterArrow.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f); // the glyph points up
+        teleporterArrow.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f); // the arrow sprite points up
     }
 
     // Pauses the game and shows a message with one or two buttons.
