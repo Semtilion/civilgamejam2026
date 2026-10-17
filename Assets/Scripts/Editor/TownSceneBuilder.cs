@@ -38,13 +38,14 @@ public static class TownSceneBuilder
         Text[] npcLabels = new Text[npcCount];
         for (int i = 0; i < npcCount; i++)
         {
-            npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(520, 210), 24);
+            npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(520, 210), 24, useTitleFont: false);
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
         }
 
         // Bottom right: the relics you own
         Image relicsPanel = NewPanel("Relics Panel", canvas, new Vector2(720, -210), new Vector2(400, 340));
         Text relicsText = NewText("Relics", relicsPanel.transform, Vector2.zero, new Vector2(360, 310), 22, TextAnchor.UpperLeft);
+        relicsText.verticalOverflow = VerticalWrapMode.Overflow; // all 11 relics + the heading run a little past the box
 
         // Bottom-right: dive ("Defend the town" on the horde day)
         Button dive = NewButton("DIVE", canvas, new Vector2(360, 110), 36);
@@ -96,20 +97,20 @@ public static class TownSceneBuilder
         Pin(plate.rectTransform, new Vector2(0.5f, 0f));
         NewImage("Line", plate.transform, new Vector2(0, 45), new Vector2(540, 4), BorderColor);
         Text nameplate = NewText("Name", plate.transform, Vector2.zero, new Vector2(520, 80), 32, TextAnchor.MiddleCenter);
-        nameplate.color = TitleColor;
+        Title(nameplate);
         // After a purchase: violet + gold diamonds burst out from the leader's head and shoulders, over the frame
         UIBurst purchaseBurst = NewUI("Purchase Burst", window.transform, framePosition + new Vector2(0, 60), new Vector2(420, 360))
             .gameObject.AddComponent<UIBurst>();
         purchaseBurst.sprite = a.square;
 
         Text leaderTitle = NewText("Title", window.transform, new Vector2(280, 290), new Vector2(940, 60), 36, TextAnchor.MiddleLeft);
-        leaderTitle.color = TitleColor;
+        Title(leaderTitle);
         Text dialogueText = NewText("Dialogue", window.transform, new Vector2(280, 100), new Vector2(940, 300), 22, TextAnchor.UpperLeft);
         dialogueText.raycastTarget = true; // click to show it all at once
         Typewriter dialogue = dialogueText.gameObject.AddComponent<Typewriter>();
         RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -130), new Vector2(940, 100), 12);
         Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
-        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17);
+        for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17, useTitleFont: false);
         Button giveButton = NewButton("Give", window.transform, new Vector2(380, 56), 22);
         Place(giveButton, new Vector2(280, -250));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
@@ -121,7 +122,7 @@ public static class TownSceneBuilder
         Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.07f, 0.97f));
         Stretch(epilogue.rectTransform);
         Text epilogueTitle = NewText("Title", epilogue.transform, new Vector2(0, 330), new Vector2(1600, 100), 72, TextAnchor.MiddleCenter);
-        epilogueTitle.color = TitleColor;
+        Title(epilogueTitle);
         Text epilogueBody = NewText("Body", epilogue.transform, new Vector2(0, 20), new Vector2(1500, 460), 30, TextAnchor.MiddleCenter);
         Button newGame = NewButton("New game", epilogue.transform, new Vector2(360, 100), 36);
         Place(newGame, new Vector2(-220, -350));

@@ -12,7 +12,7 @@ public static class MenuBuilder
         Image panel = NewPanel("Settings Panel", canvas, Vector2.zero, new Vector2(900, 620));
         Text title = NewText("Title", panel.transform, new Vector2(0, 250), new Vector2(800, 80), 52, TextAnchor.MiddleCenter);
         title.text = "SETTINGS";
-        title.color = TitleColor;
+        Title(title);
 
         RectTransform resolutionRow = Row("Resolution", panel.transform, 140);
         Button previous = NewButton("<", resolutionRow, new Vector2(60, 50), 30);
@@ -50,7 +50,7 @@ public static class MenuBuilder
     {
         Image panel = NewPanel("How To Play Panel", canvas, Vector2.zero, new Vector2(1400, 820));
         Text title = NewText("Title", panel.transform, new Vector2(0, 340), new Vector2(1300, 80), 52, TextAnchor.MiddleCenter);
-        title.color = TitleColor;
+        Title(title);
         Text body = NewText("Body", panel.transform, new Vector2(0, 20), new Vector2(1260, 520), 28, TextAnchor.UpperLeft);
         Text page = NewText("Page", panel.transform, new Vector2(0, -290), new Vector2(300, 40), 24, TextAnchor.MiddleCenter);
         Button back = NewButton("Back", panel.transform, new Vector2(220, 64), 28);
@@ -79,7 +79,7 @@ public static class MenuBuilder
         Image panel = NewPanel("Pause Panel", canvas, Vector2.zero, new Vector2(600, 560));
         Text title = NewText("Title", panel.transform, new Vector2(0, 210), new Vector2(500, 80), 56, TextAnchor.MiddleCenter);
         title.text = "PAUSED";
-        title.color = TitleColor;
+        Title(title);
         Button resume = PauseButton("Resume", panel.transform, 100);
         Button howToPlay = PauseButton("How to play", panel.transform, 10);
         Button settings = PauseButton("Settings", panel.transform, -80);
@@ -116,7 +116,7 @@ public static class MenuBuilder
         Image panel = NewPanel("Debug Relic Panel", canvas, Vector2.zero, new Vector2(760, 620));
         Text title = NewText("Title", panel.transform, new Vector2(0, 260), new Vector2(700, 60), 40, TextAnchor.MiddleCenter);
         title.text = "DEBUG: GET A RELIC";
-        title.color = TitleColor;
+        Title(title);
         keys.relicButtons = new Button[Relics.Names.Length];
         for (int i = 0; i < keys.relicButtons.Length; i++)
         {

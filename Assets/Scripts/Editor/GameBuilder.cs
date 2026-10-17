@@ -39,8 +39,14 @@ public static class GameBuilder
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
     const string UnlitMaterialPath = "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat";
 
-    static Font font;
-    public static Font UIFont => font; // the UI font (set when building starts)
+    // The UI fonts (Assets/Fonts, SIL Open Font License; set when building starts): Alegreya for text, MedievalSharp for
+    // titles, main buttons, card names, the boss name, the kill goal and damage numbers. A missing file falls back to
+    // Unity's built-in font.
+    const string FontsFolder = "Assets/Fonts";
+    const float AlegreyaLineSpacing = 0.88f; // its lines are ~20% taller than the built-in font's: keeps them about the same
+    static Font font, titleFont;
+    static float lineSpacing = 1f;
+    public static Font TitleFont => titleFont;
 
     [MenuItem("Jam/Build Game Scenes")]
     static void BuildAll()
@@ -59,13 +65,32 @@ public static class GameBuilder
         }
 
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single); // so neither target scene is open
-        font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        LoadFonts();
         GameAssets assets = EnsureAssets();
         ArenaSceneBuilder.Build(assets);
         TownSceneBuilder.Build(assets);
         TitleSceneBuilder.Build(assets); // built last, so it's the open scene: press Play to start the game
         SetBuildList(TitleSceneBuilder.ScenePath, TownSceneBuilder.ScenePath, ArenaSceneBuilder.ScenePath);
         Debug.Log("Built Title, Town and Arena. Press Play in the Title scene to start (Town or Arena also work for testing).");
+    }
+
+    static void LoadFonts()
+    {
+        Font builtIn = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        font = AssetDatabase.LoadAssetAtPath<Font>($"{FontsFolder}/Alegreya-Regular.ttf");
+        lineSpacing = AlegreyaLineSpacing;
+        if (font == null)
+        {
+            Debug.LogWarning($"{FontsFolder}/Alegreya-Regular.ttf not found: using the built-in font.");
+            font = builtIn;
+            lineSpacing = 1f;
+        }
+        titleFont = AssetDatabase.LoadAssetAtPath<Font>($"{FontsFolder}/MedievalSharp.ttf");
+        if (titleFont == null)
+        {
+            Debug.LogWarning($"{FontsFolder}/MedievalSharp.ttf not found: titles use the text font.");
+            titleFont = font;
+        }
     }
 
     // ---------- Assets ----------
@@ -469,6 +494,7 @@ public static class GameBuilder
     {
         Text text = NewUI(name, parent, position, size).gameObject.AddComponent<Text>();
         text.font = font;
+        text.lineSpacing = lineSpacing;
         text.fontSize = fontSize;
         text.alignment = alignment;
         text.color = Color.white;
@@ -476,14 +502,32 @@ public static class GameBuilder
         return text;
     }
 
-    public static Button NewButton(string label, Transform parent, Vector2 size, int fontSize = 26)
+    // Main buttons (Play, DIVE, Resume, Next, ...) use the title font; buttons whose labels carry info and numbers (the
+    // leader and building buttons) pass useTitleFont: false and use the text font.
+    public static Button NewButton(string label, Transform parent, Vector2 size, int fontSize = 26, bool useTitleFont = true)
     {
         Image image = NewImage(label, parent, Vector2.zero, size, Color.white);
         Button button = image.gameObject.AddComponent<Button>();
         Text text = NewText("Label", image.transform, Vector2.zero, size - new Vector2(16, 8), fontSize, TextAnchor.MiddleCenter);
         text.text = label;
+        if (useTitleFont) InTitleFont(text);
         StyleButton(button, image, text);
         return button;
+    }
+
+    // Switches a text to the title font.
+    public static Text InTitleFont(Text text)
+    {
+        text.font = titleFont;
+        text.lineSpacing = 1f;
+        return text;
+    }
+
+    // A title: the title font in the title color.
+    public static Text Title(Text text)
+    {
+        text.color = TitleColor;
+        return InTitleFont(text);
     }
 
     // ---------- UI look: dark with crystal purple ----------

@@ -108,7 +108,7 @@ public static class ArenaSceneBuilder
         Transform numbersCanvas = NewCanvas("Damage Numbers", -1, eventSystem: false);
         DamageNumbers damageNumbers = numbersCanvas.gameObject.AddComponent<DamageNumbers>();
         damageNumbers.cam = camera;
-        damageNumbers.font = UIFont;
+        damageNumbers.font = TitleFont;
         DeathBursts deathBursts = new GameObject("Death Bursts").AddComponent<DeathBursts>();
         deathBursts.pieceSprite = a.square;
         deathBursts.material = a.unlit;
@@ -137,13 +137,13 @@ public static class ArenaSceneBuilder
         Pin(quakeText.rectTransform, new Vector2(0f, 0f));
 
         // Top-center: kill goal + its progress bar, boss bar
-        Text goalText = Shadowed(NewText("Goal", canvas, new Vector2(0, -25), new Vector2(600, 64), 48, TextAnchor.MiddleCenter));
+        Text goalText = InTitleFont(Shadowed(NewText("Goal", canvas, new Vector2(0, -25), new Vector2(600, 64), 48, TextAnchor.MiddleCenter)));
         Pin(goalText.rectTransform, new Vector2(0.5f, 1f));
         RectTransform goalBar = NewBar("Goal Bar", canvas, new Vector2(0, -92), new Vector2(460, 12), AccentColor, out RectTransform goalFill);
         Pin(goalBar, new Vector2(0.5f, 1f));
         RectTransform bossBar = NewBar("Boss Bar", canvas, new Vector2(0, -130), new Vector2(800, 22), new Color(0.90f, 0.45f, 0.20f), out RectTransform bossFill);
         Pin(bossBar, new Vector2(0.5f, 1f));
-        Text bossName = Shadowed(NewText("Boss Name", bossBar, new Vector2(0, 26), new Vector2(800, 30), 24, TextAnchor.MiddleCenter));
+        Text bossName = InTitleFont(Shadowed(NewText("Boss Name", bossBar, new Vector2(0, 26), new Vector2(800, 30), 24, TextAnchor.MiddleCenter)));
 
         // Edge arrow pointing at the teleporter while it's off-screen (ArenaManager moves and rotates it)
         Text arrow = NewText("Teleporter Arrow", canvas, Vector2.zero, new Vector2(60, 60), 48, TextAnchor.MiddleCenter);
@@ -154,7 +154,7 @@ public static class ArenaSceneBuilder
         // Center: pause panel (depth cleared / defeat / victory)
         Image panel = NewPanel("Panel", canvas, Vector2.zero, new Vector2(1000, 440));
         Text panelTitle = NewText("Title", panel.transform, new Vector2(0, 140), new Vector2(950, 80), 56, TextAnchor.MiddleCenter);
-        panelTitle.color = TitleColor;
+        Title(panelTitle);
         Text panelBody = NewText("Body", panel.transform, new Vector2(0, 5), new Vector2(900, 180), 24, TextAnchor.MiddleCenter);
         RectTransform buttonRow = NewRow("Buttons", panel.transform, new Vector2(0, -140), new Vector2(900, 90), 40);
         Button primaryButton = NewButton("Primary", buttonRow, new Vector2(320, 80));
@@ -174,7 +174,7 @@ public static class ArenaSceneBuilder
         Image cardPanel = NewPanel("Level Up Panel", canvas, Vector2.zero, new Vector2(1320, 560));
         Text levelUpTitle = NewText("Title", cardPanel.transform, new Vector2(0, 220), new Vector2(1200, 80), 56, TextAnchor.MiddleCenter);
         levelUpTitle.text = "LEVEL UP!";
-        levelUpTitle.color = TitleColor;
+        Title(levelUpTitle);
         RectTransform cardRow = NewRow("Cards", cardPanel.transform, new Vector2(0, -40), new Vector2(1260, 360), 30);
         Button[] cardButtons = new Button[3];
         Text[] cardTitles = new Text[3];
@@ -183,7 +183,7 @@ public static class ArenaSceneBuilder
         {
             Image card = NewImage($"Card {i + 1}", cardRow, Vector2.zero, new Vector2(390, 340), Color.white);
             cardButtons[i] = card.gameObject.AddComponent<Button>();
-            cardTitles[i] = NewText("Title", card.transform, new Vector2(0, 110), new Vector2(370, 80), 30, TextAnchor.MiddleCenter);
+            cardTitles[i] = InTitleFont(NewText("Title", card.transform, new Vector2(0, 110), new Vector2(370, 80), 30, TextAnchor.MiddleCenter));
             cardDescriptions[i] = NewText("Description", card.transform, new Vector2(0, -40), new Vector2(350, 200), 24, TextAnchor.MiddleCenter);
             StyleButton(cardButtons[i], card, cardTitles[i]); // highlights on hover
         }
