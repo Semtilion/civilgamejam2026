@@ -7,12 +7,12 @@ using static GameBuilder;
 // Build them after the rest of the canvas, so they draw on top.
 public static class MenuBuilder
 {
-    static readonly Color PanelColor = new Color(0.06f, 0.05f, 0.05f, 0.96f);
-
     public static SettingsMenu Settings(Transform canvas)
     {
-        Image panel = NewImage("Settings Panel", canvas, Vector2.zero, new Vector2(900, 620), PanelColor);
-        NewText("Title", panel.transform, new Vector2(0, 250), new Vector2(800, 80), 52, TextAnchor.MiddleCenter).text = "SETTINGS";
+        Image panel = NewPanel("Settings Panel", canvas, Vector2.zero, new Vector2(900, 620));
+        Text title = NewText("Title", panel.transform, new Vector2(0, 250), new Vector2(800, 80), 52, TextAnchor.MiddleCenter);
+        title.text = "SETTINGS";
+        title.color = TitleColor;
 
         RectTransform resolutionRow = Row("Resolution", panel.transform, 140);
         Button previous = NewButton("<", resolutionRow, new Vector2(60, 50), 30);
@@ -47,8 +47,9 @@ public static class MenuBuilder
 
     public static HowToPlay HowToPlayPopup(Transform canvas)
     {
-        Image panel = NewImage("How To Play Panel", canvas, Vector2.zero, new Vector2(1400, 820), PanelColor);
+        Image panel = NewPanel("How To Play Panel", canvas, Vector2.zero, new Vector2(1400, 820));
         Text title = NewText("Title", panel.transform, new Vector2(0, 340), new Vector2(1300, 80), 52, TextAnchor.MiddleCenter);
+        title.color = TitleColor;
         Text body = NewText("Body", panel.transform, new Vector2(0, 20), new Vector2(1260, 520), 28, TextAnchor.UpperLeft);
         Text page = NewText("Page", panel.transform, new Vector2(0, -290), new Vector2(300, 40), 24, TextAnchor.MiddleCenter);
         Button back = NewButton("Back", panel.transform, new Vector2(220, 64), 28);
@@ -73,8 +74,10 @@ public static class MenuBuilder
     // The Esc menu. Its How to play and Settings panels are built after it (on top) by the caller.
     public static PauseMenu Pause(Transform canvas, ArenaManager arena)
     {
-        Image panel = NewImage("Pause Panel", canvas, Vector2.zero, new Vector2(600, 560), PanelColor);
-        NewText("Title", panel.transform, new Vector2(0, 210), new Vector2(500, 80), 56, TextAnchor.MiddleCenter).text = "PAUSED";
+        Image panel = NewPanel("Pause Panel", canvas, Vector2.zero, new Vector2(600, 560));
+        Text title = NewText("Title", panel.transform, new Vector2(0, 210), new Vector2(500, 80), 56, TextAnchor.MiddleCenter);
+        title.text = "PAUSED";
+        title.color = TitleColor;
         Button resume = PauseButton("Resume", panel.transform, 100);
         Button howToPlay = PauseButton("How to play", panel.transform, 10);
         Button settings = PauseButton("Settings", panel.transform, -80);
@@ -116,8 +119,8 @@ public static class MenuBuilder
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
 
-        go.transform.Find("Background").GetComponent<Image>().color = new Color(0.20f, 0.18f, 0.16f);
-        go.transform.Find("Fill Area/Fill").GetComponent<Image>().color = new Color(0.85f, 0.65f, 0.35f);
+        go.transform.Find("Background").GetComponent<Image>().color = new Color(0.18f, 0.14f, 0.26f);
+        go.transform.Find("Fill Area/Fill").GetComponent<Image>().color = AccentColor;
         go.transform.Find("Handle Slide Area/Handle").GetComponent<Image>().color = Color.white;
 
         Slider slider = go.GetComponent<Slider>();

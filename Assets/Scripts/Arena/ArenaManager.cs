@@ -151,6 +151,8 @@ public class ArenaManager : MonoBehaviour
     public Relics relics;
     [Tooltip("The Esc menu (Resume / How to play / Settings / Quit to title).")]
     public PauseMenu pauseMenu;
+    public DamageNumbers damageNumbers;
+    public DeathBursts deathBursts;
     public Sprite xpSprite;
     public Sprite materialSprite;
     public Sprite crystalSprite;
@@ -162,8 +164,13 @@ public class ArenaManager : MonoBehaviour
     public Text hpText;
     public Text depthText;
     public Text quakeText;
+    [Tooltip("Top-left, second line: the dive's materials, crystals and gold.")]
+    public Text lootText;
     [Tooltip("Top-center: kills toward the depth's goal, BOSS, the teleporter hint, or the horde wave.")]
     [FormerlySerializedAs("timerText")] public Text goalText;
+    [Tooltip("Under the goal text: progress toward the kill goal (or through the horde wave). Hidden otherwise.")]
+    public GameObject goalBar;
+    public RectTransform goalFill;
     [Tooltip("Points at the teleporter while it's off-screen.")]
     public RectTransform teleporterArrow;
     public GameObject bossBar;
@@ -204,6 +211,7 @@ public class ArenaManager : MonoBehaviour
     int wave;              // current horde wave, 1-based (0 = before the first)
     float waveBreakLeft;
     readonly List<EnemyData> waveQueue = new List<EnemyData>(); // still to spawn in this wave
+    int waveSize;          // enemies in this wave (for the goal bar)
 
     CameraFollow cameraFollow;
     Trap trap;          // what comes after the current tremor
@@ -228,7 +236,8 @@ public class ArenaManager : MonoBehaviour
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
             hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null ||
-            rockSprite == null || relics == null || goldSprite == null || pauseMenu == null)
+            rockSprite == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
+            deathBursts == null || lootText == null || goalBar == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
             enabled = false;
@@ -380,6 +389,10 @@ public class ArenaManager : MonoBehaviour
 
     public void OnEnemyKilled(Enemy enemy)
     {
+        bool isBoss = enemy.data.behavior == EnemyBehavior.Boss;
+        deathBursts.Burst(enemy.transform.position, enemy.data.color, enemy.data.radius, isBoss);
+        if (isBoss) cameraFollow.Shake(0.4f, 0.3f);
+
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
 
         if (enemy.data.behavior == EnemyBehavior.Crate) // broken crate or crystal cluster: just its loot, not a kill
@@ -717,6 +730,7 @@ public class ArenaManager : MonoBehaviour
         }
 
         spawnTimer = 0f;
+        waveSize = waveQueue.Count;
         hordeState = waveQueue.Count > 0 ? HordeState.Spawning : HordeState.Fighting;
     }
 
@@ -806,7 +820,7 @@ public class ArenaManager : MonoBehaviour
     }
 
     // Destroy every enemy, crate, shot, dagger, axe, fire bomb, pickup, ore, shrine, falling rock and the teleporter
-    // (lists empty at the end of the frame).
+    // (lists empty at the end of the frame), and hide the damage numbers and death bursts.
     void ClearField()
     {
         if (teleporter != null) Destroy(teleporter);
@@ -819,6 +833,8 @@ public class ArenaManager : MonoBehaviour
         foreach (Pickup pickup in Pickup.All) Destroy(pickup.gameObject);
         foreach (MineSpot spot in MineSpot.All) Destroy(spot.gameObject);
         foreach (FallingRock rock in FallingRock.All) Destroy(rock.gameObject);
+        damageNumbers.Clear();
+        deathBursts.Clear();
     }
 
     // ---------- UI ----------
@@ -828,25 +844,34 @@ public class ArenaManager : MonoBehaviour
         SetFill(hpFill, (float)player.Hp / player.maxHp);
         hpText.text = $"{player.Hp} / {player.maxHp}";
 
+        float goal = -1f; // the goal bar's fill; below 0 = hidden
         if (horde)
         {
+            int left = WaveFightersLeft() + waveQueue.Count;
             depthText.text = $"Day {campaign.day}     THE HORDE     Wave {Mathf.Max(1, wave)}/{hordeWaves.Length}     Kills {kills}";
+            lootText.text = ""; // no loot to bring home from the last fight
             quakeText.text = $"Hold the town: beat all {hordeWaves.Length} waves";
-            goalText.text = hordeState == HordeState.Break ? $"Wave {wave + 1} incoming..." : $"Wave {wave}: {WaveFightersLeft() + waveQueue.Count} left";
+            goalText.text = hordeState == HordeState.Break ? $"Wave {wave + 1} incoming..." : $"Wave {wave}: {left} left";
+            if (hordeState != HordeState.Break && waveSize > 0) goal = 1f - (float)left / waveSize;
         }
         else
         {
             string depthLabel = depth >= forceDepth ? $"Depth {depth} (the force)" : IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}";
-            depthText.text = $"Day {campaign.day}    {depthLabel}    Kills {kills}    Materials {diveMaterials}    " +
-                             $"Crystals {diveCrystals}    Gold {diveGold}";
+            depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}";
+            lootText.text = $"Materials {diveMaterials}     Crystals {diveCrystals}     Gold {diveGold}";
 
             float oreDrop = diveOres * config.orePercent;
             string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";
             quakeText.text = $"{quake}     Ores mined {diveOres} (-{oreDrop:0}% if you get home)";
 
             goalText.text = teleporter != null ? "Teleporter open: step in!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
+            if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;
         }
 
+        // The boss bar takes the goal bar's place.
+        bool showGoal = goal >= 0f && !bossBar.activeSelf;
+        goalBar.SetActive(showGoal);
+        if (showGoal) SetFill(goalFill, goal);
         if (currentBoss != null) SetFill(bossFill, (float)currentBoss.hp / currentBoss.maxHp);
     }
 

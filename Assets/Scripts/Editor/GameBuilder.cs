@@ -35,6 +35,7 @@ public static class GameBuilder
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
 
     static Font font;
+    public static Font UIFont => font; // the UI font (set when building starts)
 
     [MenuItem("Jam/Build Game Scenes")]
     static void BuildAll()
@@ -297,11 +298,13 @@ public static class GameBuilder
     // ---------- UI ----------
 
     // Screen-space canvas scaled for 1920x1080, plus the EventSystem the UI needs (new Input System module).
-    public static Transform NewCanvas(string name)
+    // Extra canvases in a scene (e.g. damage numbers) pass eventSystem: false; lower sortingOrder = drawn below.
+    public static Transform NewCanvas(string name, int sortingOrder = 0, bool eventSystem = true)
     {
-        new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+        if (eventSystem) new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         GameObject canvasObject = new GameObject(name, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         canvasObject.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasObject.GetComponent<Canvas>().sortingOrder = sortingOrder;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
@@ -362,11 +365,68 @@ public static class GameBuilder
 
     public static Button NewButton(string label, Transform parent, Vector2 size, int fontSize = 26)
     {
-        Image image = NewImage(label, parent, Vector2.zero, size, new Color(0.30f, 0.26f, 0.22f));
+        Image image = NewImage(label, parent, Vector2.zero, size, Color.white);
         Button button = image.gameObject.AddComponent<Button>();
-        button.targetGraphic = image;
-        NewText("Label", image.transform, Vector2.zero, size - new Vector2(16, 8), fontSize, TextAnchor.MiddleCenter).text = label;
+        Text text = NewText("Label", image.transform, Vector2.zero, size - new Vector2(16, 8), fontSize, TextAnchor.MiddleCenter);
+        text.text = label;
+        StyleButton(button, image, text);
         return button;
+    }
+
+    // ---------- UI look: dark with crystal purple ----------
+
+    public static readonly Color BackgroundColor = new Color(0.07f, 0.06f, 0.09f);
+    public static readonly Color PanelColor = new Color(0.08f, 0.06f, 0.11f, 0.94f);
+    public static readonly Color BorderColor = new Color(0.55f, 0.35f, 0.85f);
+    public static readonly Color TitleColor = new Color(0.82f, 0.70f, 1f);
+    public static readonly Color AccentColor = new Color(0.65f, 0.45f, 0.95f); // bar fills, slider fills
+    static readonly Color ButtonColor = new Color(0.22f, 0.16f, 0.32f);
+    static readonly Color ButtonHover = new Color(0.36f, 0.26f, 0.52f);
+    static readonly Color ButtonPressed = new Color(0.15f, 0.10f, 0.22f);
+    static readonly Color ButtonDisabled = new Color(0.14f, 0.13f, 0.16f);
+
+    // A dark panel with a thin violet border.
+    public static Image NewPanel(string name, Transform parent, Vector2 position, Vector2 size)
+    {
+        Image panel = NewImage(name, parent, position, size, PanelColor);
+        Outline border = panel.gameObject.AddComponent<Outline>();
+        border.effectColor = BorderColor;
+        border.effectDistance = new Vector2(3f, -3f);
+        border.useGraphicAlpha = false; // a solid border even on a see-through panel
+        return panel;
+    }
+
+    // Violet button states (lighter on hover, darker when pressed, grey when it can't be used; the image is white so
+    // these are the real colors), a label that dims while the button can't be used, and no keyboard navigation (WASD
+    // moves the hero, it shouldn't move a UI selection).
+    public static void StyleButton(Button button, Image image, Text label)
+    {
+        image.color = Color.white;
+        button.targetGraphic = image;
+        ColorBlock colors = button.colors;
+        colors.normalColor = ButtonColor;
+        colors.highlightedColor = ButtonHover;
+        colors.pressedColor = ButtonPressed;
+        colors.selectedColor = ButtonColor; // no "stuck" highlight after a click
+        colors.disabledColor = ButtonDisabled;
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.08f;
+        button.colors = colors;
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        ButtonLabelDim dim = button.gameObject.AddComponent<ButtonLabelDim>();
+        dim.button = button;
+        dim.label = label;
+        dim.labelColor = label.color;
+    }
+
+    // A dark outline so HUD text reads over the cave floor.
+    public static Text Shadowed(Text text)
+    {
+        Outline outline = text.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        return text;
     }
 
     // Lines up its children left to right at their own size, centered (hidden children drop out).
@@ -386,7 +446,7 @@ public static class GameBuilder
     // Dark background with a fill stretched over it. The fill's right anchor shows the amount.
     public static RectTransform NewBar(string name, Transform parent, Vector2 position, Vector2 size, Color color, out RectTransform fill)
     {
-        Image background = NewImage(name, parent, position, size, new Color(0.12f, 0.12f, 0.12f, 0.9f));
+        Image background = NewImage(name, parent, position, size, new Color(0.10f, 0.08f, 0.13f, 0.9f));
         fill = NewImage("Fill", background.transform, Vector2.zero, Vector2.zero, color).rectTransform;
         Stretch(fill);
         return background.rectTransform;

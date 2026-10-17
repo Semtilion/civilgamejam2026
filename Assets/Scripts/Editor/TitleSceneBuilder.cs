@@ -16,9 +16,10 @@ public static class TitleSceneBuilder
         camera.backgroundColor = Color.black;
 
         Transform canvas = NewCanvas("Title UI");
-        Image background = NewImage("Background (placeholder)", canvas, Vector2.zero, Vector2.zero, new Color(0.10f, 0.08f, 0.07f));
+        Image background = NewImage("Background (placeholder)", canvas, Vector2.zero, Vector2.zero, BackgroundColor);
         Stretch(background.rectTransform);
         Text title = NewText("Game Title", canvas, new Vector2(0, 260), new Vector2(1700, 220), 120, TextAnchor.MiddleCenter);
+        title.color = TitleColor;
 
         Button play = NewButton("Play", canvas, new Vector2(420, 90), 40);
         Place(play, new Vector2(0, -40));

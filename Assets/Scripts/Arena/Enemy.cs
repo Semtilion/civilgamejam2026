@@ -180,6 +180,7 @@ public class Enemy : MonoBehaviour
 
         hp -= amount;
         flashTimer = FlashTime;
+        if (amount > 0) arena.damageNumbers.Show(transform.position, amount, weaponHit);
         if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)
         {
