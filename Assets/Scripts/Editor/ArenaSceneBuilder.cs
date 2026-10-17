@@ -419,11 +419,11 @@ public static class ArenaSceneBuilder
         float halfWidth = size.x / 2f, halfHeight = size.y / 2f;
 
         // Torches on the north wall, each with a warm flickering light: the artist's (two flame frames, TorchHeight tall,
-        // standing on the wall's face, the light at the flame), else the tileset's.
+        // standing against the wall with its foot on the floor, the light at the flame), else the tileset's.
         Sprite[] flames = { ItemSprite("Torch_1", TorchHeight), ItemSprite("Torch_2", TorchHeight) };
         bool painted = flames[0] != null && flames[1] != null;
         Sprite torch = painted ? flames[0] : PropSprite("Prop_Torch");
-        float torchY = halfHeight + (painted ? TorchHeight / 2f + 0.1f : 0.5f);
+        float torchY = halfHeight + (painted ? TorchHeight / 2f - 0.15f : 0.5f); // painted: its foot just onto the floor
         if (torch != null)
             for (float x = -halfWidth + 4f; x < halfWidth; x += 8f)
             {
