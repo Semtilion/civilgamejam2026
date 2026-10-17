@@ -49,6 +49,7 @@ public class LevelUp : MonoBehaviour
     public Text[] cardDescriptions;
 
     public bool IsChoosing => cardPanel.activeSelf;
+    public int Level => level;
     // XP gem multiplier (the Scrying Pool building), set by the arena at the start of every dive.
     public float XpGain { get; set; } = 1f;
 

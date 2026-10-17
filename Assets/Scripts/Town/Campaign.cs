@@ -69,6 +69,8 @@ public class Campaign
     // when you get back, then clears it.
     public readonly List<string> report = new List<string>();
     public string reportTitle;
+    // The last dive or raid, for the town's result screen (shown first when you get back, then cleared).
+    public RunResult lastResult;
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
@@ -295,33 +297,34 @@ public class Campaign
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive ends. Survived: keep the materials, crystals, gold, supplies and relics, kills
-    // count for requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
-    // `daysLostOnDefeat` (1) days pass.
-    public void EndDive(bool survived, Dictionary<EnemyData, int> kills, int foundMaterials, int foundCrystals, int foundGold,
-        int foundSupplies, int oresMined, IReadOnlyList<RelicId> foundRelics)
+    // Called by the arena when a dive or raid ends. Survived: keep the materials, crystals, gold, supplies and relics,
+    // kills count for requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
+    // `daysLostOnDefeat` (1) days pass. The run is kept for the result screen (lastResult).
+    public void EndDive(RunResult run)
     {
-        if (survived)
+        lastResult = run;
+        if (run.survived)
         {
-            materials += foundMaterials;
-            crystals += foundCrystals;
-            gold += foundGold;
-            supplies += foundSupplies;
-            float drop = oresMined * config.orePercent;
-            quakeMeter = Mathf.Max(0f, quakeMeter - drop);
-            news.Add($"You return with {foundMaterials} materials, {foundCrystals} crystals, {foundGold} gold, " +
-                     $"{foundSupplies} supplies and {oresMined} ores destroyed (quake meter -{drop:0}%).");
-            foreach (RelicId relic in foundRelics)
+            materials += run.materials;
+            crystals += run.crystals;
+            gold += run.gold;
+            supplies += run.supplies;
+            run.quakeDrop = run.ores * config.orePercent;
+            quakeMeter = Mathf.Max(0f, quakeMeter - run.quakeDrop);
+            news.Add($"You return with {run.materials} materials, {run.crystals} crystals, {run.gold} gold, " +
+                     $"{run.supplies} supplies and {run.ores} ores destroyed (quake meter -{run.quakeDrop:0}%).");
+            foreach (RelicId relic in run.relics)
             {
                 relicOwned[(int)relic] = true;
                 news.Add($"You bring home a relic: {Relics.Names[(int)relic]}! It's yours for every dive from now on.");
             }
-            AddKills(kills);
+            AddKills(run);
             AdvanceDays(1);
         }
         else
         {
             news.Add("You were defeated. Everything found on the dive is lost.");
+            run.requestLines.Add("Kills on a lost run don't count for requests.");
             AdvanceDays(config.daysLostOnDefeat);
         }
     }
@@ -470,7 +473,8 @@ public class Campaign
         news.Add($"The quake damaged the {config.buildings[hit].name} (level {buildingLevels[hit]}).");
     }
 
-    // Request day: unfinished requests fail (no gold), then every leader left asks for something new.
+    // Request day: finished requests nobody turned in are turned in now, unfinished ones fail (no gold), then every
+    // leader left asks for something new.
     void RefreshQuests()
     {
         for (int i = 0; i < npcs.Length; i++)
@@ -481,7 +485,18 @@ public class Campaign
                 npc.quest = null;
                 continue;
             }
-            if (npc.quest != null && day > 1) news.Add($"{config.npcs[i].name}'s request wasn't met.");
+            if (npc.quest != null && day > 1)
+            {
+                if (QuestReady(i))
+                {
+                    news.Add($"{config.npcs[i].name} took your finished request at the deadline.");
+                    TurnIn(i);
+                }
+                else
+                {
+                    news.Add($"{config.npcs[i].name}'s request wasn't met.");
+                }
+            }
             npc.quest = config.NewQuest();
         }
         if (day > 1 && !GameOver) news.Add($"Day {day}: new requests from the faction leaders.");
@@ -489,29 +504,46 @@ public class Campaign
 
     // ---------- Requests ----------
 
-    void AddKills(Dictionary<EnemyData, int> kills)
+    // A run's kills count toward the kill requests (up to what's needed: you turn them in at the leader). Adds one line
+    // per request to the run's result.
+    void AddKills(RunResult run)
     {
         for (int i = 0; i < npcs.Length; i++)
         {
-            Quest quest = npcs[i].quest;
-            if (!npcs[i].Alive || quest == null || !quest.IsKill) continue;
+            NpcState npc = npcs[i];
+            Quest quest = npc.quest;
+            string name = config.npcs[i].name;
+            if (!npc.Alive || quest == null) continue;
 
-            if (kills.TryGetValue(quest.target, out int count)) quest.progress += count;
-            if (quest.progress >= quest.needed) CompleteQuest(i);
+            string ready = QuestReady(i) ? " - ready to turn in!" : "";
+            if (!quest.IsKill)
+            {
+                run.requestLines.Add($"{name}: {quest.Describe()} (you have {materials}/{quest.needed}){ready}");
+                continue;
+            }
+            bool wasReady = QuestReady(i);
+            int gained = run.kills.TryGetValue(quest.target, out int count) ? Mathf.Min(count, quest.needed - quest.progress) : 0;
+            quest.progress += gained;
+            ready = QuestReady(i) ? " - ready to turn in!" : "";
+            if (!wasReady && QuestReady(i)) news.Add($"{name}'s request is done: turn it in!");
+            run.requestLines.Add($"{name}: {quest.Describe()} {quest.progress}/{quest.needed}{(gained > 0 ? $" (+{gained})" : "")}{ready}");
         }
     }
 
-    public bool CanGive(int npcIndex)
+    // The request is finished and waits to be turned in (a yellow "!"): enough kills, or enough materials to give.
+    public bool QuestReady(int npcIndex)
     {
         NpcState npc = npcs[npcIndex];
-        return npc.Alive && npc.quest != null && !npc.quest.IsKill && materials >= npc.quest.needed;
+        if (!npc.Alive || npc.quest == null) return false;
+        return npc.quest.IsKill ? npc.quest.progress >= npc.quest.needed : materials >= npc.quest.needed;
     }
 
-    // False if you can't (nothing happens).
-    public bool GiveMaterials(int npcIndex)
+    // Turns in a finished request (a materials request hands the materials over). False if it isn't finished.
+    public bool TurnIn(int npcIndex)
     {
-        if (!CanGive(npcIndex)) return false;
-        materials -= npcs[npcIndex].quest.needed;
+        if (!QuestReady(npcIndex)) return false;
+        Quest quest = npcs[npcIndex].quest;
+        if (!quest.IsKill) materials -= quest.needed;
         CompleteQuest(npcIndex);
         return true;
     }

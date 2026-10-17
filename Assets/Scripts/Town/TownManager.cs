@@ -7,8 +7,9 @@ using UnityEngine.UI;
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, the relics you own,
 // a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
 // Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
-// their daily order, their district's buildings and the Give button below (closes with X, Esc or a click outside).
-// Coming back after a quake (or while the injured wait for care) shows the report first. State lives in
+// their daily order, their district's buildings and the turn-in button below (closes with X, Esc or a click outside).
+// A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive or raid shows the result
+// screen, then the report (after a quake, or while the injured wait for care). State lives in
 // Campaign.Current. When the run has ended (every faction wiped out), the end screen covers the town (New game /
 // Title screen).
 public class TownManager : MonoBehaviour
@@ -25,6 +26,8 @@ public class TownManager : MonoBehaviour
     public Text newsText;
     public Button[] npcButtons;
     public Text[] npcLabels;
+    [Tooltip("The yellow \"!\" on each leader button: their request is finished, turn it in.")]
+    public Text[] npcMarks;
     public Button diveButton;
     [Tooltip("Lists the relics you own.")]
     public Text relicsText;
@@ -54,9 +57,14 @@ public class TownManager : MonoBehaviour
     public Image[] orderMarks;
     [Tooltip("One button per building in the leader's district.")]
     public Button[] buildingButtons;
-    public Button giveButton;
+    [Tooltip("Complete request / Give materials: turns in the leader's finished request.")]
+    public Button turnInButton;
+    [Tooltip("The yellow \"!\" by the portrait while the open leader's request is finished.")]
+    public Text leaderMark;
     [Tooltip("Hidden when the faction is wiped out (the section captions).")]
     public GameObject[] aliveOnly;
+    [Tooltip("Shown first when you come back from a dive or raid.")]
+    public ResultsScreen results;
     [Header("Report (what happened to the people while you were away)")]
     public GameObject reportPanel;
     public Text reportHeading;
@@ -95,7 +103,7 @@ public class TownManager : MonoBehaviour
         }
         backdrop.onClick.AddListener(CloseLeader);
         closeButton.onClick.AddListener(CloseLeader);
-        giveButton.onClick.AddListener(() => { if (campaign.GiveMaterials(selected)) Thank(); });
+        turnInButton.onClick.AddListener(() => { if (campaign.TurnIn(selected)) Thank(); });
         for (int i = 0; i < orderButtons.Length; i++)
         {
             TownOrder order = (TownOrder)i; // copy for the lambda
@@ -131,7 +139,11 @@ public class TownManager : MonoBehaviour
             campaign.quakeSinceTown = false;
             quakeShake.Play(0.9f, 24f);
         }
-        ShowReport();
+        // The run's result first (unless the run is over: the end screen covers everything), then the report.
+        RunResult run = campaign.lastResult;
+        campaign.lastResult = null;
+        if (run != null && !campaign.Ended) results.Show(ResultTitle(run), ResultLines(run), ShowReport);
+        else ShowReport();
     }
 
     // What happened to the people while you were away (the epilogue covers it if the game has ended), shown once.
@@ -151,9 +163,15 @@ public class TownManager : MonoBehaviour
     {
         statusText.text = StatusLine(Time.unscaledDeltaTime); // the counters roll
 
+        // The "!" marks bob
+        Vector3 bob = Vector3.one * (1f + 0.12f * Mathf.Sin(Time.unscaledTime * 6f));
+        foreach (Text mark in npcMarks) mark.transform.localScale = bob;
+        leaderMark.transform.localScale = bob;
+
         Keyboard keyboard = Keyboard.current;
         if (howToPlay.IsOpen || keyboard == null || !keyboard.escapeKey.wasPressedThisFrame) return;
-        if (reportPanel.activeSelf) reportPanel.SetActive(false);
+        if (results.IsOpen) results.Continue();
+        else if (reportPanel.activeSelf) reportPanel.SetActive(false);
         else if (LeaderOpen) CloseLeader();
     }
 
@@ -207,7 +225,11 @@ public class TownManager : MonoBehaviour
         int first = Mathf.Max(0, campaign.news.Count - NewsLines);
         newsText.text = string.Join("\n", campaign.news.GetRange(first, campaign.news.Count - first));
 
-        for (int i = 0; i < NpcCount; i++) npcLabels[i].text = NpcSummary(i);
+        for (int i = 0; i < NpcCount; i++)
+        {
+            npcLabels[i].text = NpcSummary(i);
+            npcMarks[i].gameObject.SetActive(campaign.QuestReady(i));
+        }
         if (LeaderOpen) ShowLeader(false); // e.g. after building: new prices, no retyping
         relicsText.text = RelicsSummary();
 
@@ -292,13 +314,15 @@ public class TownManager : MonoBehaviour
         ShowBuildings(i);
         foreach (GameObject section in aliveOnly) section.SetActive(npc.Alive);
 
-        bool materialsRequest = npc.Alive && npc.quest != null && !npc.quest.IsKill;
-        giveButton.gameObject.SetActive(materialsRequest);
-        if (materialsRequest)
+        // Turn in: usable once the request is finished
+        bool hasRequest = npc.Alive && npc.quest != null;
+        turnInButton.gameObject.SetActive(hasRequest);
+        if (hasRequest)
         {
-            SetLabel(giveButton, $"Give {npc.quest.needed} materials");
-            giveButton.interactable = campaign.CanGive(i);
+            SetLabel(turnInButton, npc.quest.IsKill ? "Complete request" : $"Give {npc.quest.needed} materials");
+            turnInButton.interactable = campaign.QuestReady(i);
         }
+        leaderMark.gameObject.SetActive(campaign.QuestReady(i));
     }
 
     // What the leader says (spokenLine, in quotes), then their people (and injured), preparedness and request.
@@ -327,10 +351,61 @@ public class TownManager : MonoBehaviour
                 ? $" and teaches you {Weapon.EvolutionNames[w]}, the {Weapon.Names[w]}'s evolution" : "";
             body += npc.quest != null
                 ? $"\nRequest: {npc.quest.Describe()} ({QuestProgress(npc.quest)}), due before day {campaign.NextQuestDay}. " +
-                  $"Pays {config.questGold} gold{weapon}."
+                  $"Pays {config.questGold} gold{weapon}.{(campaign.QuestReady(i) ? " Done: turn it in!" : "")}"
                 : $"\nRequest done. A new one comes on day {campaign.NextQuestDay}.";
         }
         return body;
+    }
+
+    // ---------- Result screen ----------
+
+    static string ResultTitle(RunResult run)
+    {
+        if (run.raid) return run.survived ? $"RAID {run.raidNumber} HELD" : $"RAID {run.raidNumber} LOST";
+        return run.survived ? "BACK FROM THE DEPTHS" : $"DEFEATED ON DEPTH {run.depth}";
+    }
+
+    // How the run went, line by line ("{0}" = a number that rolls up): time held or depths, kills by type, level and
+    // evolutions, the loot (brought home or lost), ores, and each leader's request.
+    static List<ResultLine> ResultLines(RunResult run)
+    {
+        List<ResultLine> lines = new List<ResultLine>();
+        if (run.raid)
+        {
+            lines.Add(new ResultLine($"Held out {{0}} of {Mathf.RoundToInt(run.raidLength)} seconds", Mathf.RoundToInt(run.secondsHeld)));
+            if (!run.survived) lines.Add(new ResultLine($"The raiders broke in: every faction lost {run.lossPercent:0.#}% of its people."));
+        }
+        else
+        {
+            lines.Add(new ResultLine("Depths cleared: {0}", run.depthsCleared));
+            lines.Add(new ResultLine("Deepest depth: {0}", run.depth));
+        }
+        lines.Add(new ResultLine("Enemies killed: {0}", run.totalKills));
+        foreach (KeyValuePair<EnemyData, int> pair in run.kills)
+            lines.Add(new ResultLine($"      {pair.Key.displayName}: {{0}}", pair.Value));
+        lines.Add(new ResultLine("Level reached: {0}", run.level));
+        if (run.evolutions.Count > 0) lines.Add(new ResultLine("Evolved: " + string.Join(", ", run.evolutions)));
+
+        lines.Add(new ResultLine(""));
+        lines.Add(new ResultLine(run.survived ? "Brought home:" : "Lost (you fell):"));
+        lines.Add(new ResultLine("      Materials {0}", run.materials));
+        lines.Add(new ResultLine("      Crystals {0}", run.crystals));
+        lines.Add(new ResultLine("      Gold {0}", run.gold));
+        lines.Add(new ResultLine("      Supplies {0}", run.supplies));
+        foreach (RelicId relic in run.relics)
+            lines.Add(new ResultLine($"      Relic: {Relics.Names[(int)relic]}{(run.survived ? " (yours for good)" : "")}"));
+        if (!run.raid)
+            lines.Add(run.survived
+                ? new ResultLine($"Ores destroyed: {{0}} (quake meter -{run.quakeDrop:0}%)", run.ores)
+                : new ResultLine("Ores destroyed: {0} (no effect: you didn't make it home)", run.ores));
+
+        if (run.requestLines.Count > 0)
+        {
+            lines.Add(new ResultLine(""));
+            lines.Add(new ResultLine("Requests:"));
+            foreach (string request in run.requestLines) lines.Add(new ResultLine("      " + request));
+        }
+        return lines;
     }
 
     // A grey copy of a portrait (made once; the builder imports portraits with Read/Write on so the pixels can be read).

@@ -127,7 +127,7 @@ public static class ArenaSceneBuilder
         damageNumbers.cam = camera;
         damageNumbers.font = TitleFont;
         DeathBursts deathBursts = new GameObject("Death Bursts").AddComponent<DeathBursts>();
-        deathBursts.pieceSprite = a.square;
+        deathBursts.pieceSprite = a.circle;
         deathBursts.sparkSprite = EffectSprite("FX_Glint"); // the impact spark on every hit
         deathBursts.material = a.unlit;
         arena.damageNumbers = damageNumbers;

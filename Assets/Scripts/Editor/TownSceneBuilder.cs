@@ -11,6 +11,7 @@ public static class TownSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Town.unity";
     static readonly Color OrderMarkColor = new Color(1f, 0.80f, 0.30f); // gold: the faction's current order
+    static readonly Color ReadyMarkColor = new Color(1f, 0.85f, 0.15f); // yellow "!": a request to turn in
 
     public static void Build(GameAssets a)
     {
@@ -37,10 +38,12 @@ public static class TownSceneBuilder
         RectTransform npcRow = NewRow("NPCs", canvas, new Vector2(0, 110), new Vector2(1760, 220), 40);
         Button[] npcButtons = new Button[npcCount];
         Text[] npcLabels = new Text[npcCount];
+        Text[] npcMarks = new Text[npcCount];
         for (int i = 0; i < npcCount; i++)
         {
             npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(520, 210), 24, useTitleFont: false);
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
+            npcMarks[i] = ReadyMark(npcButtons[i].transform, new Vector2(225, 65), 72); // top-right corner
         }
 
         // Bottom right: the relics you own
@@ -102,7 +105,8 @@ public static class TownSceneBuilder
         // After a purchase: violet + gold diamonds burst out from the leader's head and shoulders, over the frame
         UIBurst purchaseBurst = NewUI("Purchase Burst", window.transform, framePosition + new Vector2(0, 60), new Vector2(420, 360))
             .gameObject.AddComponent<UIBurst>();
-        purchaseBurst.sprite = a.square;
+        purchaseBurst.sprite = a.circle;
+        Text leaderMark = ReadyMark(window.transform, framePosition + new Vector2(235, 270), 96); // the frame's top-right
 
         // Right side, top to bottom: title, dialogue, the daily order (4 buttons, the current one with a gold bar along
         // its bottom), the district's buildings, Give.
@@ -128,8 +132,8 @@ public static class TownSceneBuilder
         RectTransform buildingRow = NewRow("District", window.transform, new Vector2(280, -175), new Vector2(940, 100), 12);
         Button[] buildingButtons = new Button[MostBuildingsInADistrict(a.townConfig)];
         for (int i = 0; i < buildingButtons.Length; i++) buildingButtons[i] = NewButton($"Building {i + 1}", buildingRow, new Vector2(305, 100), 17, useTitleFont: false);
-        Button giveButton = NewButton("Give", window.transform, new Vector2(380, 56), 22);
-        Place(giveButton, new Vector2(280, -295));
+        Button turnInButton = NewButton("Complete request", window.transform, new Vector2(380, 56), 22);
+        Place(turnInButton, new Vector2(280, -295));
         Button close = NewButton("X", window.transform, new Vector2(56, 56), 30);
         Place(close, new Vector2(762, 312));
         AddPopIn(window);
@@ -149,6 +153,25 @@ public static class TownSceneBuilder
         Place(reportClose, new Vector2(0, -315));
         AddPopIn(reportWindow);
         report.gameObject.SetActive(false);
+
+        // The result screen after a dive or raid (before the report): lines appear one by one, numbers roll up.
+        Image resultsPanel = NewImage("Results", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
+        Stretch(resultsPanel.rectTransform);
+        Image resultsWindow = NewPanel("Window", resultsPanel.transform, Vector2.zero, new Vector2(1400, 820));
+        Text resultsHeading = Title(NewText("Title", resultsWindow.transform, new Vector2(0, 345), new Vector2(1300, 70), 48, TextAnchor.MiddleCenter));
+        Text resultsBody = NewText("Body", resultsWindow.transform, new Vector2(0, 10), new Vector2(1300, 590), 24, TextAnchor.UpperLeft);
+        resultsBody.resizeTextForBestFit = true; // a long run means many lines
+        resultsBody.resizeTextMinSize = 14;
+        resultsBody.resizeTextMaxSize = 24;
+        Button resultsContinue = NewButton("Continue", resultsWindow.transform, new Vector2(320, 80), 32);
+        Place(resultsContinue, new Vector2(0, -345));
+        AddPopIn(resultsWindow);
+        resultsPanel.gameObject.SetActive(false);
+        ResultsScreen results = new GameObject("Results Screen").AddComponent<ResultsScreen>();
+        results.panel = resultsPanel.gameObject;
+        results.heading = resultsHeading;
+        results.body = resultsBody;
+        results.continueButton = resultsContinue;
 
         // Epilogue: covers everything once the game has ended (draws over the town and blocks its clicks)
         Image epilogue = NewImage("Epilogue", canvas, Vector2.zero, Vector2.zero, new Color(0.05f, 0.04f, 0.07f, 0.97f));
@@ -179,6 +202,7 @@ public static class TownSceneBuilder
         town.newsText = news;
         town.npcButtons = npcButtons;
         town.npcLabels = npcLabels;
+        town.npcMarks = npcMarks;
         town.diveButton = dive;
         town.relicsText = relicsText;
         town.epiloguePanel = epilogue.gameObject;
@@ -201,7 +225,9 @@ public static class TownSceneBuilder
         town.orderButtons = orderButtons;
         town.orderMarks = orderMarks;
         town.buildingButtons = buildingButtons;
-        town.giveButton = giveButton;
+        town.turnInButton = turnInButton;
+        town.leaderMark = leaderMark;
+        town.results = results;
         town.aliveOnly = new[] { ordersCaption.gameObject, districtCaption.gameObject };
         town.reportPanel = report.gameObject;
         town.reportHeading = reportHeading;
@@ -210,6 +236,20 @@ public static class TownSceneBuilder
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
 
         EditorSceneManager.SaveScene(scene);
+    }
+
+    // A yellow "!" (a request is finished: turn it in), hidden at first; TownManager shows it and makes it bob.
+    static Text ReadyMark(Transform parent, Vector2 position, int size)
+    {
+        Text mark = InTitleFont(NewText("Ready Mark", parent, position, new Vector2(90, 120), size, TextAnchor.MiddleCenter));
+        mark.text = "!";
+        mark.color = ReadyMarkColor;
+        mark.raycastTarget = false;
+        Outline edge = mark.gameObject.AddComponent<Outline>();
+        edge.effectColor = Color.black;
+        edge.effectDistance = new Vector2(3f, -3f);
+        mark.gameObject.SetActive(false);
+        return mark;
     }
 
     // The detail panel needs one building button per building in the biggest district.

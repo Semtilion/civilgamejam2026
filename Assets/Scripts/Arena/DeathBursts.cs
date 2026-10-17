@@ -26,7 +26,7 @@ public class DeathBursts : MonoBehaviour
     public float sparkTime = 0.12f;
 
     [Header("Scene references")]
-    [Tooltip("Plain square, tinted per piece.")]
+    [Tooltip("Plain circle, tinted per piece.")]
     public Sprite pieceSprite;
     [Tooltip("The impact spark (a 4-point star).")]
     public Sprite sparkSprite;

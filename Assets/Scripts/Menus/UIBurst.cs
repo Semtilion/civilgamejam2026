@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// A burst of small spinning diamonds for the UI (a ParticleSystem doesn't draw on an overlay canvas, so these are
+// A burst of small round pieces for the UI (a ParticleSystem doesn't draw on an overlay canvas, so these are
 // pooled Images moved here). Burst(): they pop out of random points in this object's rect, away from its center and
 // up, then arc down with gravity, shrink and fade (unscaled time). The town's leader window: a violet + gold burst
 // around the portrait after a purchase.
@@ -9,7 +9,7 @@ public class UIBurst : MonoBehaviour
 {
     const int PoolSize = 60;
 
-    [Tooltip("Each piece (white, tinted by a random entry of colors). A square shows as a diamond.")]
+    [Tooltip("Each piece (white, tinted by a random entry of colors): a circle.")]
     public Sprite sprite;
     public Color[] colors = { new Color(0.65f, 0.45f, 0.95f), new Color(1f, 0.80f, 0.30f) }; // violet, gold
     public int count = 24;
@@ -50,7 +50,7 @@ public class UIBurst : MonoBehaviour
             piece.spin = Random.Range(-540f, 540f);
             piece.scale = Random.Range(0.6f, 1.2f);
             piece.image.rectTransform.anchoredPosition = start;
-            piece.image.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f); // a square stands as a diamond
+            piece.image.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f); // (a square sprite would stand as a diamond)
             piece.image.enabled = true;
             Draw(piece);
         }

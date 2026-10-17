@@ -38,7 +38,8 @@ public class HowToPlay : MonoBehaviour
         "Every dive takes a day. If you die, everything found on that dive is lost.",
 
         "Each leader has a faction, a request, a daily order and a district. Click a leader to see them.\n\n" +
-        "Finish a request (kill enemies, or bring materials) for gold. A leader's first finished request also teaches " +
+        "Finish a request (kill enemies, or bring materials), then turn it in at the leader (a yellow ! shows when it's " +
+        "done; at the deadline it's turned in for you) for gold. A leader's first finished request also teaches " +
         "you their weapon's evolution: the Guard's Spear, the Elder's Dagger, the Shaman's Crystal Orbit.\n\n" +
         "Spend materials, gold and crystals on district buildings: permanent upgrades. Under half its people, a " +
         "faction's district works at half strength; at 0, the faction is gone.",

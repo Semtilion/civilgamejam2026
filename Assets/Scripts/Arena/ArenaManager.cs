@@ -190,6 +190,7 @@ public class ArenaManager : MonoBehaviour
     int depth;      // a raid: the depth its enemies are as strong as
     int kills;      // whole dive
     int depthKills; // this depth, toward the goal
+    int depthsCleared;
     int diveMaterials;
     int diveCrystals;
     int diveGold;
@@ -274,6 +275,7 @@ public class ArenaManager : MonoBehaviour
         diveOres = 0;
         diveKills.Clear();
         depth = 0;
+        depthsCleared = 0;
     }
 
     // HP, levels and loot carry over between depths; the hero starts each depth in the middle of a fresh cave.
@@ -507,6 +509,7 @@ public class ArenaManager : MonoBehaviour
     // Stepped into the teleporter: everything still on the floor is collected, then: go deeper or go home.
     void DepthCleared()
     {
+        depthsCleared++;
         int foundMaterials = 0;
         int foundCrystals = 0;
         int foundGold = 0;
@@ -685,11 +688,34 @@ public class ArenaManager : MonoBehaviour
         return point;
     }
 
-    // Back to town: the campaign takes the loot (or not), the day passes, and the Town scene loads.
+    // Back to town: the campaign takes the run's result (the loot, or not), the day passes, and the Town scene loads
+    // (it shows the result screen first).
     void EndDive(bool survived, string nextScene = null)
     {
         campaign.RecordDive(kills, raid ? 0 : depth, diveOres);
-        campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveGold, diveSupplies, diveOres, relics.FoundThisDive);
+        RunResult run = new RunResult
+        {
+            raid = raid,
+            survived = survived,
+            raidNumber = raid ? campaign.RaidNumber : 0,
+            raidLength = raidLength,
+            secondsHeld = raid ? raidLength - Mathf.Max(0f, raidLeft) : 0f,
+            lossPercent = raid && !survived ? campaign.day * config.raidLossPerDay * raidLeft / raidLength : 0f,
+            depth = raid ? 0 : depth,
+            depthsCleared = depthsCleared,
+            level = leveling.Level,
+            materials = diveMaterials,
+            crystals = diveCrystals,
+            gold = diveGold,
+            supplies = diveSupplies,
+            ores = diveOres,
+            totalKills = kills,
+        };
+        foreach (KeyValuePair<EnemyData, int> pair in diveKills) run.kills[pair.Key] = pair.Value;
+        run.relics.AddRange(relics.FoundThisDive);
+        foreach (Weapon weapon in leveling.weapons)
+            if (weapon.enabled && weapon.evolved) run.evolutions.Add(weapon.EvolutionName);
+        campaign.EndDive(run);
         Time.timeScale = 1f;
         SceneManager.LoadScene(nextScene ?? townScene);
     }
