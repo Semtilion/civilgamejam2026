@@ -40,6 +40,7 @@ public static class GameBuilder
     const string DungeonArtFolder = "Assets/Art/Dungeon";
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
+    const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     // The Spitter's stem and flower share one canvas centered on the flower's core (its hit center). 210 px = 1 unit,
     // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
@@ -176,6 +177,15 @@ public static class GameBuilder
             a.spitter.projectileSprite = shot;
             EditorUtility.SetDirty(a.spitter);
         }
+        // The crystal cluster: the crystal art three times (Crystal_Cluster.png), ClusterWidth wide (Enemy.Spawn draws a
+        // sprite at radius x 2 per unit), untinted (its glow stays violet: ArenaManager).
+        Sprite clusterArt = SizedSprite($"{DungeonArtFolder}/Crystal_Cluster.png", ClusterWidth / (a.crystalCluster.radius * 2f), byWidth: true);
+        if (clusterArt != null && a.crystalCluster.sprite != clusterArt)
+        {
+            a.crystalCluster.sprite = clusterArt;
+            a.crystalCluster.color = Color.white;
+            EditorUtility.SetDirty(a.crystalCluster);
+        }
         a.townConfig = TownConfigAsset(a);
         // The artist's portraits go on the leaders that don't have one yet.
         foreach (NpcDefinition npc in a.townConfig.npcs)
@@ -281,11 +291,10 @@ public static class GameBuilder
     // it (Enemy.Spawn: radius x 2). Returns null if the file isn't there.
     static Sprite EnemySprite(string name, float pixelsPerUnit) => PaintedSprite($"{EnemyArtFolder}/{name}.png", pixelsPerUnit);
 
-    // The artist's dungeon pieces (Assets/Art/Dungeon/<name>.png): the ore vein OreHeight units tall; the crystal and
-    // the XP gem (its grey copy) 1 unit tall (Pickup sizes them). Return null if the file isn't there.
+    // The artist's dungeon pieces (Assets/Art/Dungeon/<name>.png): the ore vein OreHeight units tall; the crystal
+    // pickup 1 unit tall (Pickup sizes it). Return null if the file isn't there.
     public static Sprite OreSprite() => SizedSprite($"{DungeonArtFolder}/Ore.png", OreHeight);
     public static Sprite CrystalSprite() => SizedSprite($"{DungeonArtFolder}/Crystal.png", 1f);
-    public static Sprite XpGemSprite() => SizedSprite($"{DungeonArtFolder}/XpGem.png", 1f);
 
     // Painted art imported so its whole image is `units` tall (or wide, `byWidth`). Returns null if the file isn't there.
     static Sprite SizedSprite(string path, float units, bool byWidth = false)

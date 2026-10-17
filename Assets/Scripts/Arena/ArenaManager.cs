@@ -229,6 +229,7 @@ public class ArenaManager : MonoBehaviour
     static readonly Color TeleporterColor = new Color(0.4f, 0.9f, 1f, 0.8f);
     static readonly Color XpShrineColor = new Color(0.55f, 0.80f, 1f);    // light blue
     static readonly Color CrystalShrineColor = new Color(0.65f, 0.35f, 0.95f); // purple
+    static readonly Color CrystalGlowColor = new Color(0.80f, 0.60f, 1f);     // light violet, around crystal clusters
 
     int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
     bool IsBossDepth => depth % bossEvery == 0 || depth >= forceDepth;
@@ -312,7 +313,7 @@ public class ArenaManager : MonoBehaviour
     {
         for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
         for (int i = 0; i < clustersPerDepth; i++)
-            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, crystalCluster.color, 4f, 1.1f);
+            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, CrystalGlowColor, 4f, 1.1f);
         for (int i = 0; i < oresPerDepth; i++)
             MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
         for (int i = 0; i < shrinesPerDepth; i++)

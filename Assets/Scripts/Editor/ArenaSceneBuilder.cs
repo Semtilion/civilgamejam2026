@@ -260,9 +260,9 @@ public static class ArenaSceneBuilder
         arena.quakeText = quakeText;
         arena.player = player;
         arena.leveling = leveling;
-        // Crystals and XP gems: the artist's crystal (XP: its grey copy, tinted cyan by Pickup), else placeholder circles.
-        Sprite crystalArt = CrystalSprite(), gemArt = XpGemSprite();
-        arena.xpSprite = gemArt != null ? gemArt : a.circle;
+        // Crystals: the artist's crystal (the clusters' art), else a placeholder circle. XP gems: cyan circles.
+        Sprite crystalArt = CrystalSprite();
+        arena.xpSprite = a.circle;      // tinted cyan by Pickup
         arena.materialSprite = a.square;
         arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
         arena.goldSprite = a.circle;    // tinted yellow by Pickup
