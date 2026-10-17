@@ -23,7 +23,7 @@ public class Axe : MonoBehaviour
     {
         GameObject go = new GameObject("Axe");
         go.transform.position = from;
-        go.transform.localScale = Vector3.one * radius * 2.4f; // the whirl art (1 unit), a bit bigger than what it hits
+        go.transform.localScale = Vector3.one * radius * 2.4f; // the art (1 unit tall), a bit bigger than what it hits
 
         SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;

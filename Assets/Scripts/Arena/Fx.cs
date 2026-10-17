@@ -11,6 +11,14 @@ public static class Fx
         if (UnlitMaterial != null) renderer.sharedMaterial = UnlitMaterial;
     }
 
+    // A flame's gentle squash and stretch instead of turning (fire patches): `size` across, 7% wider and shorter, then
+    // narrower and taller, about once a second. `time`: seconds plus a random offset per flame.
+    public static Vector3 FlameScale(float size, float time)
+    {
+        float wobble = 0.07f * Mathf.Sin(time * 6f);
+        return new Vector3(size * (1f + wobble), size * (1f - wobble), 1f);
+    }
+
     // 0 -> 1 with a little overshoot at the end (pops).
     public static float EaseOutBack(float t)
     {

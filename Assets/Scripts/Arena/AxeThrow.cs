@@ -15,7 +15,8 @@ public class AxeThrow : Weapon
     [Tooltip("Degrees between axes when throwing more than one.")]
     public float spreadAngle = 20f;
     public Sprite axeSprite;
-    public Color axeColor = new Color(0.70f, 0.72f, 0.78f);
+    [Tooltip("Tint (white = the art's own colors).")]
+    public Color axeColor = Color.white;
 
     protected override bool Attack()
     {

@@ -12,6 +12,8 @@ using static GameBuilder;
 public static class ArenaSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/Arena.unity";
+    const float TorchHeight = 1.6f; // world units: the artist's torch (its whole image)
+    const float TorchFlameY = 0.5f; // its flame, above the torch's center
 
     public static void Build(GameAssets a)
     {
@@ -97,10 +99,10 @@ public static class ArenaSceneBuilder
         NewLight("Hero Light", hero.transform, new Color(1f, 0.92f, 0.80f), 9f, 0.75f);
         staff.boltSprite = Fx("FX_Bolt", a.square);
         staff.impactSprite = Fx("FX_Crackle", a.circle);
-        bomb.bombSprite = Fx("FX_Orb", a.circle);
+        bomb.bombSprite = ItemSprite("Bomb", 1f) ?? Fx("FX_Orb", a.circle); // the artist's bomb, centered on its ball
         bomb.fireSprite = Fx("FX_Fire", a.circle);
         bomb.scorchSprite = EffectSprite("FX_Scorch");
-        axe.axeSprite = Fx("FX_Whirl", a.square);
+        axe.axeSprite = ItemSprite("Axe", 1f) ?? Fx("FX_Whirl", a.square); // the artist's axe, 1 unit tall
         foreach (Weapon weapon in new Weapon[] { dagger, spear, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
 
         // Camera from the template
@@ -269,7 +271,7 @@ public static class ArenaSceneBuilder
         arena.xpSprite = a.circle;      // tinted cyan by Pickup
         arena.materialSprite = a.square;
         arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
-        arena.goldSprite = a.circle;    // tinted yellow by Pickup
+        arena.goldSprite = ItemSprite("Gold", 1f) ?? a.circle; // the artist's gold nugget, 1 unit tall (Pickup sizes it)
         arena.relicSprite = Fx("FX_Glint", a.circle); // a star, tinted pale gold by Pickup
         arena.fireTrailSprite = Fx("FX_Fire", a.circle);
         arena.blastCoreSprite = a.circle;
@@ -416,14 +418,22 @@ public static class ArenaSceneBuilder
     {
         float halfWidth = size.x / 2f, halfHeight = size.y / 2f;
 
-        // Torches on the north wall, each with a warm flickering light
-        Sprite torch = PropSprite("Prop_Torch");
+        // Torches on the north wall, each with a warm flickering light: the artist's (two flame frames, TorchHeight tall,
+        // standing on the wall's face, the light at the flame), else the tileset's.
+        Sprite[] flames = { ItemSprite("Torch_1", TorchHeight), ItemSprite("Torch_2", TorchHeight) };
+        bool painted = flames[0] != null && flames[1] != null;
+        Sprite torch = painted ? flames[0] : PropSprite("Prop_Torch");
+        float torchY = halfHeight + (painted ? TorchHeight / 2f + 0.1f : 0.5f);
         if (torch != null)
             for (float x = -halfWidth + 4f; x < halfWidth; x += 8f)
             {
-                SpriteRenderer torchSprite = NewSprite("Torch", torch, new Vector2(x, halfHeight + 0.5f), Vector2.one, Color.white, -4);
+                SpriteRenderer torchSprite = NewSprite("Torch", torch, new Vector2(x, torchY), Vector2.one, Color.white, -4);
                 Light2D torchLight = NewLight("Torch Light", torchSprite.transform, new Color(1f, 0.60f, 0.25f), 6f, 1.2f);
-                torchSprite.gameObject.AddComponent<Flicker>().torchLight = torchLight;
+                Flicker flicker = torchSprite.gameObject.AddComponent<Flicker>();
+                flicker.torchLight = torchLight;
+                if (!painted) continue;
+                torchLight.transform.localPosition = new Vector3(0f, TorchFlameY, 0f);
+                flicker.frames = flames;
             }
 
         Sprite barrel = PropSprite("Prop_Barrel");

@@ -41,6 +41,7 @@ public static class GameBuilder
     const string NpcFolder = "Assets/Art/NPCs";
     const string EnemyArtFolder = "Assets/Art/Enemies";
     const string DungeonArtFolder = "Assets/Art/Dungeon";
+    const string ItemsFolder = "Assets/Art/Items";     // the artist's items sheet, cut up: crate, torches, gold, axe, bomb
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
     const string FrameFolder = "Assets/Art/UI/Frame";    // the artist's ornate frame in 12 pieces, white lines (tinted)
@@ -57,6 +58,7 @@ public static class GameBuilder
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
+    const float CrateWidth = 1.3f;    // world units: the supply crate (its hit circle is 1 across)
     const int PixelsPerTile = 16; // the test tileset: 16 px = 1 world unit
     // The Spitter's stem and flower share one canvas centered on the flower's core (its hit center). 210 px = 1 unit,
     // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
@@ -174,8 +176,9 @@ public static class GameBuilder
         a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square, supplies: 1);
         a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
 
-        // Real crate art (from the tileset) replaces the brown placeholder square on the existing asset.
-        Sprite crateArt = PropSprite("Prop_Crate");
+        // The artist's crate (CrateWidth wide; Enemy.Spawn draws a sprite at radius x 2 per unit), else the tileset's,
+        // replaces the brown placeholder square on the existing asset.
+        Sprite crateArt = ItemSprite("Crate", CrateWidth / (a.crate.radius * 2f), byWidth: true) ?? PropSprite("Prop_Crate");
         if (crateArt != null && a.crate.sprite != crateArt)
         {
             a.crate.sprite = crateArt;
@@ -375,6 +378,10 @@ public static class GameBuilder
     // A weapon effect texture (Assets/Art/Effects/<name>.png), 1 unit wide like the placeholders it replaces.
     // Returns null if the file isn't there.
     public static Sprite EffectSprite(string name) => SizedSprite($"{EffectsFolder}/{name}.png", 1f, byWidth: true);
+
+    // One of the artist's items (Assets/Art/Items/<name>.png), its whole image `units` tall (or wide, `byWidth`).
+    // Returns null if the file isn't there.
+    public static Sprite ItemSprite(string name, float units, bool byWidth = false) => SizedSprite($"{ItemsFolder}/{name}.png", units, byWidth);
 
     // One tile of the artist's cave (Assets/Art/Cave/<name>.png), 1 unit wide, with mipmaps (the painted floor would
     // shimmer when the camera scrolls if it were only shrunk). Returns null if the file isn't there.

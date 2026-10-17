@@ -13,9 +13,13 @@ MonoBehaviour:
   m_Name: Supply Crate
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Supply Crate
-  sprite: {fileID: 21300000, guid: 801219e5e0a1e5145a0013758c7e1bd3, type: 3}
+  sprite: {fileID: 21300000, guid: e9cc10796432ae248b9e085ce6083961, type: 3}
+  walkFrames: []
+  artFacesLeft: 0
   color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.5
+  shadowSize: {x: 0, y: 0}
+  shadowOffset: {x: 0, y: 0}
   maxHp: 20
   moveSpeed: 0
   contactDamage: 0
@@ -23,7 +27,18 @@ MonoBehaviour:
   xp: 0
   materialChance: 1
   materialAmount: 3
+  crystalAmount: 0
   supplyAmount: 1
+  goldChance: 0
+  goldAmount: 0
+  flower: {fileID: 0}
+  shotAngles:
+  - 18
+  - 90
+  - 162
+  - 234
+  - 306
+  projectileSprite: {fileID: 0}
   fireRange: 10
   fireWarning: 0.5
   fireInterval: 2.5
@@ -33,3 +48,4 @@ MonoBehaviour:
   chargeWindup: 0.8
   chargeSpeed: 12
   chargeDuration: 0.6
+  chargeRest: 0.5

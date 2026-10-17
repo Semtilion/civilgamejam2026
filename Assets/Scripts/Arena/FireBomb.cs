@@ -1,53 +1,68 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// A thrown fire bomb: flies to where the enemy was, then burns there as a patch (flames over a scorch mark, slowly
-// turning). Every tick, every enemy inside takes the damage (a weapon hit, so it can trigger on-hit relics).
+// A lobbed fire bomb: arcs to where the enemy was (spinning, its shadow sliding along the ground under it), catches
+// fire at the top of the arc (flames behind it and a warm light), breaks on landing (shards and sparks), then burns
+// there as a patch (flames over a scorch mark, gently wobbling). Every tick, every enemy inside takes the damage (a
+// weapon hit, so it can trigger on-hit relics).
+// The object itself moves along the ground; the bomb rides above it on the arc.
 public class FireBomb : MonoBehaviour
 {
     public static readonly List<FireBomb> All = new List<FireBomb>();
 
-    const float BombSize = 0.5f;
+    const float BombSize = 0.7f;      // world units (the art's ball is about 3/4 of it)
+    const float SpinSpeed = 360f;     // degrees per second in flight
+    const float LobHeight = 0.6f;     // the top of the arc: this + LobPerUnit x the throw's length
+    const float LobPerUnit = 0.25f;
+    const float FlameSize = 0.9f;     // the flames on the bomb in flight (world units), a little above it
+    const float FlameRise = 0.15f;
+    const float ShadowWidth = 0.5f;   // world units (60% of it at the top of the arc)
     const float PatchAlpha = 0.85f;
-    const float PatchTurnSpeed = 40f; // degrees per second, so the flames look alive
+    const float PatchGrowTime = 0.2f; // the patch pops up after the break
     static readonly Color ScorchColor = new Color(0.12f, 0.06f, 0.04f, 0.7f);
+    static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.35f); // like the hero's
+    static readonly Color ShardColor = new Color(0.55f, 0.55f, 0.58f);
 
-    SpriteRenderer sprite;
-    Sprite fireSprite, scorchSprite;
+    FireBombThrow weapon;
     Player player;
+    Transform bomb, shadow;
+    SpriteRenderer flames; // on the bomb from the top of the arc, then the patch
     Vector2 from, to;
-    float flightTime, radius, burnTime, tickInterval;
+    float arcHeight, radius, age, tickTimer, wobblePhase;
     int damage;
-    float age;       // since thrown, then since it started burning
-    float tickTimer;
-    bool burning;
+    bool lit, burning;
 
-    public static void Throw(Sprite sprite, Sprite fireSprite, Sprite scorchSprite, Color color, Vector2 from, Vector2 to,
-        float flightTime, float radius, float burnTime, float tickInterval, int damage, Player player)
+    public static void Throw(FireBombThrow weapon, Vector2 from, Vector2 to, float radius, int damage, Player player)
     {
-        GameObject go = new GameObject("Fire Bomb");
-        go.transform.position = from;
-        go.transform.localScale = Vector3.one * BombSize;
+        FireBomb fireBomb = new GameObject("Fire Bomb").AddComponent<FireBomb>();
+        fireBomb.transform.position = from;
+        fireBomb.weapon = weapon;
+        fireBomb.player = player;
+        fireBomb.from = from;
+        fireBomb.to = to;
+        fireBomb.arcHeight = LobHeight + LobPerUnit * Vector2.Distance(from, to);
+        fireBomb.radius = radius;
+        fireBomb.damage = damage;
+        fireBomb.wobblePhase = Random.value * 10f;
 
-        SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
-        renderer.sprite = sprite;
-        renderer.color = color;
-        renderer.sortingOrder = 3;
-        Fx.Unlit(renderer);
+        fireBomb.shadow = fireBomb.Layer("Shadow", player.arena.shadowSprite, ShadowColor, -1).transform;
+        SpriteRenderer bomb = fireBomb.Layer("Bomb", weapon.bombSprite, Color.white, 3);
+        bomb.transform.localScale = Vector3.one * BombSize;
+        Fx.Unlit(bomb);
+        fireBomb.bomb = bomb.transform;
+        fireBomb.flames = fireBomb.Layer("Flames", weapon.fireSprite, Color.clear, 2); // behind the bomb, so it peeks out
+        Fx.Unlit(fireBomb.flames);
+        All.Add(fireBomb);
+    }
 
-        FireBomb bomb = go.AddComponent<FireBomb>();
-        bomb.sprite = renderer;
-        bomb.fireSprite = fireSprite;
-        bomb.scorchSprite = scorchSprite;
-        bomb.player = player;
-        bomb.from = from;
-        bomb.to = to;
-        bomb.flightTime = flightTime;
-        bomb.radius = radius;
-        bomb.burnTime = burnTime;
-        bomb.tickInterval = tickInterval;
-        bomb.damage = damage;
-        All.Add(bomb);
+    SpriteRenderer Layer(string name, Sprite sprite, Color color, int sortingOrder)
+    {
+        SpriteRenderer layer = new GameObject(name).AddComponent<SpriteRenderer>();
+        layer.transform.SetParent(transform, false);
+        layer.sprite = sprite;
+        layer.color = color;
+        layer.sortingOrder = sortingOrder;
+        return layer;
     }
 
     void OnDestroy()
@@ -62,47 +77,69 @@ public class FireBomb : MonoBehaviour
         age += Time.deltaTime;
         if (!burning)
         {
-            transform.position = Vector2.Lerp(from, to, age / flightTime);
-            if (age >= flightTime) Burst();
+            float t = Mathf.Clamp01(age / weapon.flightTime);
+            float lift = 4f * t * (1f - t); // 0 -> 1 at the top of the arc -> 0
+            transform.position = Vector2.Lerp(from, to, t);
+            bomb.localPosition = new Vector3(0f, arcHeight * lift, 0f);
+            bomb.Rotate(0f, 0f, -SpinSpeed * Time.deltaTime);
+            shadow.localScale = new Vector3(ShadowWidth, ShadowWidth * 0.35f, 1f) * (1f - 0.4f * lift);
+
+            float fire = Mathf.Clamp01((t - 0.5f) / 0.1f); // catches fire at the top of the arc
+            if (fire > 0f && !lit)
+            {
+                lit = true;
+                Glow.Add(bomb.gameObject, weapon.fireColor, 1.5f, 0.8f); // goes with the bomb when it breaks
+            }
+            flames.transform.localPosition = bomb.localPosition + new Vector3(0f, FlameRise, 0f);
+            ShowFlames(FlameSize, fire);
+            if (t >= 1f) Break();
             return;
         }
 
-        if (age >= burnTime)
+        if (age >= weapon.burnTime)
         {
             Destroy(gameObject);
             return;
         }
-        transform.Rotate(0f, 0f, PatchTurnSpeed * Time.deltaTime);
+        ShowFlames(radius * 2f * Fx.EaseOutBack(age / PatchGrowTime), 1f);
         tickTimer -= Time.deltaTime;
         if (tickTimer <= 0f)
         {
-            tickTimer = tickInterval;
+            tickTimer = weapon.tickInterval;
             Burn();
         }
     }
 
-    // Lands: becomes flames on the floor over a scorch mark (the art is 1 unit wide). The first tick is right away.
-    void Burst()
+    // The flames `size` across (the art is 1 unit wide), wobbling, at `alpha` x PatchAlpha.
+    void ShowFlames(float size, float alpha)
+    {
+        flames.transform.localScale = Fx.FlameScale(size, age + wobblePhase);
+        Color color = weapon.fireColor;
+        color.a = PatchAlpha * alpha;
+        flames.color = color;
+    }
+
+    // Lands: the bomb breaks into shards and sparks, and the fire spreads into a patch over a scorch mark. The first
+    // tick is right away.
+    void Break()
     {
         burning = true;
         age = 0f;
         tickTimer = 0f;
         transform.position = to;
-        transform.localScale = Vector3.one * radius * 2f;
-        if (fireSprite != null) sprite.sprite = fireSprite;
-        Color color = sprite.color;
-        color.a = PatchAlpha;
-        sprite.color = color;
-        sprite.sortingOrder = -1;
-        if (scorchSprite != null)
+        Destroy(bomb.gameObject); // (its light too)
+        Destroy(shadow.gameObject);
+        player.arena.deathBursts.Burst(to, ShardColor, 0.3f, false);
+        player.arena.deathBursts.Burst(to, weapon.fireColor, 0.3f, false);
+
+        flames.transform.localPosition = Vector3.zero;
+        flames.sortingOrder = -1;
+        if (weapon.scorchSprite != null)
         {
-            SpriteRenderer scorch = new GameObject("Scorch").AddComponent<SpriteRenderer>();
-            scorch.transform.SetParent(transform, false);
-            scorch.sprite = scorchSprite;
-            scorch.color = ScorchColor;
-            scorch.sortingOrder = -2; // under the flames
+            SpriteRenderer scorch = Layer("Scorch", weapon.scorchSprite, ScorchColor, -2); // under the flames
+            scorch.transform.localScale = Vector3.one * radius * 2f;
         }
-        Glow.Add(gameObject, new Color(1f, 0.55f, 0.2f), radius * 2.5f, 1.1f); // the fire lights up the cave
+        Glow.Add(gameObject, weapon.fireColor, radius * 2.5f, 1.1f); // the fire lights up the cave
     }
 
     void Burn()

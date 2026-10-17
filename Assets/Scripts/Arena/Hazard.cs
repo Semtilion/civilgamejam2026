@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // A danger on the floor left by a variant enemy (EnemyVariant); it only hurts the hero. Fire (a red variant's trail):
-// flames that burn for a while, hurting the hero every tick while inside, fading out at the end. Blast (a purple
+// flames that burn for a while (gently wobbling), hurting the hero every tick while inside, fading out at the end. Blast (a purple
 // variant's death): its area as a faint ring, a ring that grows to fill it and a core that pulses faster and faster;
 // when the fuse runs out, one hit to the hero inside and a burst. Frozen while a panel is open; cleared with the field.
 public class Hazard : MonoBehaviour
@@ -12,7 +12,6 @@ public class Hazard : MonoBehaviour
     const float FireAlpha = 0.8f;
     const float FireFadeIn = 0.15f;  // seconds
     const float FireFadeOut = 0.4f;  // the last seconds
-    const float FireTurnSpeed = 60f; // degrees per second, so the flames look alive
     const float CoreSize = 0.6f;     // world units
 
     ArenaManager arena;
@@ -21,6 +20,7 @@ public class Hazard : MonoBehaviour
     Color color;
     bool blast;
     float radius, life, tick, age, tickTimer;
+    float wobblePhase; // fire: its own wobble timing
     int damage;
 
     // A fire patch at `at` (the fire art is 1 unit wide): burns `life` seconds, `damage` every `tick` seconds while the
@@ -30,7 +30,8 @@ public class Hazard : MonoBehaviour
         Hazard hazard = Create("Fire Patch", at, color, radius, life, damage, arena);
         hazard.tick = tick;
         hazard.look = hazard.Layer("Flames", fire, radius * 2f, -1);
-        hazard.transform.Rotate(0f, 0f, Random.value * 360f);
+        hazard.transform.Rotate(0f, 0f, Random.value * 360f); // each patch at its own angle (it doesn't turn)
+        hazard.wobblePhase = Random.value * 10f;
         hazard.Draw();
     }
 
@@ -96,7 +97,6 @@ public class Hazard : MonoBehaviour
                 Destroy(gameObject);
                 return;
             }
-            transform.Rotate(0f, 0f, FireTurnSpeed * Time.deltaTime);
             tickTimer -= Time.deltaTime;
             if (tickTimer <= 0f && HeroInside())
             {
@@ -112,6 +112,7 @@ public class Hazard : MonoBehaviour
         if (!blast)
         {
             float fade = Mathf.Min(age / FireFadeIn, (life - age) / FireFadeOut); // in, then out at the end
+            look.transform.localScale = Fx.FlameScale(radius * 2f, age + wobblePhase);
             look.color = new Color(color.r, color.g, color.b, FireAlpha * Mathf.Clamp01(fade));
             return;
         }
