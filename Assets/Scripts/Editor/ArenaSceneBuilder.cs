@@ -242,6 +242,7 @@ public static class ArenaSceneBuilder
         arena.whiteSquare = a.square;
         arena.rockSprite = a.circle;
         arena.unlitMaterial = a.unlit;
+        arena.flashMaterial = a.flash;
         Relics relics = arena.gameObject.AddComponent<Relics>();
         relics.arena = arena;
         relics.circleSprite = a.circle;

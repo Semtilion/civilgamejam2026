@@ -18,6 +18,7 @@ public class GameAssets
     public Sprite arrow;      // generated: the teleporter arrow (a triangle pointing up)
     public Sprite glow;       // generated: soft-edged, 9-sliced (the glow around the leader portrait)
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
+    public Material flash;    // the hit flash (Assets/Shaders/SpriteSilhouette.shader): a sprite's shape in white
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
     public Sprite[] heroWalk;
     public EnemyData crawler, brute, spitter, colossus, crate, crystalCluster;
@@ -140,6 +141,7 @@ public static class GameBuilder
         a.glow = GlowSprite();
         a.unlit = AssetDatabase.LoadAssetAtPath<Material>(UnlitMaterialPath);
         if (a.unlit == null) Debug.LogWarning("Unlit sprite material not found at " + UnlitMaterialPath + ": effects will use the lit one.");
+        a.flash = FlashMaterial();
         a.heroIdle = HeroSprite("Hero_Idle");
         a.heroWalk = new[] { HeroSprite("Hero_Walk1"), HeroSprite("Hero_Walk2") }.Where(s => s != null).ToArray();
 
@@ -297,6 +299,25 @@ public static class GameBuilder
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // The hit flash material (Assets/Art/Materials/HitFlash.mat, the "Jam/Sprite Silhouette" shader at 80% white), made
+    // once. Being a scene reference, it also makes builds include the shader. Null (no flash) if the shader is missing.
+    static Material FlashMaterial()
+    {
+        const string path = "Assets/Art/Materials/HitFlash.mat";
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (material != null) return material;
+        Shader shader = Shader.Find("Jam/Sprite Silhouette");
+        if (shader == null)
+        {
+            Debug.LogWarning("Shader Jam/Sprite Silhouette (Assets/Shaders) not found: enemies won't flash white when hit.");
+            return null;
+        }
+        CreateFolder("Assets/Art", "Materials");
+        material = new Material(shader);
+        AssetDatabase.CreateAsset(material, path);
+        return material;
     }
 
     // A piece of enemy art (Assets/Art/Enemies/<name>.png), `pixelsPerUnit` px = 1 unit before the enemy's size scales

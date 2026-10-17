@@ -41,6 +41,7 @@ public class Enemy : MonoBehaviour
     ArenaManager arena;
     SpriteRenderer sprite;
     SpriteRenderer flower; // a Spitter's flower (null without the art; `sprite` is then the whole enemy, else its stem)
+    HitFlash bodyFlash, flowerFlash; // white silhouettes while flashing (flowerFlash: null without a flower)
     float stunTimer, fireTimer, flashTimer, stateTimer;
     float pinTimer; // the Spear's Impale: held in place
     float slowTimer, slowPace = 1f; // Frost Shard: moves and attacks at slowPace speed while slowTimer runs
@@ -67,6 +68,7 @@ public class Enemy : MonoBehaviour
         renderer.color = data.color;
         renderer.sortingOrder = 1;
         go.AddComponent<SpriteOutline>();
+        go.AddComponent<HitFlash>();
 
         Enemy enemy = go.AddComponent<Enemy>();
         enemy.Init(data, statScale, player, arena);
@@ -79,6 +81,7 @@ public class Enemy : MonoBehaviour
         player = target;
         arena = owner;
         sprite = GetComponent<SpriteRenderer>();
+        bodyFlash = GetComponent<HitFlash>();
         if (data.flower != null)
         {
             flower = new GameObject("Flower").AddComponent<SpriteRenderer>();
@@ -87,6 +90,7 @@ public class Enemy : MonoBehaviour
             flower.sprite = data.flower;
             flower.sortingOrder = sprite.sortingOrder;
             flower.gameObject.AddComponent<SpriteOutline>(); // drawn over the stem (between it and the flower)
+            flowerFlash = flower.gameObject.AddComponent<HitFlash>();
         }
 
         maxHp = Mathf.RoundToInt(data.maxHp * statScale);
@@ -130,6 +134,8 @@ public class Enemy : MonoBehaviour
         Color warned = warning && flashTimer <= 0f ? WarningColor : normal;
         sprite.color = flower != null ? normal : warned; // with a flower, only the flower glows red
         if (flower != null) flower.color = warned;
+        bodyFlash.On = flashTimer > 0f; // white silhouette (the white tint above only brightens placeholder sprites)
+        if (flowerFlash != null) flowerFlash.On = flashTimer > 0f;
         Animate();
     }
 

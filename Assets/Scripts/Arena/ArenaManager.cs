@@ -149,6 +149,8 @@ public class ArenaManager : MonoBehaviour
     public DebugKeys debugKeys;
     [Tooltip("Unlit sprite material: effects, shots and pickups use it to stay bright in the dark cave.")]
     public Material unlitMaterial;
+    [Tooltip("The hit flash (HitFlash): draws a sprite's shape in white. Empty = enemies don't flash white.")]
+    public Material flashMaterial;
     public Sprite xpSprite;
     public Sprite materialSprite;
     public Sprite crystalSprite;
@@ -226,6 +228,7 @@ public class ArenaManager : MonoBehaviour
     {
         Bounds = new Rect(-arenaSize / 2f, arenaSize);
         Fx.UnlitMaterial = unlitMaterial;
+        HitFlash.Material = flashMaterial;
     }
 
     void Start()
