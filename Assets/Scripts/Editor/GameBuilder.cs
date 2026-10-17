@@ -44,6 +44,7 @@ public static class GameBuilder
     const string ItemsFolder = "Assets/Art/Items";     // the artist's items sheet, cut up: crate, torches, gold, axe, bomb
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
+    const string UiFolder = "Assets/Art/UI";             // the title screen's art (Tools/bake_title.py)
     const string FrameFolder = "Assets/Art/UI/Frame";    // the artist's ornate frame in 12 pieces, white lines (tinted)
     // The frame art's sizes in px: the top / bottom bands and the side columns, and the bands' fixed pieces (the end
     // pieces with the corners, and the centered ornament); the strips between them stretch.
@@ -374,6 +375,20 @@ public static class GameBuilder
     // pickup 1 unit tall (Pickup sizes it). Return null if the file isn't there.
     public static Sprite OreSprite() => SizedSprite($"{DungeonArtFolder}/Ore.png", OreHeight);
     public static Sprite CrystalSprite() => SizedSprite($"{DungeonArtFolder}/Crystal.png", 1f);
+
+    // The title screen's art (Assets/Art/UI/<name>.png, baked by Tools/bake_title.py): smooth, no mipmaps, uncompressed
+    // (a compressed dark gradient shows bands). Returns null if the file isn't there.
+    public static Sprite TitleArt(string name)
+    {
+        string path = $"{UiFolder}/{name}.png";
+        Sprite sprite = PaintedSprite(path, 100f);
+        if (sprite == null) return null;
+        TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        if (importer.textureCompression == TextureImporterCompression.Uncompressed) return sprite;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
 
     // A weapon effect texture (Assets/Art/Effects/<name>.png), 1 unit wide like the placeholders it replaces.
     // Returns null if the file isn't there.

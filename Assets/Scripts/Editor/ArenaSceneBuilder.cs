@@ -413,7 +413,7 @@ public static class ArenaSceneBuilder
         return go.GetComponent<Tilemap>();
     }
 
-    // Looks only (no collision): torches on the north wall's face every 8 tiles, and 8 barrels near the walls.
+    // Looks only (no collision): torches on the north wall every 8 tiles.
     static void PlaceDecorations(Vector2 size)
     {
         float halfWidth = size.x / 2f, halfHeight = size.y / 2f;
@@ -435,23 +435,6 @@ public static class ArenaSceneBuilder
                 torchLight.transform.localPosition = new Vector3(0f, TorchFlameY, 0f);
                 flicker.frames = flames;
             }
-
-        Sprite barrel = PropSprite("Prop_Barrel");
-        if (barrel == null) return;
-        System.Random random = new System.Random(11); // the same spots on every build
-        for (int i = 0; i < 8; i++)
-        {
-            float along = (float)random.NextDouble() * 2f - 1f; // -1..1 along the chosen wall
-            Vector2 position;
-            switch (i % 4)
-            {
-                case 0: position = new Vector2(-halfWidth + 0.8f, along * (halfHeight - 2f)); break; // west wall
-                case 1: position = new Vector2(halfWidth - 0.8f, along * (halfHeight - 2f)); break;  // east wall
-                case 2: position = new Vector2(along * (halfWidth - 2f), -halfHeight + 0.8f); break; // south wall
-                default: position = new Vector2(along * (halfWidth - 2f), halfHeight - 1.2f); break;  // under the north wall
-            }
-            NewSprite("Barrel", barrel, position, Vector2.one, Color.white, 0);
-        }
     }
 
     // Invisible child sprite a weapon flashes on each attack (the weapon sets its alpha, size and rotation).
