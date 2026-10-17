@@ -4,16 +4,16 @@ using UnityEngine;
 // Evolution (Twin Strike, available from the start): a back-swing follows every swing, hitting everything again.
 // The Quake Hammer relic is a second one of these with bigger, slower numbers (set by the scene builder).
 // Look: the sword spins a swirl slash once around the hero (from the way he faces; the back-swing turns the other
-// way); the hammer sends out an expanding shockwave ring, throws up dirt and jolts the camera.
+// way); the hammer cracks the ground out to its reach (GroundCracks: glowing cracks, dust where they end) and jolts the
+// camera.
 public class SwordSweep : Weapon
 {
     public enum SweepStyle { Spin, Shockwave }
 
-    const float SwingTime = 0.18f;    // the slash's full turn / the ring's growth
+    const float SwingTime = 0.18f;    // the slash's full turn
     const float FlashTime = 0.25f;    // fade
     const float FlashAlpha = 0.8f;
     const float BackSwingDelay = 0.15f; // Twin Strike
-    static readonly Color DirtColor = new Color(0.75f, 0.58f, 0.40f, 0.9f);
 
     [Header("Sword")]
     public float radius = 2.2f;
@@ -21,10 +21,10 @@ public class SwordSweep : Weapon
     public float bonusRadius = 0.4f;
     public float knockback = 6f;
     public SweepStyle style = SweepStyle.Spin;
-    [Tooltip("The slash (an arc sprite) or the shockwave (a ring sprite); placeholder visual, a child of the hero.")]
+    [Tooltip("Spin style: the slash (an arc sprite), a child of the hero.")]
     public SpriteRenderer sweepVisual;
-    [Tooltip("Shockwave style only: dirt thrown up around the hero on every slam (empty = none).")]
-    public Sprite dirtSprite;
+    [Tooltip("Shockwave style: the ground crack patterns (one at random per slam; empty = none).")]
+    public Sprite[] crackSprites;
 
     float sinceSweep = 99f;
     float startAngle;
@@ -58,7 +58,8 @@ public class SwordSweep : Weapon
         if (style == SweepStyle.Shockwave)
         {
             player.arena.ShakeCamera(0.15f, 0.15f);
-            if (dirtSprite != null) FadeEffect.Circle(dirtSprite, center, reachBase * 0.8f, DirtColor, 0.4f);
+            if (crackSprites.Length > 0)
+                GroundCracks.Spawn(crackSprites[Random.Range(0, crackSprites.Length)], center, reachBase, player.arena.deathBursts);
         }
     }
 
@@ -71,22 +72,15 @@ public class SwordSweep : Weapon
             if (backSwingIn < 0f) Sweep(1f);
         }
         sinceSweep += Time.deltaTime;
-        FadeFlash(sweepVisual, sinceSweep, FlashTime, FlashAlpha);
+        if (style != SweepStyle.Spin) return; // the hammer's cracks look after themselves
 
+        // One fast turn with the arc sprite's bright end leading: mirrored (y flipped) for the counter-clockwise
+        // back-swing.
+        FadeFlash(sweepVisual, sinceSweep, FlashTime, FlashAlpha);
         float swing = Mathf.Clamp01(sinceSweep / SwingTime);
-        if (style == SweepStyle.Spin)
-        {
-            // One fast turn with the arc sprite's bright end leading: mirrored (y flipped) for the counter-clockwise
-            // back-swing.
-            float size = Radius * 2f; // placeholder sprites are 1 unit wide
-            sweepVisual.transform.localScale = new Vector3(size, -turn * size, 1f);
-            sweepVisual.transform.localRotation = Quaternion.Euler(0f, 0f, startAngle + turn * 360f * swing);
-        }
-        else
-        {
-            // The ring grows from a third of the radius out to the full radius.
-            sweepVisual.transform.localScale = Vector3.one * Radius * 2f * Mathf.Lerp(0.3f, 1f, Fx.EaseOutBack(swing));
-        }
+        float size = Radius * 2f; // placeholder sprites are 1 unit wide
+        sweepVisual.transform.localScale = new Vector3(size, -turn * size, 1f);
+        sweepVisual.transform.localRotation = Quaternion.Euler(0f, 0f, startAngle + turn * 360f * swing);
     }
 
     void OnDisable()

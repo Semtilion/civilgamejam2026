@@ -110,9 +110,8 @@ public static class ArenaSceneBuilder
         hammer.bonusRadius = 0.5f;
         hammer.knockback = 10f;
         hammer.style = SwordSweep.SweepStyle.Shockwave;
-        hammer.sweepVisual = NewFlashSprite("Shockwave", Fx("FX_Shockwave", a.ring), hero.transform, a.unlit);
-        hammer.dirtSprite = EffectSprite("FX_Dirt");
-        hammer.sweepVisual.color = new Color(0.95f, 0.70f, 0.40f, 0f); // dusty orange (the alpha is set by the weapon)
+        // its slam cracks the ground: the crack patterns baked by Tools/bake_cracks.py (Assets/Art/Effects)
+        hammer.crackSprites = Enumerable.Range(0, 4).Select(i => EffectSprite($"QuakeCracks_{i}")).Where(s => s != null).ToArray();
 
         // The cave is dark: a soft light follows the hero
         NewLight("Hero Light", hero.transform, new Color(1f, 0.92f, 0.80f), 9f, 0.75f);
@@ -168,10 +167,10 @@ public static class ArenaSceneBuilder
         Pin(lootText.rectTransform, new Vector2(0f, 1f));
 
         // Bottom-left (above the level): quake meter + ores mined this dive
-        Image bottomLeft = NewImage("Bottom-Left Backing", canvas, new Vector2(14, 78), new Vector2(920, 44), backing);
+        Image bottomLeft = NewImage("Bottom-Left Backing", canvas, new Vector2(14, 78), new Vector2(460, 44), backing); // fits its longest line
         Pin(bottomLeft.rectTransform, new Vector2(0f, 0f));
         AddFrame(bottomLeft.transform, HudFrameThickness * 2f, FrameColor); // a thin strip: a thinner frame
-        Text quakeText = Shadowed(NewText("Quake", canvas, new Vector2(24, 84), new Vector2(900, 32), 24, TextAnchor.MiddleLeft));
+        Text quakeText = Shadowed(NewText("Quake", canvas, new Vector2(24, 84), new Vector2(440, 32), 24, TextAnchor.MiddleLeft));
         Pin(quakeText.rectTransform, new Vector2(0f, 0f));
 
         // Top-center: kill goal + its progress bar, boss bar
