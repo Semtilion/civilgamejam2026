@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The title screen (the game starts here): Play, Settings, Quit.
+// The title screen (the game starts here): Play, Settings, Quit, and the best run so far.
 // Play continues the game in memory if one is running (there are no save files), otherwise starts a new one.
 public class TitleManager : MonoBehaviour
 {
@@ -13,6 +13,8 @@ public class TitleManager : MonoBehaviour
 
     [Header("Scene references")]
     public Text titleText;
+    [Tooltip("The best run (Campaign.BestDay); empty before the first one ends.")]
+    public Text bestText;
     public Button playButton;
     public Button settingsButton;
     public Button quitButton;
@@ -24,6 +26,7 @@ public class TitleManager : MonoBehaviour
     {
         Time.timeScale = 1f;
         titleText.text = gameTitle;
+        bestText.text = Campaign.BestDay > 0 ? $"Best run: the town held out until day {Campaign.BestDay} ({Campaign.BestRaids} raids held)" : "";
         playButton.GetComponentInChildren<Text>().text = GameRunning ? "Continue" : "Play";
         playButton.onClick.AddListener(Play);
         settingsButton.onClick.AddListener(settings.Open);

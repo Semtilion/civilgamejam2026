@@ -17,11 +17,11 @@ public class HowToPlay : MonoBehaviour
 
     static readonly string[] Pages =
     {
-        "Earthquakes are tearing the island apart, and a force deep in the dungeon below is feeding them.\n\n" +
-        "Save the town in one of two ways:\n" +
-        "  •  Dive down to depth 10 and destroy the Force.\n" +
-        "  •  Or hold out until day 15 and beat the horde that attacks the town.\n\n" +
-        "You lose if the horde breaks through, or if the quakes wipe out every faction.",
+        "Earthquakes are tearing the island apart, and the crystals in the dungeon below are feeding them.\n\n" +
+        "Keep the town alive for as long as you can. Every second earthquake, crystal monsters pour out of the cracks " +
+        "and raid the town: hold them off until the timer runs out. A lost raid costs every faction people, more the " +
+        "later the day and the more of the raid was left.\n\n" +
+        "The run ends when every faction is wiped out. Your best run is kept.",
 
         "Move with WASD or the arrow keys. Your weapons attack on their own.\n\n" +
         "On every depth, kill the number of enemies shown at the top. Then a teleporter opens (follow the arrow): " +
@@ -43,8 +43,8 @@ public class HowToPlay : MonoBehaviour
         "Spend materials, gold and crystals on district buildings: permanent upgrades. Under half its people, a " +
         "faction's district works at half strength; at 0, the faction is gone.",
 
-        "Earthquakes hit on days 4, 7, 10 and 13. The quake meter rises every day; the top bar shows how strong the next " +
-        "one will be. Destroy ore veins in the dungeon to weaken it, and build Ley Stones to slow it down.\n\n" +
+        "Earthquakes hit every 3 days (day 4, 7, 10, ...); every second one also brings a raid. The quake meter rises " +
+        "every day; the top bar shows how strong the next one will be. Destroy ore veins in the dungeon to weaken it, and build Ley Stones to slow it down.\n\n" +
         "From 40%, a quake hurts every faction: some people are killed, some injured. People never come back.\n\n" +
         "The injured can't work. Supplies treat them (one each, automatically); anyone still untreated 2 days after " +
         "the quake dies. A report shows what happened when you get back.",

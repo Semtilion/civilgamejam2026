@@ -8,9 +8,9 @@ public enum RelicId
     VolatileCore, StormOrb, FrostShard,                 // on-hit items
 }
 
-// Relics: rare, permanent finds. Every boss killed on a dive (not the Force) drops one random relic you don't have
+// Relics: rare, permanent finds. Every boss killed on a dive drops one random relic you don't have
 // yet. It works right away and is yours for good once you get home (lost if you die on that dive, like other loot).
-// Weapon relics are equipped at Lv 1 at the start of every dive and the horde; the rest change how you play.
+// Weapon relics are equipped at Lv 1 at the start of every dive and raid; the rest change how you play.
 // Sits on the Arena Manager object; ArenaManager, Enemy and the weapons ask it (Has, DamageMultiplier, OnWeaponHit...).
 public class Relics : MonoBehaviour
 {

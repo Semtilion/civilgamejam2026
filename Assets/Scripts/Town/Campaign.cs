@@ -26,10 +26,11 @@ public class Quest
     public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} materials";
 }
 
-// The whole playthrough: day, materials / crystals / gold / supplies, NPCs (faction leaders) with their requests,
-// people, preparedness (daily orders) and district buildings, unlocked weapons, relics, the quake meter, a news log
-// and the report of what happened to the people while you were away. Kept in a static so it survives switching
-// between the Town and Arena scenes. Rules come from TownConfig.
+// The whole playthrough (endless: it ends when every faction is wiped out): day, materials / crystals / gold /
+// supplies, NPCs (faction leaders) with their requests, people, preparedness (daily orders) and district buildings,
+// unlocked evolutions, relics, the quake meter, raids, a news log and the report of what happened to the people while
+// you were away. Kept in a static so it survives switching between the Town and Arena scenes. Rules come from
+// TownConfig. The best run (the day the town fell) is kept in PlayerPrefs.
 public class Campaign
 {
     public static Campaign Current { get; private set; }
@@ -73,28 +74,33 @@ public class Campaign
     public int totalKills;
     public int totalOres;
     public int deepestDepth;
+    public int raidsHeld, raidsLost;
 
-    // The game is over (the Town shows the epilogue): won or lost, and why.
+    // The game is over (every faction wiped out; the Town shows the end screen), and why.
     public bool Ended { get; private set; }
-    public bool Won { get; private set; }
     public string endingReason;
+    public bool newBest; // this run beat the best record
 
-    // Day 15: the only thing left is to defend the town from the horde.
-    public bool IsHordeDay => day >= config.hordeDay && !Ended;
+    // The best run so far (PlayerPrefs, survives restarts): the day the town fell, and the raids it held.
+    const string BestDayKey = "BestDay", BestRaidsKey = "BestRaids";
+    public static int BestDay => PlayerPrefs.GetInt(BestDayKey, 0);
+    public static int BestRaids => PlayerPrefs.GetInt(BestRaidsKey, 0);
+
+    // Quakes: on firstQuakeDay, then every quakeEvery days, forever. Every raidEveryQuakes-th quake brings a raid
+    // that day: the day's dive becomes defending the town (the arena runs the raid).
+    public bool IsQuakeDay(int d) => d >= config.firstQuakeDay && (d - config.firstQuakeDay) % config.quakeEvery == 0;
+    int QuakeNumber(int d) => (d - config.firstQuakeDay) / config.quakeEvery + 1; // 1 = the first quake
+    public bool IsRaidOn(int d) => IsQuakeDay(d) && QuakeNumber(d) % config.raidEveryQuakes == 0;
+    public bool IsRaidDay => IsRaidOn(day) && !Ended;
+    public int RaidNumber => QuakeNumber(day) / config.raidEveryQuakes; // on a raid day: 1, 2, 3...
 
     // The day the current requests are due (and new ones arrive).
     public int NextQuestDay => day + config.questInterval - (day - 1) % config.questInterval;
 
-    // The next quake day after today, or -1 if there are no more.
-    public int NextQuakeDay
-    {
-        get
-        {
-            foreach (int quakeDay in config.earthquakeDays)
-                if (quakeDay > day) return quakeDay;
-            return -1;
-        }
-    }
+    // The next quake day after today.
+    public int NextQuakeDay => day < config.firstQuakeDay
+        ? config.firstQuakeDay
+        : day + config.quakeEvery - (day - config.firstQuakeDay) % config.quakeEvery;
 
     // Ley Stones lower the passive rise.
     float PassivePerDay => Mathf.Max(0f, config.quakePassivePerDay - BuildingBonus(BuildingEffect.QuakePassive));
@@ -102,7 +108,7 @@ public class Campaign
     float QuakeBaseline => config.quakeStart + passiveRise;
 
     // How strong the next quake will be if no more ores are mined.
-    public float QuakeForecast => NextQuakeDay < 0 ? quakeMeter : Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
+    public float QuakeForecast => Mathf.Min(100f, quakeMeter + DailyQuakeRise * (NextQuakeDay - day));
 
     public int Population
     {
@@ -243,11 +249,48 @@ public class Campaign
         deepestDepth = Mathf.Max(deepestDepth, depth);
     }
 
-    public void EndGame(bool won, string reason)
+    // Every faction is gone: the run is over. Saves it as the best run if the town lasted longer than ever.
+    public void EndGame(string reason)
     {
         Ended = true;
-        Won = won;
         endingReason = reason;
+        if (day <= BestDay) return;
+        newBest = true;
+        PlayerPrefs.SetInt(BestDayKey, day);
+        PlayerPrefs.SetInt(BestRaidsKey, raidsHeld);
+        PlayerPrefs.Save();
+    }
+
+    // ---------- Raids ----------
+
+    // The raid was held: news + report (then the arena ends it like a dive: the loot is kept, a day passes).
+    public void RaidHeld()
+    {
+        raidsHeld++;
+        reportTitle = $"RAID HELD: DAY {day}";
+        Report($"Day {day}: you held the town against raid {RaidNumber}. The crystal monsters fall back into the cracks.");
+    }
+
+    // The raid was lost with `timeLeftShare` (0-1) of its timer left: every faction loses (day x raidLossPerDay)% of
+    // its starting people, times that share (they never come back). Then the arena ends it like a lost dive.
+    public void RaidLost(float timeLeftShare)
+    {
+        raidsLost++;
+        reportTitle = $"RAID LOST: DAY {day}";
+        float share = day * config.raidLossPerDay / 100f * timeLeftShare;
+        Report($"Day {day}: the raiders broke into the town with {timeLeftShare * 100f:0}% of the raid left.");
+        for (int i = 0; i < npcs.Length; i++)
+        {
+            NpcState npc = npcs[i];
+            NpcDefinition definition = config.npcs[i];
+            if (!npc.Alive) continue;
+            bool wasFull = DistrictStrength(i) == 1f;
+            int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * share));
+            npc.population -= lost;
+            npc.injured = Mathf.Min(npc.injured, npc.population);
+            Report($"The {definition.faction} lost {lost} people ({npc.population}/{definition.startPopulation} left)." + LossNote(i, wasFull));
+        }
+        CheckGameOver();
     }
 
     // ---------- Days ----------
@@ -284,8 +327,8 @@ public class Campaign
     }
 
     // Each day: the factions do their orders (so today's preparation counts for tomorrow's quake), the quake meter
-    // rises (cycle + passive), on a quake day the quake hits, the injured are cared for, and on a request day the
-    // requests are refreshed.
+    // rises (cycle + passive), on a quake day the quake hits, the injured are cared for, on a request day the requests
+    // are refreshed, and a raid day is announced.
     void AdvanceDays(int count)
     {
         for (int i = 0; i < count; i++)
@@ -294,11 +337,10 @@ public class Campaign
             day++;
             passiveRise += PassivePerDay;
             quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);
-            if (System.Array.IndexOf(config.earthquakeDays, day) >= 0) Earthquake();
+            if (IsQuakeDay(day)) Earthquake();
             CareForInjured();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
-            if (day == config.hordeDay && !Ended)
-                news.Add($"Day {day}: the horde is coming! Defend the town.");
+            if (IsRaidDay) Report($"Day {day}: crystal monsters pour out of the cracks! Today, defend the town.");
         }
     }
 
@@ -412,7 +454,7 @@ public class Campaign
     {
         if (!GameOver || Ended) return;
         news.Add("Every faction is gone. The town has fallen.");
-        EndGame(false, "The earthquakes wiped out every faction.");
+        EndGame("The earthquakes and the raids wiped out every faction.");
     }
 
     // A random built building in this leader's district loses a level.

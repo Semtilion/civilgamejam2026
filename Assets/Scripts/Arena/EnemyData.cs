@@ -15,6 +15,10 @@ public class EnemyData : ScriptableObject
     public string displayName;
     [Tooltip("Scaled by Radius x 2, so a 1-unit-wide sprite (the placeholders) fills the hit circle. A Spitter's stem.")]
     public Sprite sprite;
+    [Tooltip("Optional walk cycle: shown in turn as it walks (the first is usually Sprite). Empty = Sprite only.")]
+    public Sprite[] walkFrames;
+    [Tooltip("The art faces left: mirrored while walking right (off: faces right, mirrored walking left). Only with walk frames.")]
+    public bool artFacesLeft;
     public Color color = Color.white;
     [Tooltip("Size in world units (hit size and sprite size).")]
     public float radius = 0.4f;

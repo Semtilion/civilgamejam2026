@@ -229,17 +229,7 @@ public static class ArenaSceneBuilder
             new SpawnEntry { enemy = a.spitter, weight = 15f },
             new SpawnEntry { enemy = a.brute, weight = 15f, depth1Multiplier = 1f / 3f }, // rarer on depth 1
         };
-        arena.boss = a.colossus;
-        arena.forceBoss = a.force;
-        // Day-15 horde: the default ramp x1.5 (25 / 30+5 / 30+6+4 / 40+8+8 / 30+6+6 + Colossus)
-        arena.hordeWaves = new[]
-        {
-            Wave((a.crawler, 38)),
-            Wave((a.crawler, 45), (a.spitter, 8)),
-            Wave((a.crawler, 45), (a.spitter, 9), (a.brute, 6)),
-            Wave((a.crawler, 60), (a.spitter, 12), (a.brute, 12)),
-            Wave((a.crawler, 45), (a.spitter, 9), (a.brute, 9), (a.colossus, 1)),
-        };
+        arena.boss = a.colossus; // every 5th depth, and in raids from raid 3 (the raid numbers are the component's defaults)
         arena.crate = a.crate;
         arena.crystalCluster = a.crystalCluster;
         // Ores: the artist's crystal vein; without it the tileset's stone pillar, or a tinted, slightly bigger
@@ -376,14 +366,6 @@ public static class ArenaSceneBuilder
             }
             NewSprite("Barrel", barrel, position, Vector2.one, Color.white, 0);
         }
-    }
-
-    static HordeWave Wave(params (EnemyData enemy, int count)[] groups)
-    {
-        HordeWave wave = new HordeWave { groups = new HordeGroup[groups.Length] };
-        for (int i = 0; i < groups.Length; i++)
-            wave.groups[i] = new HordeGroup { enemy = groups[i].enemy, count = groups[i].count };
-        return wave;
     }
 
     // Invisible child sprite a weapon flashes on each attack (the weapon sets its alpha, size and rotation).

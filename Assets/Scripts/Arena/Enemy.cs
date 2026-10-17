@@ -28,6 +28,7 @@ public class Enemy : MonoBehaviour
     const float ShakeOffset = 0.05f;
     const float PopTime = 0.2f;
     const float FlowerDepth = -0.01f;
+    const float StepLength = 0.45f; // walk cycle: the next frame every this many units walked
     const float SpawnTurn = 20f; // a shooter's flower (and its volley) is turned by up to this many degrees, random per spawn
     static readonly Color WarningColor = new Color(1f, 0.15f, 0.15f);
     static readonly Color IceColor = new Color(0.55f, 0.85f, 1f);
@@ -51,6 +52,7 @@ public class Enemy : MonoBehaviour
     Vector3 baseScale;    // the size from data.radius
     float age, animTime, squishTimer, popTimer, wobblePhase;
     float turn; // shooters: SpawnTurn, picked at spawn
+    float walked; // units walked (walk cycle)
 
     public bool IsDead => hp <= 0;
 
@@ -214,11 +216,15 @@ public class Enemy : MonoBehaviour
         }
         else if (data.behavior == EnemyBehavior.Chaser)
         {
-            position = Vector2.MoveTowards(position, target, data.moveSpeed * delta);
+            Vector2 next = Vector2.MoveTowards(position, target, data.moveSpeed * delta);
+            Walk(next - position);
+            position = next;
         }
         else if (data.behavior == EnemyBehavior.Boss)
         {
-            position += BossVelocity(target - position) * delta;
+            Vector2 step = BossVelocity(target - position) * delta;
+            Walk(step);
+            position += step;
         }
         // Shooters never move.
 
@@ -226,6 +232,16 @@ public class Enemy : MonoBehaviour
         position.x = Mathf.Clamp(position.x, bounds.xMin + data.radius, bounds.xMax - data.radius);
         position.y = Mathf.Clamp(position.y, bounds.yMin + data.radius, bounds.yMax - data.radius);
         transform.position = position;
+    }
+
+    // Enemies with walk frames (the Brute): the next frame every StepLength units walked, facing where it goes.
+    // Not while knocked back or pinned (only called for its own steps).
+    void Walk(Vector2 moved)
+    {
+        if (data.walkFrames == null || data.walkFrames.Length == 0) return;
+        if (Mathf.Abs(moved.x) > 0.0001f) sprite.flipX = data.artFacesLeft ? moved.x > 0f : moved.x < 0f;
+        walked += moved.magnitude;
+        sprite.sprite = data.walkFrames[(int)(walked / StepLength) % data.walkFrames.Length];
     }
 
     // Chase -> stop and glow red (wind-up) -> dash at where the hero was -> chase again.

@@ -110,8 +110,15 @@ public class TownConfig : ScriptableObject
     [Header("Days")]
     [Tooltip("Days that pass when the hero dies in the dungeon (a normal dive = 1 day).")]
     public int daysLostOnDefeat = 1;
-    public int[] earthquakeDays = { 4, 7, 10, 13 };
-    public int hordeDay = 15;
+    [Tooltip("The first quake hits on this day...")]
+    public int firstQuakeDay = 4;
+    [Tooltip("...then one every this many days, forever (the game is endless).")]
+    public int quakeEvery = 3;
+    [Tooltip("Every this-many-th quake brings a raid the same day (2: days 7, 13, 19...).")]
+    public int raidEveryQuakes = 2;
+    [Tooltip("A lost raid: every faction loses (day x this)% of its starting people, times the share of the raid's " +
+             "timer that was left.")]
+    public float raidLossPerDay = 1f;
 
     [Header("Earthquakes (meter in %)")]
     [Tooltip("Meter at the start of the game; after a quake it goes back to this plus all the passive rise so far.")]

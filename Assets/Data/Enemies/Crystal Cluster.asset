@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Crystal Cluster
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   displayName: Crystal Cluster
-  sprite: {fileID: 21300000, guid: c2d52d951f7131b45b14ba1ff771a34f, type: 3}
-  color: {r: 0.8, g: 0.6, b: 1, a: 1}
+  sprite: {fileID: 21300000, guid: 078428b8853cbb44d9823b3292e5d29c, type: 3}
+  color: {r: 1, g: 1, b: 1, a: 1}
   radius: 0.6
   maxHp: 30
   moveSpeed: 0
@@ -24,6 +24,17 @@ MonoBehaviour:
   materialChance: 0
   materialAmount: 0
   crystalAmount: 1
+  supplyAmount: 0
+  goldChance: 0
+  goldAmount: 0
+  flower: {fileID: 0}
+  shotAngles:
+  - 18
+  - 90
+  - 162
+  - 234
+  - 306
+  projectileSprite: {fileID: 0}
   fireRange: 10
   fireWarning: 0.5
   fireInterval: 2.5

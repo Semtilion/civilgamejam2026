@@ -118,8 +118,10 @@ MonoBehaviour:
   goldPerLevel: 40
   crystalsPerLevel: 1
   daysLostOnDefeat: 1
-  earthquakeDays: 04000000070000000a0000000d000000i
-  hordeDay: 15
+  firstQuakeDay: 4
+  quakeEvery: 3
+  raidEveryQuakes: 2
+  raidLossPerDay: 1
   quakeStart: 30
   quakePerDay: 10
   quakePassivePerDay: 5

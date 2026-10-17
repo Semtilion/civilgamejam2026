@@ -14,31 +14,19 @@ public class SpawnEntry
     [Min(0f)] public float depth1Multiplier = 1f;
 }
 
-[System.Serializable]
-public class HordeGroup
-{
-    public EnemyData enemy;
-    public int count;
-}
-
-[System.Serializable]
-public class HordeWave
-{
-    public HordeGroup[] groups;
-}
-
-// Runs one dungeon dive (Vampire Survivors style), or the final horde on day 15.
+// Runs one dungeon dive (Vampire Survivors style), or a raid (every 2nd quake day).
 // Dive: every depth, kill N enemies while the horde builds up. Normal depth: reaching N opens a teleporter. Boss depth
-// (every `bossEvery` depths): reaching N summons the boss while the horde keeps coming; killing it opens the teleporter.
-// The boss on `forceDepth` is the force itself (victory). Once the teleporter is open, spawning stops; stepping in
-// clears the depth: go deeper or return to town. Kills, materials, crystals, gold, ores and relics go back to the town.
+// (every `bossEvery` depths, endless): reaching N summons the boss while the horde keeps coming; killing it opens the
+// teleporter. Once the teleporter is open, spawning stops; stepping in clears the depth: go deeper or return to town.
+// Kills, materials, crystals, gold, supplies, ores and relics go back to the town.
 // Ores and shrines (MineSpot) are used by standing next to them; every mined ore shakes the cave and may set off a trap.
-// Every boss but the Force drops a relic (Relics, on this object).
-// Horde: the same cave, `hordeWaves` one after another; beat them all to win, die and the town falls.
-// The hero starts with the town's NPC buffs (Campaign).
+// Every boss drops a relic (Relics, on this object).
+// Raid: the same cave, crystal monsters keep pouring in; hold out until the timer runs out (bigger and longer every
+// raid, a Colossus at the halfway mark from raid `raidBossFrom`). Held: like a dive's return. Lost: the town is hurt
+// (Campaign.RaidLost).
+// The hero starts with the town's buffs (Campaign).
 public class ArenaManager : MonoBehaviour
 {
-    enum HordeState { Break, Spawning, Fighting }
     enum Trap { None, Ambush, RockRain }
 
     public const float WallThickness = 1f; // walls left/right of the arena (how far the camera may show past the bounds)
@@ -59,7 +47,6 @@ public class ArenaManager : MonoBehaviour
     public int extraKillsPerDepth = 10;
     [Tooltip("A boss appears on every depth divisible by this (5, 10, ...).")]
     [Min(1)] public int bossEvery = 5;
-    public int forceDepth = 10;
     [Tooltip("Enemy HP/damage multiplier added per depth below the first (0.3 = +30% each depth).")]
     public float statScalePerDepth = 0.3f;
     [Tooltip("Spawn speed multiplier added per depth below the first.")]
@@ -73,7 +60,6 @@ public class ArenaManager : MonoBehaviour
     public float spawnIntervalEnd = 0.25f;
     public int maxEnemies = 250;
     public EnemyData boss;
-    public EnemyData forceBoss;
 
     [Header("Crates, crystal clusters and ores (placed at the start of every depth)")]
     public EnemyData crate;
@@ -134,16 +120,21 @@ public class ArenaManager : MonoBehaviour
     public Sprite teleporterStairs;
     public float teleporterRadius = 1.2f;
 
-    [Header("Final horde (day 15)")]
-    public HordeWave[] hordeWaves;
-    [Tooltip("Horde enemies are as strong as on this depth.")]
-    public int hordeStrengthDepth = 4;
-    [Tooltip("Free level-up picks at the start of the horde (all unlocked weapons are also given at Lv 1).")]
-    public int hordeFreePicks = 5;
-    [Tooltip("Seconds of calm before each wave.")]
-    public float waveBreak = 3f;
-    [Tooltip("Seconds between spawns while a wave pours in.")]
-    public float waveSpawnInterval = 0.1f;
+    [Header("Raids (every 2nd quake day: hold out until the timer runs out)")]
+    [Tooltip("Raid 1 lasts this many seconds...")]
+    public float raidTime = 90f;
+    [Tooltip("...plus this many for every raid after it...")]
+    public float raidTimePerRaid = 15f;
+    [Tooltip("...up to this.")]
+    public float raidTimeMax = 180f;
+    [Tooltip("Raid 1's enemies are as strong (and come as fast) as on this depth...")]
+    public int raidDepth = 2;
+    [Tooltip("...plus this many depths for every raid after it.")]
+    public int raidDepthPerRaid = 2;
+    [Tooltip("From this raid on, a Colossus joins at the halfway mark.")]
+    public int raidBossFrom = 3;
+    [Tooltip("Free level-up picks at the start of a raid (every base weapon is also given at Lv 1).")]
+    public int raidFreePicks = 5;
 
     [Header("Scene references")]
     public Player player;
@@ -193,8 +184,8 @@ public class ArenaManager : MonoBehaviour
     public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen;
 
     Campaign campaign;
-    bool horde;     // this run is the final horde, not a dive
-    int depth;
+    bool raid;      // this run is a raid, not a dive
+    int depth;      // a raid: the depth its enemies are as strong as
     int kills;      // whole dive
     int depthKills; // this depth, toward the goal
     int diveMaterials;
@@ -214,11 +205,7 @@ public class ArenaManager : MonoBehaviour
     GameObject teleporter; // null = not open
     Transform teleporterGlow;
 
-    HordeState hordeState;
-    int wave;              // current horde wave, 1-based (0 = before the first)
-    float waveBreakLeft;
-    readonly List<EnemyData> waveQueue = new List<EnemyData>(); // still to spawn in this wave
-    int waveSize;          // enemies in this wave (for the goal bar)
+    float raidLength, raidLeft; // seconds
 
     CameraFollow cameraFollow;
     Trap trap;          // what comes after the current tremor
@@ -232,8 +219,8 @@ public class ArenaManager : MonoBehaviour
     static readonly Color CrystalGlowColor = new Color(0.80f, 0.60f, 1f);     // light violet, around crystal clusters
 
     int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
-    bool IsBossDepth => depth % bossEvery == 0 || depth >= forceDepth;
-    float StatScale => 1f + statScalePerDepth * ((horde ? hordeStrengthDepth : depth) - 1);
+    bool IsBossDepth => depth % bossEvery == 0;
+    float StatScale => 1f + statScalePerDepth * (depth - 1);
 
     void Awake()
     {
@@ -244,7 +231,7 @@ public class ArenaManager : MonoBehaviour
     void Start()
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
-            hordeWaves == null || hordeWaves.Length == 0 || whiteSquare == null || crystalCluster == null || crystalSprite == null ||
+            whiteSquare == null || crystalCluster == null || crystalSprite == null ||
             rockSprite == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
             deathBursts == null || lootText == null || goalBar == null || debugKeys == null)
         {
@@ -254,8 +241,8 @@ public class ArenaManager : MonoBehaviour
         }
         cameraFollow = cam.GetComponent<CameraFollow>();
         campaign = Campaign.Current ?? Campaign.StartNew(config); // also lets you press Play in this scene directly
-        horde = campaign.IsHordeDay;
-        if (horde) StartHorde();
+        raid = campaign.IsRaidDay;
+        if (raid) StartRaid();
         else StartDive();
     }
 
@@ -343,9 +330,9 @@ public class ArenaManager : MonoBehaviour
         UpdateArrow();
         if (!IsPlaying) return;
 
-        if (horde)
+        if (raid)
         {
-            UpdateHorde();
+            UpdateRaid();
             return;
         }
 
@@ -385,8 +372,7 @@ public class ArenaManager : MonoBehaviour
 
     void SpawnBoss()
     {
-        EnemyData data = depth >= forceDepth && forceBoss != null ? forceBoss : boss;
-        ShowBoss(Enemy.Spawn(data, OffscreenPoint(), StatScale, player, this));
+        ShowBoss(Enemy.Spawn(boss, OffscreenPoint(), StatScale, player, this));
     }
 
     void ShowBoss(Enemy enemy)
@@ -421,18 +407,11 @@ public class ArenaManager : MonoBehaviour
         diveKills[enemy.data] = diveKills.TryGetValue(enemy.data, out int count) ? count + 1 : 1;
         relics.OnKill(); // Bloodstone
 
-        if (horde)
+        if (raid)
         {
             if (enemy == currentBoss) bossBar.SetActive(false);
             DropLoot(enemy);
-            return; // waves are handled in UpdateHorde
-        }
-
-        if (enemy == currentBoss && depth >= forceDepth)
-        {
-            ShowPanel("THE FORCE IS DESTROYED", "Deep below the island, the force falls silent.\nThe earthquakes are over.",
-                "Continue", () => FinishGame(true, "You destroyed the Force at the bottom of the dungeon. The earthquakes stopped."));
-            return;
+            return; // a raid only ends with its timer
         }
 
         DropLoot(enemy); // a boss's loot lands on the floor too; what's left is collected at the teleporter
@@ -440,7 +419,7 @@ public class ArenaManager : MonoBehaviour
         if (enemy == currentBoss)
         {
             OpenTeleporter();
-            relicDue = true; // every boss but the Force drops a relic
+            relicDue = true; // every boss drops a relic
         }
         else if (!bossSpawned && teleporter == null && depthKills >= KillsNeeded)
         {
@@ -462,10 +441,15 @@ public class ArenaManager : MonoBehaviour
         }
     }
 
-    // Debug (F4): the depth's kill goal is met right away (not during the horde, or once it's already met).
+    // Debug (F4): the depth's kill goal is met right away (or once it's already met: nothing). A raid: the timer ends.
     public void DebugClearDepth()
     {
-        if (horde || bossSpawned || teleporter != null) return;
+        if (raid)
+        {
+            raidLeft = 0f;
+            return;
+        }
+        if (bossSpawned || teleporter != null) return;
         depthKills = Mathf.Max(depthKills, KillsNeeded);
         GoalReached();
     }
@@ -566,8 +550,14 @@ public class ArenaManager : MonoBehaviour
     {
         if (relics.TrySecondWind()) return; // back up, the fight goes on
 
-        if (horde)
-            ShowPanel("DEFEATED", "The horde overruns the town.", "Continue", () => FinishGame(false, "The horde overran the town on the last night."));
+        if (raid)
+        {
+            float loss = campaign.day * config.raidLossPerDay * raidLeft / raidLength;
+            ShowPanel("THE RAIDERS BREAK THROUGH",
+                $"You fell with {Mathf.CeilToInt(raidLeft)} seconds left. Every faction loses {loss:0.#}% of its people\n" +
+                "(the later the day and the more of the raid left, the worse). Everything found is lost.",
+                "Return to town", () => EndRaid(false));
+        }
         else
             ShowPanel("DEFEATED", "Everything found on this dive is lost.", "Return to town", () => EndDive(false));
     }
@@ -695,129 +685,93 @@ public class ArenaManager : MonoBehaviour
     // Back to town: the campaign takes the loot (or not), the day passes, and the Town scene loads.
     void EndDive(bool survived, string nextScene = null)
     {
-        campaign.RecordDive(kills, depth, diveOres);
+        campaign.RecordDive(kills, raid ? 0 : depth, diveOres);
         campaign.EndDive(survived, diveKills, diveMaterials, diveCrystals, diveGold, diveSupplies, diveOres, relics.FoundThisDive);
         Time.timeScale = 1f;
         SceneManager.LoadScene(nextScene ?? townScene);
     }
 
-    // The game is over (won or lost): record this fight's stats, then the Town scene shows the epilogue.
-    void FinishGame(bool won, string reason, string nextScene = null)
-    {
-        campaign.RecordDive(kills, depth, diveOres);
-        campaign.EndGame(won, reason);
-        Time.timeScale = 1f;
-        SceneManager.LoadScene(nextScene ?? townScene);
-    }
-
     // Pause menu > Quit to title. Counts as dying, so it can't be used to retry a bad dive: the dive's loot is lost and
-    // a day passes. During the horde, the town falls.
+    // a day passes. During a raid, it counts as losing the raid.
     public void QuitToTitle()
     {
-        if (horde) FinishGame(false, "You abandoned the town on the last night.", titleScene);
+        if (raid) EndRaid(false, titleScene);
         else EndDive(false, titleScene);
     }
 
-    // ---------- Final horde ----------
+    // ---------- Raids ----------
 
-    // Every base weapon (Sword, Dagger, Spear, Crystal Orbit) at Lv 1 plus some free level-up picks, then wave 1 after
-    // a short calm.
-    void StartHorde()
+    // Every base weapon (Sword, Dagger, Spear, Crystal Orbit) at Lv 1 plus some free level-up picks, in an empty cave
+    // (no crates or ores). Each raid is longer and its enemies stronger (and quicker to come) than the last.
+    void StartRaid()
     {
         ResetRun();
         foreach (Weapon weapon in leveling.weapons)
             if (!Weapon.IsRelicWeapon(weapon.id)) weapon.enabled = true;
 
+        int number = campaign.RaidNumber;
+        depth = raidDepth + raidDepthPerRaid * (number - 1);
+        raidLength = Mathf.Min(raidTimeMax, raidTime + raidTimePerRaid * (number - 1));
+        raidLeft = raidLength;
+        bossSpawned = number < raidBossFrom; // true = no Colossus coming
         ClearField();
         player.transform.position = Bounds.center;
         bossBar.SetActive(false);
         panel.SetActive(false);
         Time.timeScale = 1f;
-        wave = 0;
-        hordeState = HordeState.Break;
-        waveBreakLeft = waveBreak;
-        leveling.GrantPicks(hordeFreePicks);
-    }
-
-    // Break ("Wave N incoming") -> Spawning (the wave pours in from off-screen) -> Fighting (until it's beaten).
-    void UpdateHorde()
-    {
-        switch (hordeState)
-        {
-            case HordeState.Break:
-                waveBreakLeft -= Time.deltaTime;
-                if (waveBreakLeft <= 0f) StartNextWave();
-                break;
-
-            case HordeState.Spawning:
-                spawnTimer -= Time.deltaTime;
-                if (spawnTimer <= 0f)
-                {
-                    spawnTimer = waveSpawnInterval;
-                    EnemyData data = waveQueue[waveQueue.Count - 1];
-                    waveQueue.RemoveAt(waveQueue.Count - 1);
-                    Enemy enemy = Enemy.Spawn(data, OffscreenPoint(), StatScale, player, this);
-                    if (data.behavior == EnemyBehavior.Boss) ShowBoss(enemy);
-                    if (waveQueue.Count == 0) hordeState = HordeState.Fighting;
-                }
-                break;
-
-            case HordeState.Fighting:
-                if (WaveFightersLeft() == 0) WaveBeaten();
-                break;
-        }
-    }
-
-    void StartNextWave()
-    {
-        wave++;
-        waveQueue.Clear();
-        foreach (HordeGroup group in hordeWaves[wave - 1].groups)
-            for (int i = 0; i < group.count; i++) waveQueue.Add(group.enemy);
-
-        // Mix the enemy types so they don't arrive in blocks.
-        for (int i = waveQueue.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (waveQueue[i], waveQueue[j]) = (waveQueue[j], waveQueue[i]);
-        }
-
         spawnTimer = 0f;
-        waveSize = waveQueue.Count;
-        hordeState = waveQueue.Count > 0 ? HordeState.Spawning : HordeState.Fighting;
+        leveling.GrantPicks(raidFreePicks);
     }
 
-    // Spitters left behind don't have to be hunted down: they vanish when the rest of the wave is beaten.
-    void WaveBeaten()
+    // Monsters keep coming (faster as the timer runs down); a Colossus at the halfway mark; the timer ends it.
+    void UpdateRaid()
     {
-        foreach (Enemy enemy in Enemy.All)
-            if (enemy.data.behavior == EnemyBehavior.Shooter) Destroy(enemy.gameObject);
-
-        if (wave >= hordeWaves.Length)
+        raidLeft -= Time.deltaTime;
+        if (raidLeft <= 0f)
         {
-            ShowPanel("THE HORDE IS BROKEN", "You held the town through the last night.", "Continue",
-                () => FinishGame(true, "You held the town against the horde on the last night."));
+            RaidHeld();
             return;
         }
-        hordeState = HordeState.Break;
-        waveBreakLeft = waveBreak;
+        if (!bossSpawned && raidLeft <= raidLength / 2f)
+        {
+            bossSpawned = true;
+            SpawnBoss();
+        }
+
+        spawnTimer -= Time.deltaTime;
+        if (spawnTimer <= 0f)
+        {
+            spawnTimer = CurrentSpawnInterval();
+            if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy(OffscreenPoint());
+        }
     }
 
-    // Enemies that still have to be beaten for the wave to end (Spitters and crates don't count).
-    int WaveFightersLeft()
+    // Held: everything still on the floor is collected, then back to town like after a dive.
+    void RaidHeld()
     {
-        int count = 0;
-        foreach (Enemy enemy in Enemy.All)
-            if (!enemy.IsDead && enemy.data.behavior != EnemyBehavior.Shooter && enemy.data.behavior != EnemyBehavior.Crate) count++;
-        return count;
+        foreach (Pickup pickup in Pickup.All)
+            if (pickup.kind != PickupKind.Xp) Collect(pickup.kind, pickup.amount);
+        ShowPanel("THE TOWN HOLDS", $"The crystal monsters fall back into the cracks. Raid {campaign.RaidNumber} held!\n" +
+            $"You bring home {diveMaterials} materials, {diveCrystals} crystals, {diveGold} gold and {diveSupplies} supplies.",
+            "Return to town", () => EndRaid(true));
+    }
+
+    // The campaign records the raid (a lost one hurts the town, more the more of the timer was left), then it ends
+    // like a dive (held: the loot is kept; lost: it's lost) and a day passes.
+    void EndRaid(bool held, string nextScene = null)
+    {
+        if (held) campaign.RaidHeld();
+        else campaign.RaidLost(Mathf.Clamp01(raidLeft / raidLength));
+        EndDive(held, nextScene);
     }
 
     // ---------- Spawning ----------
 
-    // Spawns speed up as the kill count gets closer to the goal, and more on deeper levels.
+    // Spawns speed up as the kill count gets closer to the goal (a raid: as its timer runs down), and more on deeper
+    // levels.
     float CurrentSpawnInterval()
     {
-        float progress = Mathf.Clamp01((float)depthKills / KillsNeeded);
+        float progress = raid ? 1f - raidLeft / raidLength : Mathf.Clamp01((float)depthKills / KillsNeeded);
         float interval = Mathf.Lerp(spawnIntervalStart, spawnIntervalEnd, progress);
         return interval / (1f + spawnScalePerDepth * (depth - 1));
     }
@@ -898,26 +852,24 @@ public class ArenaManager : MonoBehaviour
         hpText.text = $"{player.Hp} / {player.maxHp}";
 
         float goal = -1f; // the goal bar's fill; below 0 = hidden
-        if (horde)
+        float dt = Time.unscaledDeltaTime; // the loot counters roll up toward the real numbers
+        lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
+                        $"Gold {goldShown.Next(diveGold, dt)}     Supplies {suppliesShown.Next(diveSupplies, dt)}";
+        if (raid)
         {
-            int left = WaveFightersLeft() + waveQueue.Count;
-            depthText.text = $"Day {campaign.day}     THE HORDE     Wave {Mathf.Max(1, wave)}/{hordeWaves.Length}     Kills {kills}";
-            lootText.text = ""; // no loot to bring home from the last fight
-            quakeText.text = $"Hold the town: beat all {hordeWaves.Length} waves";
-            goalText.text = hordeState == HordeState.Break ? $"Wave {wave + 1} incoming..." : $"Wave {wave}: {left} left";
-            if (hordeState != HordeState.Break && waveSize > 0) goal = 1f - (float)left / waveSize;
+            int seconds = Mathf.CeilToInt(Mathf.Max(0f, raidLeft));
+            depthText.text = $"Day {campaign.day}     RAID {campaign.RaidNumber}     Kills {kills}";
+            quakeText.text = "Defend the town: hold out until the timer runs out";
+            goalText.text = $"Hold out: {seconds / 60}:{seconds % 60:00}";
+            goal = 1f - raidLeft / raidLength;
         }
         else
         {
-            string depthLabel = depth >= forceDepth ? $"Depth {depth} (the force)" : IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}";
-            depthText.text = $"Day {campaign.day}     {depthLabel}     Kills {kills}";
-            float dt = Time.unscaledDeltaTime; // the counters roll up toward the real numbers
-            lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
-                            $"Gold {goldShown.Next(diveGold, dt)}     Supplies {suppliesShown.Next(diveSupplies, dt)}";
-
+            depthText.text = $"Day {campaign.day}     {(IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}")}     Kills {kills}";
             float oreDrop = diveOres * config.orePercent;
-            string quake = campaign.NextQuakeDay > 0 ? $"Next quake (day {campaign.NextQuakeDay}): {campaign.QuakeForecast:0}%" : "No more quakes";
-            quakeText.text = $"{quake}     Ores mined {diveOres} (-{oreDrop:0}% if you get home)";
+            string raidToo = campaign.IsRaidOn(campaign.NextQuakeDay) ? " + raid" : "";
+            quakeText.text = $"Next quake (day {campaign.NextQuakeDay}{raidToo}): {campaign.QuakeForecast:0}%     " +
+                             $"Ores mined {diveOres} (-{oreDrop:0}% if you get home)";
 
             goalText.text = teleporter != null ? "Teleporter open: step in!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
             if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;

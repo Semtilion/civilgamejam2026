@@ -20,7 +20,7 @@ public class GameAssets
     public Material unlit;    // URP's unlit sprite material (effects stay bright in the dark cave)
     public Sprite heroIdle;   // null = no hero art yet (placeholder circle)
     public Sprite[] heroWalk;
-    public EnemyData crawler, brute, spitter, colossus, force, crate, crystalCluster;
+    public EnemyData crawler, brute, spitter, colossus, crate, crystalCluster;
     public TownConfig townConfig;
 }
 
@@ -46,6 +46,9 @@ public static class GameBuilder
     // times the enemy's size (radius 0.4 x 2): the plant (419 px) stands 1.6 units tall and the flower's body fills
     // its hit circle.
     const float SpitterPixelsPerUnit = 210f;
+    // The Brute's two poses (stand, step) share one canvas centered on its torso (its hit center). The figure (264 px)
+    // stands 2.6 units tall at the Brute's size (radius 0.6 x 2 = 1.2): 264 / (2.6 / 1.2) = 122 px per unit.
+    const float BrutePixelsPerUnit = 122f;
     const string EnemiesFolder = "Assets/Data/Enemies";
     const string TownConfigPath = "Assets/Data/TownConfig.asset";
     const string UnlitMaterialPath = "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat";
@@ -145,7 +148,6 @@ public static class GameBuilder
         a.brute    = EnemyAsset("Crystal Brute",    EnemyBehavior.Chaser,  new Color(0.70f, 0.30f, 0.30f), 0.6f,   60, 1.4f, 15,   3, 0.25f,  1, a.circle, goldChance: 0.25f, gold: 5);
         a.spitter  = EnemyAsset("Shard Spitter",    EnemyBehavior.Shooter, new Color(0.30f, 0.70f, 0.70f), 0.4f,   20, 2.2f,  5,   2, 0.15f,  1, a.circle, goldChance: 0.15f, gold: 3);
         a.colossus = EnemyAsset("Crystal Colossus", EnemyBehavior.Boss,    new Color(0.90f, 0.45f, 0.20f), 1.5f,  300, 1.6f, 25,  20, 1f,    10, a.circle, goldChance: 1f, gold: 50);
-        a.force    = EnemyAsset("The Force",        EnemyBehavior.Boss,    new Color(0.45f, 0.10f, 0.55f), 2.2f,  800, 1.8f, 30,   0, 0f,     0, a.circle);
         a.crate    = EnemyAsset("Supply Crate",     EnemyBehavior.Crate,   new Color(0.55f, 0.38f, 0.20f), 0.5f,   20, 0f,    0,   0, 1f,     3, a.square, supplies: 1);
         a.crystalCluster = EnemyAsset("Crystal Cluster", EnemyBehavior.Crate, new Color(0.80f, 0.60f, 1f), 0.6f, 30, 0f, 0,   0, 0f,     0, a.circle, crystals: 1);
 
@@ -156,6 +158,16 @@ public static class GameBuilder
             a.crate.sprite = crateArt;
             a.crate.color = Color.white;
             EditorUtility.SetDirty(a.crate);
+        }
+        // The artist's Brute (a crystal-backed hulk): a 2-pose walk cycle, drawn facing left.
+        Sprite brute1 = EnemySprite("Brute_1", BrutePixelsPerUnit), brute2 = EnemySprite("Brute_2", BrutePixelsPerUnit);
+        if (brute1 != null && brute2 != null && a.brute.sprite != brute1)
+        {
+            a.brute.sprite = brute1;
+            a.brute.walkFrames = new[] { brute1, brute2 };
+            a.brute.artFacesLeft = true;
+            a.brute.color = Color.white;
+            EditorUtility.SetDirty(a.brute);
         }
         // The artist's Spitter (a crystal flower on a stem) replaces its placeholder circle and fires from the flower's 5 tips.
         Sprite spitterStem = EnemySprite("Spitter_Stem", SpitterPixelsPerUnit);
@@ -464,13 +476,6 @@ public static class GameBuilder
         enemy.goldChance = goldChance;
         enemy.goldAmount = gold;
         enemy.sprite = sprite;
-        if (name == "The Force")
-        {
-            enemy.chargeInterval = 4f;
-            enemy.chargeWindup = 0.7f;
-            enemy.chargeSpeed = 14f;
-            enemy.chargeDuration = 0.7f;
-        }
         AssetDatabase.CreateAsset(enemy, path);
         return enemy;
     }

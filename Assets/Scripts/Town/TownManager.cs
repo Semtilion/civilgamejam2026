@@ -5,11 +5,12 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, news, one button per faction leader, the relics you own,
-// a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on the horde day).
+// a "?" button (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
 // Clicking a leader opens their window: portrait on the left, their greeting and situation typed out on the right,
 // their daily order, their district's buildings and the Give button below (closes with X, Esc or a click outside).
 // Coming back after a quake (or while the injured wait for care) shows the report first. State lives in
-// Campaign.Current. When the game has ended (won or lost), the epilogue covers the screen (New game / Title screen).
+// Campaign.Current. When the run has ended (every faction wiped out), the end screen covers the town (New game /
+// Title screen).
 public class TownManager : MonoBehaviour
 {
     const int NewsLines = 6;
@@ -110,7 +111,7 @@ public class TownManager : MonoBehaviour
             int slot = i; // copy for the lambda
             buildingButtons[i].onClick.AddListener(() => { if (campaign.Build(shownBuildings[slot])) Thank(); });
         }
-        diveButton.onClick.AddListener(() => Leave(arenaScene)); // the arena runs the horde on day 15
+        diveButton.onClick.AddListener(() => Leave(arenaScene)); // the arena runs the raid on a raid day
         newGameButton.onClick.AddListener(() =>
         {
             Campaign.StartNew(config);
@@ -210,40 +211,31 @@ public class TownManager : MonoBehaviour
         if (LeaderOpen) ShowLeader(false); // e.g. after building: new prices, no retyping
         relicsText.text = RelicsSummary();
 
-        SetLabel(diveButton, campaign.IsHordeDay ? "DEFEND\nTHE TOWN" : "DIVE");
+        SetLabel(diveButton, campaign.IsRaidDay ? "DEFEND\nTHE TOWN" : "DIVE");
         ShowEpilogue();
     }
 
-    // Result, what became of each faction, and a few run stats.
+    // The end of the run: how long the town held out, the run's stats, and the best run.
     void ShowEpilogue()
     {
         epiloguePanel.SetActive(campaign.Ended);
         if (!campaign.Ended) return;
 
-        epilogueTitle.text = campaign.Won ? "THE ISLAND IS SAVED" : "THE TOWN HAS FALLEN";
-        string body = campaign.endingReason + "\n";
-        for (int i = 0; i < config.npcs.Length; i++)
-        {
-            NpcDefinition definition = config.npcs[i];
-            NpcState npc = campaign.npcs[i];
-            if (!npc.Alive)
-                body += $"\nThe {definition.faction} were wiped out.";
-            else if (campaign.DistrictStrength(i) < 1f)
-                body += $"\nThe {definition.faction} barely survived: {npc.population} of {definition.startPopulation} remain.";
-            else
-                body += $"\nThe {definition.faction} endured: {npc.population} of {definition.startPopulation} remain.";
-        }
-        body += $"\n\nDay reached: {campaign.day}     Deepest depth: {campaign.deepestDepth}     " +
-                $"Enemies killed: {campaign.totalKills}     Ores destroyed: {campaign.totalOres}";
+        epilogueTitle.text = "THE TOWN HAS FALLEN";
+        string body = campaign.endingReason;
+        body += $"\n\nThe town held out until day {campaign.day}.\nRaids held: {campaign.raidsHeld}     Raids lost: {campaign.raidsLost}";
+        body += $"\nDeepest depth: {campaign.deepestDepth}     Enemies killed: {campaign.totalKills}     Ores destroyed: {campaign.totalOres}";
+        body += campaign.newBest ? "\n\nA new record!" : $"\n\nBest run: day {Campaign.BestDay} ({Campaign.BestRaids} raids held)";
         epilogueBody.text = body;
     }
 
+    // "RAID TODAY!" on a raid day, then the next quake (and whether a raid comes with it).
     string NextThreat()
     {
         int quakeDay = campaign.NextQuakeDay;
-        if (quakeDay > 0)
-            return $"Next quake: day {quakeDay} at {campaign.QuakeForecast:0}% (harmful from {config.quakeHarmAt:0}%)";
-        return campaign.day <= config.hordeDay ? $"Horde on day {config.hordeDay}" : "";
+        string today = campaign.IsRaidDay ? "RAID TODAY!    " : "";
+        string raid = campaign.IsRaidOn(quakeDay) ? " + raid" : "";
+        return $"{today}Next quake: day {quakeDay}{raid} at {campaign.QuakeForecast:0}% (harmful from {config.quakeHarmAt:0}%)";
     }
 
     string RelicsSummary()

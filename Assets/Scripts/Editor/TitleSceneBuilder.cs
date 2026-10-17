@@ -20,6 +20,7 @@ public static class TitleSceneBuilder
         Stretch(background.rectTransform);
         Text title = NewText("Game Title", canvas, new Vector2(0, 260), new Vector2(1700, 220), 120, TextAnchor.MiddleCenter);
         Title(title);
+        Text best = NewText("Best Run", canvas, new Vector2(0, 90), new Vector2(1400, 50), 28, TextAnchor.MiddleCenter);
 
         Button play = NewButton("Play", canvas, new Vector2(420, 90), 40);
         Place(play, new Vector2(0, -40));
@@ -33,6 +34,7 @@ public static class TitleSceneBuilder
         TitleManager manager = new GameObject("Title Manager").AddComponent<TitleManager>();
         manager.config = a.townConfig;
         manager.titleText = title;
+        manager.bestText = best;
         manager.playButton = play;
         manager.settingsButton = settings;
         manager.quitButton = quit;
