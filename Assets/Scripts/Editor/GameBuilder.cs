@@ -41,6 +41,7 @@ public static class GameBuilder
     const string DungeonArtFolder = "Assets/Art/Dungeon";
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
+    const string FramePath = "Assets/Art/UI/Frame.png";  // the artist's ornate frame, as white lines (tinted per use)
     const float OreHeight = 1.8f;  // world units (the whole image, a few px of padding included)
     const float ShotLength = 0.5f; // world units: the Spitter's shot (its art points right)
     const float ClusterWidth = 1.35f; // world units: the crystal cluster (three crystals; its hit circle is 1.2 across)
@@ -65,6 +66,7 @@ public static class GameBuilder
     const string FontsFolder = "Assets/Fonts";
     const float AlegreyaLineSpacing = 0.88f; // its lines are ~20% taller than the built-in font's: keeps them about the same
     static Font font, titleFont;
+    static Sprite frameSprite; // the 9-sliced frame (loaded when building starts; null = thin outlines instead)
     static float lineSpacing = 1f;
     public static Font TitleFont => titleFont;
 
@@ -86,6 +88,7 @@ public static class GameBuilder
 
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single); // so neither target scene is open
         LoadFonts();
+        frameSprite = FrameSprite();
         GameAssets assets = EnsureAssets();
         ArenaSceneBuilder.Build(assets);
         TownSceneBuilder.Build(assets);
@@ -531,13 +534,13 @@ public static class GameBuilder
         {
             new NpcDefinition { name = "Guard",  faction = "Soldiers", startPopulation = 100, unlocksEvolution = true, weapon = WeaponId.Spear,
                                 greeting = "Steel holds. Stone doesn't.",
-                                thanks = "Good. My soldiers will put it to use.", workGold = 20 },
+                                thanks = "Good. My soldiers will put it to use.", workGold = 20, color = new Color(1f, 0.80f, 0.30f) },
             new NpcDefinition { name = "Shaman", faction = "Mages",    startPopulation = 50,  unlocksEvolution = true, weapon = WeaponId.CrystalOrbit,
                                 greeting = "The crystals sing louder every day. Every vein you break, the island hears it.",
-                                thanks = "The crystals approve. So do I.", workGold = 10, workCrystals = 1 },
+                                thanks = "The crystals approve. So do I.", workGold = 10, workCrystals = 1, color = new Color(0.65f, 0.45f, 0.95f) },
             new NpcDefinition { name = "Elder",  faction = "Peasants", startPopulation = 200, unlocksEvolution = true, weapon = WeaponId.Dagger,
                                 greeting = "My old bones feel the quakes before the ground does. Build us something that stands.",
-                                thanks = "Bless you. That will hold a while longer.", workMaterials = 8 },
+                                thanks = "Bless you. That will hold a while longer.", workMaterials = 8, color = new Color(0.85f, 0.65f, 0.35f) },
         }; // their district buildings are TownConfig.buildings (code defaults); portraits are filled in by EnsureAssets
         config.killQuests = new[]
         {
@@ -684,6 +687,9 @@ public static class GameBuilder
     public static readonly Color BackgroundColor = new Color(0.07f, 0.06f, 0.09f);
     public static readonly Color PanelColor = new Color(0.08f, 0.06f, 0.11f, 0.94f);
     public static readonly Color BorderColor = new Color(0.55f, 0.35f, 0.85f);
+    public static readonly Color FrameColor = new Color(0.43f, 0.59f, 0.92f); // steel blue: the artist's frame
+    // How thin the frame is drawn (the art's 80-150 px edges / this, in canvas units) on each kind of element.
+    public const float PanelFrameThickness = 2f, CardFrameThickness = 2.5f, HudFrameThickness = 3f, ButtonFrameThickness = 4f;
     public static readonly Color TitleColor = new Color(0.82f, 0.70f, 1f);
     public static readonly Color AccentColor = new Color(0.65f, 0.45f, 0.95f); // bar fills, slider fills
     static readonly Color ButtonColor = new Color(0.22f, 0.16f, 0.32f);
@@ -692,20 +698,73 @@ public static class GameBuilder
     static readonly Color ButtonDisabled = new Color(0.14f, 0.13f, 0.16f);
 
     // A dark panel with a thin violet border.
+    // A dark panel in the artist's frame (steel blue; a thin violet outline if the frame art is missing). The frame is
+    // its first child, named "Frame" (PanelFrame(panel) finds it, e.g. to tint the leader window).
     public static Image NewPanel(string name, Transform parent, Vector2 position, Vector2 size)
     {
         Image panel = NewImage(name, parent, position, size, PanelColor);
-        Outline border = panel.gameObject.AddComponent<Outline>();
-        border.effectColor = BorderColor;
-        border.effectDistance = new Vector2(3f, -3f);
-        border.useGraphicAlpha = false; // a solid border even on a see-through panel
+        if (AddFrame(panel.transform, PanelFrameThickness, FrameColor) == null)
+        {
+            Outline border = panel.gameObject.AddComponent<Outline>();
+            border.effectColor = BorderColor;
+            border.effectDistance = new Vector2(3f, -3f);
+            border.useGraphicAlpha = false; // a solid border even on a see-through panel
+        }
         return panel;
+    }
+
+    public static Image PanelFrame(Image panel)
+    {
+        Transform frame = panel.transform.Find("Frame");
+        return frame != null ? frame.GetComponent<Image>() : null;
+    }
+
+    // The artist's frame stretched over `parent`, tinted `color`. `thickness`: how much thinner than the art its
+    // edges are drawn (PanelFrameThickness ...). Behind the parent's other children, or over them (`onTop`: call it
+    // after they're made, e.g. around the portrait). Null (nothing added) without the frame art.
+    public static Image AddFrame(Transform parent, float thickness, Color color, bool onTop = false)
+    {
+        if (frameSprite == null) return null;
+        Image frame = NewImage("Frame", parent, Vector2.zero, Vector2.zero, color);
+        Stretch(frame.rectTransform);
+        frame.sprite = frameSprite;
+        frame.type = Image.Type.Sliced;
+        frame.fillCenter = false;
+        frame.pixelsPerUnitMultiplier = thickness;
+        frame.raycastTarget = false;
+        if (!onTop) frame.transform.SetAsFirstSibling();
+        return frame;
+    }
+
+    // The frame art (Assets/Art/UI/Frame.png), 9-sliced: its corners (80 px at the sides, 100 at the top, 150 at the
+    // bottom) stay as drawn and its edges stretch. 100 px per unit, so on a canvas a thickness of 2 draws them at half.
+    // Null if the file isn't there.
+    static Sprite FrameSprite()
+    {
+        if (!File.Exists(FramePath)) return null;
+        AssetDatabase.ImportAsset(FramePath); // in case Unity hasn't picked up a freshly dropped file yet
+        TextureImporter importer = AssetImporter.GetAtPath(FramePath) as TextureImporter;
+        if (importer == null) return null;
+        Vector4 border = new Vector4(80f, 150f, 80f, 100f); // left, bottom, right, top
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+            importer.spriteBorder != border || importer.mipmapEnabled || Mathf.Abs(importer.spritePixelsPerUnit - 100f) > 0.01f)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spriteBorder = border;
+            importer.spritePixelsPerUnit = 100f;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(FramePath);
     }
 
     // Violet button states (lighter on hover, darker when pressed, grey when it can't be used; the image is white so
     // these are the real colors), a label that dims while the button can't be used, and no keyboard navigation (WASD
     // moves the hero, it shouldn't move a UI selection).
-    public static void StyleButton(Button button, Image image, Text label)
+    public static void StyleButton(Button button, Image image, Text label, float frameThickness = ButtonFrameThickness)
     {
         image.color = Color.white;
         button.targetGraphic = image;
@@ -724,6 +783,8 @@ public static class GameBuilder
         dim.button = button;
         dim.label = label;
         dim.labelColor = label.color;
+        dim.frame = AddFrame(image.transform, frameThickness, FrameColor); // dimmed with the label; leaders recolor it
+        dim.frameColor = FrameColor;
         button.gameObject.AddComponent<ButtonMotion>().button = button; // grows on hover, bounces on click
     }
 

@@ -140,6 +140,7 @@ public static class ArenaSceneBuilder
         // Top-left: HP bar, day / depth / kills, then the dive's loot
         Image topLeft = NewImage("Top-Left Backing", canvas, new Vector2(20, -20), new Vector2(620, 140), backing);
         Pin(topLeft.rectTransform, new Vector2(0f, 1f));
+        AddFrame(topLeft.transform, HudFrameThickness, FrameColor);
         RectTransform hpBar = NewBar("HP Bar", canvas, new Vector2(40, -40), new Vector2(420, 30), new Color(0.80f, 0.15f, 0.15f), out RectTransform hpFill);
         Pin(hpBar, new Vector2(0f, 1f));
         Text hpText = Shadowed(NewText("HP Text", hpBar, Vector2.zero, new Vector2(420, 30), 20, TextAnchor.MiddleCenter));
@@ -151,6 +152,7 @@ public static class ArenaSceneBuilder
         // Bottom-left (above the level): quake meter + ores mined this dive
         Image bottomLeft = NewImage("Bottom-Left Backing", canvas, new Vector2(14, 78), new Vector2(920, 44), backing);
         Pin(bottomLeft.rectTransform, new Vector2(0f, 0f));
+        AddFrame(bottomLeft.transform, HudFrameThickness * 2f, FrameColor); // a thin strip: a thinner frame
         Text quakeText = Shadowed(NewText("Quake", canvas, new Vector2(24, 84), new Vector2(900, 32), 24, TextAnchor.MiddleLeft));
         Pin(quakeText.rectTransform, new Vector2(0f, 0f));
 
@@ -207,7 +209,7 @@ public static class ArenaSceneBuilder
             cardButtons[i] = card.gameObject.AddComponent<Button>();
             cardTitles[i] = InTitleFont(NewText("Title", card.transform, new Vector2(0, 110), new Vector2(370, 80), 30, TextAnchor.MiddleCenter));
             cardDescriptions[i] = NewText("Description", card.transform, new Vector2(0, -40), new Vector2(350, 200), 24, TextAnchor.MiddleCenter);
-            StyleButton(cardButtons[i], card, cardTitles[i]); // highlights on hover
+            StyleButton(cardButtons[i], card, cardTitles[i], CardFrameThickness); // highlights on hover
         }
         AddPopIn(cardPanel);
         cardPanel.gameObject.SetActive(false);

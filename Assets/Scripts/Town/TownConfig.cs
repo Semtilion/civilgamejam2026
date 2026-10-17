@@ -19,6 +19,8 @@ public class NpcDefinition
     public string greeting;
     [Tooltip("What they say after you buy a building level in their district or finish their materials request.")]
     public string thanks;
+    [Tooltip("Their color: the frame of their button in town, of their window and of their portrait.")]
+    public Color color = Color.white;
     [Tooltip("What a day of the Work order makes at full health (scaled by the faction's healthy share, rounded up).")]
     public int workGold, workMaterials, workCrystals;
 }

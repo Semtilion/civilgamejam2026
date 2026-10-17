@@ -49,6 +49,11 @@ public class TownManager : MonoBehaviour
     public UIBurst purchaseBurst;
     [Tooltip("The name on the bar across the bottom of the portrait.")]
     public Text nameplate;
+    [Tooltip("Take the open leader's color (NpcDefinition.color; grey once wiped out). The frames may be empty.")]
+    public Image windowFrame;
+    public Image portraitBorder;
+    public Image portraitGlow;
+    public Image nameplateLine;
     public Text leaderTitle;
     public Typewriter dialogue;
     [Tooltip("One button per order, in TownOrder order (Work, Reinforce, Stockpile, Drill).")]
@@ -305,6 +310,11 @@ public class TownManager : MonoBehaviour
         portrait.sprite = npc.Alive ? definition.portrait : GreyPortrait(definition.portrait);
         portrait.color = npc.Alive ? Color.white : GoneTint;
         nameplate.text = definition.name.ToUpper();
+        Color color = npc.Alive ? definition.color : GoneTint;
+        if (windowFrame != null) windowFrame.color = color;
+        if (portraitBorder != null) portraitBorder.color = color;
+        portraitGlow.color = new Color(color.r, color.g, color.b, portraitGlow.color.a);
+        nameplateLine.color = color;
 
         string text = Dialogue(i);
         if (retype) dialogue.Play(text);

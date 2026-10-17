@@ -44,6 +44,7 @@ public static class TownSceneBuilder
             npcButtons[i] = NewButton($"NPC {i + 1}", npcRow, new Vector2(520, 210), 24, useTitleFont: false);
             npcLabels[i] = npcButtons[i].GetComponentInChildren<Text>();
             npcMarks[i] = ReadyMark(npcButtons[i].transform, new Vector2(225, 65), 72); // top-right corner
+            npcButtons[i].GetComponent<ButtonLabelDim>().frameColor = a.townConfig.npcs[i].color; // framed in their color
         }
 
         // Bottom right: the relics you own
@@ -84,9 +85,6 @@ public static class TownSceneBuilder
         glow.type = Image.Type.Sliced;
         glow.raycastTarget = false;
         Image frame = NewImage("Portrait Frame", window.transform, framePosition, frameSize, new Color(0.04f, 0.03f, 0.06f));
-        Outline frameBorder = frame.gameObject.AddComponent<Outline>();
-        frameBorder.effectColor = BorderColor;
-        frameBorder.effectDistance = new Vector2(6f, -6f);
         RectTransform portraitClip = NewUI("Portrait Clip", frame.transform, Vector2.zero, Vector2.zero);
         Stretch(portraitClip);
         portraitClip.gameObject.AddComponent<RectMask2D>();
@@ -99,9 +97,18 @@ public static class TownSceneBuilder
         // and ~75 at the top of the hop)
         Image plate = NewImage("Nameplate", frame.transform, Vector2.zero, new Vector2(540, 90), new Color(0.07f, 0.05f, 0.10f));
         Pin(plate.rectTransform, new Vector2(0.5f, 0f));
-        NewImage("Line", plate.transform, new Vector2(0, 45), new Vector2(540, 4), BorderColor);
+        Image plateLine = NewImage("Line", plate.transform, new Vector2(0, 45), new Vector2(540, 4), BorderColor);
         Text nameplate = NewText("Name", plate.transform, Vector2.zero, new Vector2(520, 80), 32, TextAnchor.MiddleCenter);
         Title(nameplate);
+        // The ornate frame over the portrait and nameplate (the leader's color, set by TownManager); a thick outline
+        // without the frame art.
+        Image portraitBorder = AddFrame(frame.transform, PanelFrameThickness, BorderColor, onTop: true);
+        if (portraitBorder == null)
+        {
+            Outline frameBorder = frame.gameObject.AddComponent<Outline>();
+            frameBorder.effectColor = BorderColor;
+            frameBorder.effectDistance = new Vector2(6f, -6f);
+        }
         // After a purchase: violet + gold diamonds burst out from the leader's head and shoulders, over the frame
         UIBurst purchaseBurst = NewUI("Purchase Burst", window.transform, framePosition + new Vector2(0, 60), new Vector2(420, 360))
             .gameObject.AddComponent<UIBurst>();
@@ -217,6 +224,10 @@ public static class TownSceneBuilder
         town.backdrop = backdrop;
         town.closeButton = close;
         town.portrait = portrait;
+        town.windowFrame = PanelFrame(window);
+        town.portraitBorder = portraitBorder;
+        town.portraitGlow = glow;
+        town.nameplateLine = plateLine;
         town.portraitMotion = portraitMotion;
         town.purchaseBurst = purchaseBurst;
         town.nameplate = nameplate;
