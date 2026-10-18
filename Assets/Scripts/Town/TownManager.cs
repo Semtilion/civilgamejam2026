@@ -495,7 +495,7 @@ public class TownManager : MonoBehaviour
     }
 
     // How the run went, line by line ("{0}" = a number that rolls up): depths, kills by type, level and
-    // evolutions, the loot (brought home or lost), ores, and each leader's request.
+    // evolutions, the loot (brought home or lost), ores, each leader's request, and what each faction did meanwhile.
     static List<ResultLine> ResultLines(RunResult run)
     {
         List<ResultLine> lines = new List<ResultLine>();
@@ -529,6 +529,12 @@ public class TownManager : MonoBehaviour
             lines.Add(new ResultLine(""));
             lines.Add(new ResultLine("Requests"));
             foreach (string request in run.requestLines) lines.Add(new ResultLine("      " + request));
+        }
+        if (run.townLines.Count > 0)
+        {
+            lines.Add(new ResultLine(""));
+            lines.Add(new ResultLine("The town"));
+            foreach (string line in run.townLines) lines.Add(new ResultLine("      " + line));
         }
         return lines;
     }

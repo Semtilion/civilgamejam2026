@@ -90,7 +90,7 @@ public static class TownSceneBuilder
         // Bottom right: the relics you own
         Image relicsPanel = NewPanel("Relics Panel", canvas, new Vector2(720, -210), new Vector2(400, 340));
         Text relicsText = NewText("Relics", relicsPanel.transform, Vector2.zero, new Vector2(360, 310), 22, TextAnchor.UpperLeft);
-        relicsText.verticalOverflow = VerticalWrapMode.Overflow; // all 11 relics + the heading run a little past the box
+        // (all 11 relics + the heading run a little past the box: NewText lets them)
 
         // Bottom-right: dive ("Defend the town" on the horde day)
         Button dive = NewButton("DIVE", canvas, new Vector2(360, 110), 36);
@@ -202,6 +202,7 @@ public static class TownSceneBuilder
         Text reportHeading = Title(NewText("Title", reportWindow.transform, new Vector2(0, 320), new Vector2(1300, 70), 48, TextAnchor.MiddleCenter));
         Text reportText = NewText("Body", reportWindow.transform, new Vector2(0, 15), new Vector2(1300, 510), 24, TextAnchor.UpperLeft);
         reportText.resizeTextForBestFit = true; // a bad quake can mean a long report
+        reportText.verticalOverflow = VerticalWrapMode.Truncate; // (best fit shrinks it to fit the box)
         reportText.resizeTextMinSize = 16;
         reportText.resizeTextMaxSize = 24;
         Button reportClose = NewButton("Continue", reportWindow.transform, new Vector2(320, 80), 32);
@@ -239,6 +240,7 @@ public static class TownSceneBuilder
         Text resultsHeading = Title(NewText("Title", resultsWindow.transform, new Vector2(0, 345), new Vector2(1300, 70), 48, TextAnchor.MiddleCenter));
         Text resultsBody = NewText("Body", resultsWindow.transform, new Vector2(0, 10), new Vector2(1300, 590), 24, TextAnchor.UpperLeft);
         resultsBody.resizeTextForBestFit = true; // a long run means many lines
+        resultsBody.verticalOverflow = VerticalWrapMode.Truncate; // (best fit shrinks it to fit the box)
         resultsBody.resizeTextMinSize = 14;
         resultsBody.resizeTextMaxSize = 24;
         Button resultsContinue = NewButton("Continue", resultsWindow.transform, new Vector2(320, 80), 32);

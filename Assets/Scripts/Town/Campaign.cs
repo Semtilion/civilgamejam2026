@@ -170,33 +170,51 @@ public class Campaign
     }
 
     // The day that's ending: readiness fades a little, then every faction does its order (Reinforce needs materials:
-    // without them, or once fully reinforced, that faction idles).
-    void DoOrders()
+    // without them, or once fully reinforced, that faction idles). What each did goes into `lines` (the dive's result
+    // screen: "Mages worked: +10 gold, +1 crystal", "Soldiers reinforced homes: +15% (now 45%)", or why it idled).
+    void DoOrders(List<string> lines)
     {
         for (int i = 0; i < npcs.Length; i++)
         {
             NpcState npc = npcs[i];
             if (!npc.Alive) continue;
+            string faction = config.npcs[i].faction;
 
             npc.readiness = Mathf.Max(0f, npc.readiness - config.readinessFade);
             switch (npc.order)
             {
                 case TownOrder.Reinforce:
-                    if (npc.reinforced >= 100f || materials < config.reinforceMaterials) break;
-                    materials -= config.reinforceMaterials;
-                    npc.reinforced = Mathf.Min(100f, npc.reinforced + ReinforceGain(i));
+                    if (npc.reinforced >= 100f)
+                        lines.Add($"{faction} idled: homes already fully reinforced");
+                    else if (materials < config.reinforceMaterials)
+                        lines.Add($"{faction} idled: no materials to reinforce (needs {config.reinforceMaterials})");
+                    else
+                    {
+                        materials -= config.reinforceMaterials;
+                        float before = npc.reinforced;
+                        npc.reinforced = Mathf.Min(100f, npc.reinforced + ReinforceGain(i));
+                        lines.Add($"{faction} reinforced homes: +{npc.reinforced - before:0}% (now {npc.reinforced:0}%)");
+                    }
                     break;
                 case TownOrder.Stockpile:
-                    supplies += StockpileGain(i);
+                    int stock = StockpileGain(i);
+                    supplies += stock;
+                    lines.Add($"{faction} stockpiled: +{stock} {(stock == 1 ? "supply" : "supplies")}");
                     break;
                 case TownOrder.Drill:
+                    float faded = npc.readiness;
                     npc.readiness = Mathf.Min(100f, npc.readiness + DrillGain(i));
+                    lines.Add($"{faction} drilled: +{npc.readiness - faded:0}% readiness (now {npc.readiness:0}%)");
                     break;
                 default: // Work
                     NpcDefinition definition = config.npcs[i];
-                    gold += WorkGain(definition.workGold, i);
-                    materials += WorkGain(definition.workMaterials, i);
-                    crystals += WorkGain(definition.workCrystals, i);
+                    int workGold = WorkGain(definition.workGold, i);
+                    int workMaterials = WorkGain(definition.workMaterials, i);
+                    int workCrystals = WorkGain(definition.workCrystals, i);
+                    gold += workGold;
+                    materials += workMaterials;
+                    crystals += workCrystals;
+                    lines.Add($"{faction} worked: {Gains(workGold, workMaterials, workCrystals)}");
                     break;
             }
         }
@@ -251,23 +269,23 @@ public class Campaign
             quakeMeter = Mathf.Max(0f, quakeMeter - run.quakeDrop);
             foreach (RelicId relic in run.relics) relicOwned[(int)relic] = true;
             AddKills(run);
-            AdvanceDays(1);
+            AdvanceDays(1, run);
         }
         else
         {
             run.requestLines.Add("Kills don't count (you fell).");
-            AdvanceDays(config.daysLostOnDefeat);
+            AdvanceDays(config.daysLostOnDefeat, run);
         }
     }
 
-    // Each day: the factions do their orders (so today's preparation counts for tomorrow's quake), the quake meter
-    // rises (cycle + passive), on a quake day the quake hits, the injured are cared for, on a request day the requests
-    // are refreshed.
-    void AdvanceDays(int count)
+    // Each day: the factions do their orders (so today's preparation counts for tomorrow's quake; what they did goes
+    // on the dive's result screen), the quake meter rises (cycle + passive), on a quake day the quake hits, the injured
+    // are cared for, on a request day the requests are refreshed.
+    void AdvanceDays(int count, RunResult run)
     {
         for (int i = 0; i < count; i++)
         {
-            DoOrders();
+            DoOrders(run.townLines);
             day++;
             passiveRise += PassivePerDay;
             quakeMeter = Mathf.Min(100f, quakeMeter + DailyQuakeRise);

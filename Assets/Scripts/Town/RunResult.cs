@@ -18,4 +18,5 @@ public class RunResult
     // Filled in by Campaign.EndDive
     public float quakeDrop;
     public readonly List<string> requestLines = new List<string>();
+    public readonly List<string> townLines = new List<string>(); // what each faction did that day (Campaign.DoOrders)
 }

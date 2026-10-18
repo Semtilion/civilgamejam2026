@@ -808,8 +808,10 @@ public static class GameBuilder
         return image;
     }
 
-    // A line taller than the box isn't drawn at all (not even clipped): give `size.y` at least 1.36 x fontSize per line
-    // for the text font (Alegreya), 1.13 x for the title font (MedievalSharp).
+    // Lines may run past the box's height (vertical Overflow): with Truncate, a line even a pixel taller than the box
+    // isn't drawn at all, and the canvas scaling rounds font sizes differently at every resolution (the dungeon's loot
+    // line vanished in the build). Still give `size.y` about 1.36 x fontSize per line for the text font (Alegreya),
+    // 1.13 x for the title font (MedievalSharp). Best-fit texts set Truncate back (they shrink to fit instead).
     public static Text NewText(string name, Transform parent, Vector2 position, Vector2 size, int fontSize, TextAnchor alignment)
     {
         Text text = NewUI(name, parent, position, size).gameObject.AddComponent<Text>();
@@ -817,6 +819,7 @@ public static class GameBuilder
         text.lineSpacing = lineSpacing;
         text.fontSize = fontSize;
         text.alignment = alignment;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
         text.color = Color.white;
         text.raycastTarget = false;
         return text;
