@@ -74,9 +74,17 @@ public static class MenuBuilder
     }
 
     // The Esc menu. Its How to play and Settings panels are built after it (on top) by the caller.
-    public static PauseMenu Pause(Transform canvas, ArenaManager arena)
+    // `dim`: a dark backdrop over the whole screen behind it (the town: so its buttons can't be clicked meanwhile).
+    public static PauseMenu Pause(Transform canvas, ArenaManager arena, bool dim = false)
     {
-        Image panel = NewPanel("Pause Panel", canvas, Vector2.zero, new Vector2(600, 560));
+        Transform parent = canvas;
+        if (dim)
+        {
+            Image backdrop = NewImage("Pause Backdrop", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
+            Stretch(backdrop.rectTransform);
+            parent = backdrop.transform;
+        }
+        Image panel = NewPanel("Pause Panel", parent, Vector2.zero, new Vector2(600, 560));
         Text title = NewText("Title", panel.transform, new Vector2(0, 210), new Vector2(500, 80), 56, TextAnchor.MiddleCenter);
         title.text = "PAUSED";
         Title(title);
@@ -85,11 +93,12 @@ public static class MenuBuilder
         Button settings = PauseButton("Settings", panel.transform, -80);
         Button quit = PauseButton("Quit to title", panel.transform, -170);
         AddPopIn(panel);
-        panel.gameObject.SetActive(false);
+        GameObject shown = dim ? parent.gameObject : panel.gameObject; // what opens and closes
+        shown.SetActive(false);
 
         PauseMenu menu = new GameObject("Pause Menu").AddComponent<PauseMenu>();
         menu.arena = arena;
-        menu.panel = panel.gameObject;
+        menu.panel = shown;
         menu.resumeButton = resume;
         menu.howToPlayButton = howToPlay;
         menu.settingsButton = settings;

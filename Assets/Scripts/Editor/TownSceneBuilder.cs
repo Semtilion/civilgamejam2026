@@ -264,7 +264,10 @@ public static class TownSceneBuilder
         AddPopIn(epilogue, 0.97f);
         epilogue.gameObject.SetActive(false);
 
+        PauseMenu pauseMenu = MenuBuilder.Pause(canvas, null, dim: true); // Esc (under the help and settings it opens)
         HowToPlay howToPlay = MenuBuilder.HowToPlayPopup(canvas); // on top of the town
+        pauseMenu.howToPlay = howToPlay;
+        pauseMenu.settings = MenuBuilder.Settings(canvas);
 
         // The quake flash: over everything, see-through until it flashes (UIShake)
         Image quakeFlash = NewImage("Quake Flash", canvasRoot, Vector2.zero, Vector2.zero, new Color(1f, 0.85f, 0.6f, 0f));
@@ -289,6 +292,7 @@ public static class TownSceneBuilder
         town.titleButton = titleScreen;
         town.helpButton = help;
         town.howToPlay = howToPlay;
+        pauseMenu.town = town;
         town.quakeShake = quakeShake;
         town.leaderWindow = leaderWindow.gameObject;
         town.leaderSlide = slide;

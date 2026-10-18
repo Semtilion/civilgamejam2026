@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -261,14 +260,21 @@ public class TownManager : MonoBehaviour
         Vector3 bob = Vector3.one * (1f + 0.12f * Mathf.Sin(Time.unscaledTime * 6f));
         foreach (Text mark in npcMarks) mark.transform.localScale = bob;
         leaderMark.transform.localScale = bob;
+    }
 
-        Keyboard keyboard = Keyboard.current;
-        if (howToPlay.IsOpen || keyboard == null || !keyboard.escapeKey.wasPressedThisFrame) return;
+    // Esc (PauseMenu): closes the popup on top. False when none is open (then the pause menu opens).
+    public bool CloseTopPopup()
+    {
         if (results.IsOpen) results.Continue();
         else if (reportPanel.activeSelf) CloseReport();
         else if (evolutionPanel.activeSelf) CloseEvolution();
         else if (LeaderOpen) CloseLeader();
+        else return false;
+        return true;
     }
+
+    // The pause menu's Quit to title.
+    public void QuitToTitle() => Leave(titleScene);
 
     bool LeaderOpen => leaderWindow.activeSelf;
 
