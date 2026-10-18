@@ -135,4 +135,4 @@ MonoBehaviour:
   killedReady: 0.2
   injuredDays: 2
   glassCannonEnabled: 0
-  footageMode: 1
+  footageMode: 0
