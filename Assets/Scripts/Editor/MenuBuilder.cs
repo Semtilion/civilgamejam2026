@@ -138,7 +138,7 @@ public static class MenuBuilder
         Add(Sound.Ricochet, "MetalHits", 0.35f);                      // a dagger bounces (Ricochet)
 
         // Dungeon: progress
-        Add(Sound.XpPickup, "Metal1.aif", 0.15f);                     // XP picked up (very quiet: it's constant)
+        Add(Sound.XpPickup, "XpPickup.wav", 0.35f);                   // a tiny chime (made for the game): XP picked up
         Add(Sound.LevelUp, "SoundPack01/Upper01.aif", 0.7f);          // the level-up moment
         Add(Sound.CardPick, "WoodHits", 0.6f);                        // a level-up card is picked
         Add(Sound.RelicFound, "SoundPack01/Rise03.aif", 0.8f);        // a relic is found
@@ -157,7 +157,7 @@ public static class MenuBuilder
         Add(Sound.Evolution, "SoundPack01/Upper01.aif", 0.7f);        // a leader taught an evolution
         Add(Sound.Results, "Coins", 0.5f);                            // a dive's results
         Add(Sound.GameOver, "SoundPack01/Downer01.aif", 0.8f);        // the town has fallen
-        Add(Sound.Hit, "Punches", 0.35f);                             // punches 2 and 3: an enemy is hit
+        Add(Sound.Hit, "Hit.wav", 0.4f);                              // a thud tick (made for the game): an enemy is hit
         Add(Sound.Tremor, "RockBreak.mp3", 0.4f);                     // small rock break, lowered: a mined ore's tremor
         Add(Sound.RockLand, "RockBreak.mp3", 0.25f);                  // ... quieter: each rock of a rock rain lands
         Add(Sound.Quake, "Earthquake.mp3", 0.9f, 3f, 1.5f);           // the earthquake loop, a piece: the town's quake
