@@ -456,6 +456,25 @@ public static class GameBuilder
         return new AudioClip[0];
     }
 
+    // A tiling texture for the title / town screens (Assets/Art/UI/<name>.png, e.g. "Town/Rain"): repeats, smooth,
+    // uncompressed, for a RawImage that scrolls its uvRect. Null if the file isn't there.
+    public static Texture2D TiledArt(string name)
+    {
+        string path = $"{UiFolder}/{name}.png";
+        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+        if (importer.textureType != TextureImporterType.Default || importer.wrapMode != TextureWrapMode.Repeat)
+        {
+            importer.textureType = TextureImporterType.Default;
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+    }
+
     // The title and town screens' art (Assets/Art/UI/<name>.png, baked by Tools/bake_title.py and bake_town.py; `name`
     // may include a folder, e.g. "Town/TownBackground"): smooth, no mipmaps, uncompressed (a compressed dark gradient
     // shows bands). Returns null if the file isn't there.

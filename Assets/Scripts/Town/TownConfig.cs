@@ -54,7 +54,7 @@ public class Building
             case BuildingEffect.QuakePassive: return $"-{amount:0.#}% quake rise/day";
             case BuildingEffect.ReinforceBonus: return $"+{amount:0.#}% per Reinforce day";
             case BuildingEffect.XpGain: return $"+{amount * 100f:0}% XP";
-            case BuildingEffect.MaterialBonus: return $"+{amount:0.#} material per drop";
+            case BuildingEffect.MaterialBonus: return $"+{amount:0.#} wood per drop";
             default: return $"treats {amount:0.#} injured a day"; // TreatInjured
         }
     }

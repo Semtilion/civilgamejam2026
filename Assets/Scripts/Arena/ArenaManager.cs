@@ -155,7 +155,10 @@ public class ArenaManager : MonoBehaviour
     [Tooltip("The hit flash (HitFlash): draws a sprite's shape in white. Empty = enemies don't flash white.")]
     public Material flashMaterial;
     public Sprite xpSprite;
-    public Sprite materialSprite;
+    [Tooltip("Food (supplies) pickups: the artist's drumstick.")]
+    public Sprite foodSprite;
+    [Tooltip("Wood (materials) pickups: the artist's single logs, one at random per drop.")]
+    public Sprite[] woodSprites;
     public Sprite crystalSprite;
     public Sprite goldSprite;
     [Tooltip("The crystal and gold pickups' sparkle (and the crystal's glow): their art's average colors, set by the builder.")]
@@ -456,11 +459,11 @@ public class ArenaManager : MonoBehaviour
         {
             Vector2 at = enemy.transform.position;
             if (enemy.data.materialAmount > 0)
-                Pickup.Drop(PickupKind.Materials, materialSprite, at, enemy.data.materialAmount + materialBonus, this);
+                Pickup.Drop(PickupKind.Materials, WoodSprite(), at, enemy.data.materialAmount + materialBonus, this);
             if (enemy.data.crystalAmount > 0)
                 Pickup.Drop(PickupKind.Crystal, crystalSprite, at, enemy.data.crystalAmount, this);
             if (enemy.data.supplyAmount > 0)
-                Pickup.Drop(PickupKind.Supplies, materialSprite, at + Random.insideUnitCircle * 0.3f, enemy.data.supplyAmount, this);
+                Pickup.Drop(PickupKind.Supplies, foodSprite, at + Random.insideUnitCircle * 0.3f, enemy.data.supplyAmount, this);
             return;
         }
 
@@ -518,7 +521,7 @@ public class ArenaManager : MonoBehaviour
         if (variant && Random.value < variants.relicChance && relics.AnyMissing)
             Pickup.Drop(PickupKind.Relic, relicSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, 1, this);
         if (Random.value < enemy.data.materialChance)
-            Pickup.Drop(PickupKind.Materials, materialSprite, enemy.transform.position, enemy.data.materialAmount + materialBonus, this);
+            Pickup.Drop(PickupKind.Materials, WoodSprite(), enemy.transform.position, enemy.data.materialAmount + materialBonus, this);
         if (Random.value < enemy.data.goldChance)
             Pickup.Drop(PickupKind.Gold, goldSprite, (Vector2)enemy.transform.position + Random.insideUnitCircle * 0.3f, enemy.data.goldAmount, this);
         if (leveling.levelingEnabled && enemy.data.xp > 0)
@@ -609,7 +612,7 @@ public class ArenaManager : MonoBehaviour
         }
 
         ShowPanel($"Depth {depth} cleared",
-            $"Carrying {diveMaterials} materials · {diveCrystals} crystals · {diveGold} gold · {diveSupplies} supplies" + relicLine,
+            $"Carrying {diveMaterials} wood · {diveCrystals} crystals · {diveGold} gold · {diveSupplies} food" + relicLine,
             "Go deeper", NextDepth, "Return to town", () => EndDive(true));
         leveling.AddXp(xp); // the cards wait until "Go deeper"
     }
@@ -630,9 +633,13 @@ public class ArenaManager : MonoBehaviour
         ShowPanel("DEFEATED", "The loot is lost.", "Return to town", () => EndDive(false));
     }
 
+    // A wood pickup's look: one of the artist's logs at random (none: a plain square).
+    Sprite WoodSprite() => woodSprites.Length > 0 ? woodSprites[Random.Range(0, woodSprites.Length)] : whiteSquare;
+
     public void Collect(PickupKind kind, int amount)
     {
-        if (kind == PickupKind.Materials || kind == PickupKind.Supplies) Sfx.Play(Sound.MaterialsPickup);
+        if (kind == PickupKind.Materials) Sfx.Play(Sound.MaterialsPickup);
+        else if (kind == PickupKind.Supplies) Sfx.Play(Sound.FoodPickup);
         else if (kind == PickupKind.Crystal) Sfx.Play(Sound.CrystalPickup);
         else if (kind == PickupKind.Gold) Sfx.Play(Sound.GoldPickup);
         else if (kind == PickupKind.Xp) Sfx.Play(Sound.XpPickup);
@@ -912,8 +919,8 @@ public class ArenaManager : MonoBehaviour
 
         float goal = -1f; // the goal bar's fill; below 0 = hidden
         float dt = Time.unscaledDeltaTime; // the loot counters roll up toward the real numbers
-        lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
-                        $"Gold {goldShown.Next(diveGold, dt)}     Supplies {suppliesShown.Next(diveSupplies, dt)}";
+        lootText.text = $"Wood {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
+                        $"Gold {goldShown.Next(diveGold, dt)}     Food {suppliesShown.Next(diveSupplies, dt)}";
         depthText.text = $"Day {campaign.day}     {(IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}")}     Kills {kills}";
         float oreDrop = diveOres * config.orePercent;
         quakeText.text = $"Quake day {campaign.NextQuakeDay}: {campaign.QuakeForecast:0}%     Ores {diveOres} (-{oreDrop:0}%)";

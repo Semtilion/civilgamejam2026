@@ -70,9 +70,36 @@ public static class TownSceneBuilder
             beam.rectTransform.anchorMax = new Vector2(1f, 1f);
         }
 
-        // Top: status bar
-        Text status = NewText("Status", canvas, new Vector2(0, -30), new Vector2(1860, 50), 24, TextAnchor.MiddleCenter);
-        Pin(status.rectTransform, new Vector2(0.5f, 1f));
+        // Rain over the village (TownRain): in front of the backdrop and banners, behind everything made after this
+        Texture2D rain = TiledArt("Town/Rain");
+        if (rain != null)
+        {
+            RectTransform rainRoot = NewUI("Rain", canvas, Vector2.zero, Vector2.zero);
+            Stretch(rainRoot);
+            TownRain townRain = rainRoot.gameObject.AddComponent<TownRain>();
+            townRain.layers = new RawImage[3]; // far to near
+            for (int i = 0; i < townRain.layers.Length; i++)
+            {
+                RawImage layer = NewUI($"Layer {i + 1}", rainRoot, Vector2.zero, Vector2.zero).gameObject.AddComponent<RawImage>();
+                Stretch(layer.rectTransform);
+                layer.texture = rain;
+                layer.raycastTarget = false;
+                townRain.layers[i] = layer;
+            }
+        }
+
+        // Bottom-left: a box each for the day, the resources, the people and the next quake (TownManager.ShowStatus).
+        // Wood: the artist's log pile; food: the drumstick (also the dungeon's food pickup).
+        float boxX = 20f;
+        Sprite logPile = ItemSprite("Log_Pile", 1f, byWidth: true);
+        Sprite food = ItemSprite("Food", 1f);
+        Text dayText = StatusBox(canvas, ref boxX, 120, "Day", null, Color.white);
+        Text woodText = StatusBox(canvas, ref boxX, 185, "Wood", logPile ?? a.square, logPile != null ? Color.white : Pickup.MaterialsColor);
+        Text crystalsText = StatusBox(canvas, ref boxX, 190, "Crystals", CrystalSprite(), Color.white);
+        Text goldText = StatusBox(canvas, ref boxX, 175, "Gold", ItemSprite("Gold", 1f), Color.white);
+        Text foodText = StatusBox(canvas, ref boxX, 165, "Food", food ?? a.square, food != null ? Color.white : Pickup.SuppliesColor);
+        Text populationText = StatusBox(canvas, ref boxX, 225, "People", MenuArt("Town/Banner_Guard"), Color.white);
+        Text quakeText = StatusBox(canvas, ref boxX, 265, "Quake", EffectSprite("QuakeCracks_0"), Color.white);
 
         // Middle: one button per faction leader
         RectTransform npcRow = NewRow("NPCs", canvas, new Vector2(0, 110), new Vector2(1760, 220), NpcStep - NpcWidth);
@@ -175,7 +202,7 @@ public static class TownSceneBuilder
         Image[] orderMarks = new Image[orderCount];
         for (int i = 0; i < orderCount; i++)
         {
-            orderButtons[i] = NewButton(((TownOrder)i).ToString(), orderRow, new Vector2(226, 70), 18, useTitleFont: false); // 18: "+20% homes, 15 materials" just fits
+            orderButtons[i] = NewButton(((TownOrder)i).ToString(), orderRow, new Vector2(226, 70), 18, useTitleFont: false); // 18: "+20% homes, 15 wood" fits
             orderMarks[i] = NewImage("Current", orderButtons[i].transform, new Vector2(0, -31), new Vector2(206, 5), OrderMarkColor);
             orderMarks[i].raycastTarget = false;
         }
@@ -281,7 +308,13 @@ public static class TownSceneBuilder
 
         TownManager town = new GameObject("Town Manager").AddComponent<TownManager>();
         town.config = a.townConfig;
-        town.statusText = status;
+        town.dayText = dayText;
+        town.woodText = woodText;
+        town.crystalsText = crystalsText;
+        town.goldText = goldText;
+        town.foodText = foodText;
+        town.populationText = populationText;
+        town.quakeText = quakeText;
         town.npcButtons = npcButtons;
         town.npcLabels = npcLabels;
         town.npcMarks = npcMarks;
@@ -339,7 +372,7 @@ public static class TownSceneBuilder
         town.evolutionBackdrop = evolutionBackdrop;
         town.evolutionBurst = evolutionBurst;
         town.evolutionTexts = a.evolutionTexts;
-        MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
+        MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 1f)); // F3 resources; hint top-left (the status boxes are bottom-left)
         MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
         MenuBuilder.MusicPlayer("ANewTown.mp3"); // A New Town
         MenuBuilder.SoundPlayer(); // (for when the game starts in this scene)
@@ -368,6 +401,31 @@ public static class TownSceneBuilder
         image.raycastTarget = false;
         Stretch(image.rectTransform);
         return image;
+    }
+
+    static readonly Color StatusBacking = new Color(0.05f, 0.04f, 0.07f, 0.75f);
+
+    // One status box along the bottom-left, at `x` (moved on past it): a dark box in the HUD frame, the symbol (null: the
+    // text alone) and the text (set by TownManager.ShowStatus).
+    static Text StatusBox(Transform canvas, ref float x, float width, string name, Sprite symbol, Color symbolColor)
+    {
+        Image box = NewImage($"{name} Box", canvas, new Vector2(x, 20), new Vector2(width, 56), StatusBacking);
+        Pin(box.rectTransform, Vector2.zero);
+        AddFrame(box.transform, HudFrameThickness * 2f, FrameColor); // a thin strip: a thinner frame
+        float textLeft = 14f;
+        if (symbol != null)
+        {
+            Image icon = NewImage("Symbol", box.transform, new Vector2(14, 0), new Vector2(32, 32), symbolColor);
+            icon.sprite = symbol;
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            Pin(icon.rectTransform, new Vector2(0f, 0.5f));
+            textLeft = 54f;
+        }
+        Text text = Shadowed(NewText("Text", box.transform, new Vector2(textLeft, 0), new Vector2(width - textLeft - 8, 34), 24, TextAnchor.MiddleLeft));
+        Pin(text.rectTransform, new Vector2(0f, 0.5f));
+        x += width + 10f;
+        return text;
     }
 
     static Text ReadyMark(Transform parent, Vector2 position, int size)

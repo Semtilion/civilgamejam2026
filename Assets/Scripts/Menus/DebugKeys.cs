@@ -89,7 +89,7 @@ public class DebugKeys : MonoBehaviour
         campaign.crystals += Crystals;
         campaign.supplies += Supplies;
         if (town != null) town.Refresh();
-        Report($"+{Gold} gold, +{Materials} materials, +{Crystals} crystals, +{Supplies} supplies (town stock)");
+        Report($"+{Gold} gold, +{Materials} wood, +{Crystals} crystals, +{Supplies} food (town stock)");
     }
 
     // Pauses the game while the list is open.

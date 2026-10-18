@@ -23,7 +23,9 @@ public class TownManager : MonoBehaviour
     public string titleScene = "Title";
 
     [Header("Scene references")]
-    public Text statusText;
+    [Tooltip("The status boxes along the bottom-left (ShowStatus).")]
+    public Text dayText;
+    public Text woodText, crystalsText, goldText, foodText, populationText, quakeText;
     public Button[] npcButtons;
     public Text[] npcLabels;
     [Tooltip("The yellow \"!\" on each leader button: their request is finished, turn it in.")]
@@ -111,7 +113,7 @@ public class TownManager : MonoBehaviour
     int selected;       // whose window is open
     string spokenLine;  // what they say above the info: their thanks after a purchase or turn-in (null: nothing)
     string reward;      // after it on a turn-in: what the request paid (null otherwise)
-    Ticker materialsShown, crystalsShown, goldShown; // the status bar's counters roll to the real amounts
+    Ticker materialsShown, crystalsShown, goldShown; // the status boxes' counters roll to the real amounts
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
     Sprite[] liveBanners; // the banners as built
@@ -254,7 +256,7 @@ public class TownManager : MonoBehaviour
 
     void Update()
     {
-        statusText.text = StatusLine(Time.unscaledDeltaTime); // the counters roll
+        ShowStatus(Time.unscaledDeltaTime); // the counters roll
 
         // The "!" marks bob
         Vector3 bob = Vector3.one * (1f + 0.12f * Mathf.Sin(Time.unscaledTime * 6f));
@@ -328,17 +330,23 @@ public class TownManager : MonoBehaviour
         else SceneTransition.Load(scene);
     }
 
-    string StatusLine(float deltaTime)
+    // The status boxes (wood, crystals and gold roll to the real amounts). Players see materials as "wood" and
+    // supplies as "food".
+    void ShowStatus(float deltaTime)
     {
-        return $"Day {campaign.day}    Materials {materialsShown.Next(campaign.materials, deltaTime)}    " +
-               $"Crystals {crystalsShown.Next(campaign.crystals, deltaTime)}    Gold {goldShown.Next(campaign.gold, deltaTime)}    " +
-               $"Supplies {campaign.supplies}    People {campaign.Population}/{campaign.StartPopulation}    {NextThreat()}";
+        dayText.text = $"Day {campaign.day}";
+        woodText.text = $"Wood {materialsShown.Next(campaign.materials, deltaTime)}";
+        crystalsText.text = $"Crystals {crystalsShown.Next(campaign.crystals, deltaTime)}";
+        goldText.text = $"Gold {goldShown.Next(campaign.gold, deltaTime)}";
+        foodText.text = $"Food {campaign.supplies}";
+        populationText.text = $"People {campaign.Population}/{campaign.StartPopulation}";
+        quakeText.text = NextThreat();
     }
 
     // Redraws everything from Campaign.Current (also called by the debug keys).
     public void Refresh()
     {
-        statusText.text = StatusLine(0f);
+        ShowStatus(0f);
 
         for (int i = 0; i < NpcCount; i++)
         {
@@ -448,7 +456,7 @@ public class TownManager : MonoBehaviour
         turnInButton.gameObject.SetActive(hasRequest);
         if (hasRequest)
         {
-            SetLabel(turnInButton, npc.quest.IsKill ? "Turn in" : $"Give {npc.quest.needed} materials");
+            SetLabel(turnInButton, npc.quest.IsKill ? "Turn in" : $"Give {npc.quest.needed} wood");
             turnInButton.interactable = campaign.QuestReady(i);
         }
         leaderMark.gameObject.SetActive(campaign.QuestReady(i));
@@ -474,7 +482,7 @@ public class TownManager : MonoBehaviour
         if (npc.injured > 0) people += $"\n{npc.injured} hurt · die day {npc.injuredDeadline}";
         peopleText.text = people;
 
-        preparedText.text = $"Homes {npc.reinforced:0}%\nReady {npc.readiness:0}%\nSupplies {campaign.supplies}";
+        preparedText.text = $"Homes {npc.reinforced:0}%\nReady {npc.readiness:0}%\nFood {campaign.supplies}";
 
         if (npc.quest == null)
         {
@@ -514,10 +522,10 @@ public class TownManager : MonoBehaviour
         {
             if (amount > 0) lines.Add(new ResultLine($"      {name} {{0}}", amount));
         }
-        Loot("Materials", run.materials);
+        Loot("Wood", run.materials);
         Loot("Crystals", run.crystals);
         Loot("Gold", run.gold);
-        Loot("Supplies", run.supplies);
+        Loot("Food", run.supplies);
         foreach (RelicId relic in run.relics) lines.Add(new ResultLine($"      Relic: {Relics.Names[(int)relic]}"));
         if (run.ores > 0)
             lines.Add(run.survived
@@ -577,8 +585,8 @@ public class TownManager : MonoBehaviour
     {
         switch (order)
         {
-            case TownOrder.Reinforce: return $"REINFORCE\n+{campaign.ReinforceGain(i):0}% homes, {config.reinforceMaterials} materials";
-            case TownOrder.Stockpile: return $"STOCKPILE\n+{campaign.StockpileGain(i)} supplies";
+            case TownOrder.Reinforce: return $"REINFORCE\n+{campaign.ReinforceGain(i):0}% homes, {config.reinforceMaterials} wood";
+            case TownOrder.Stockpile: return $"STOCKPILE\n+{campaign.StockpileGain(i)} food";
             case TownOrder.Drill: return $"DRILL\n+{campaign.DrillGain(i):0}% readiness";
             default: return $"WORK\n{campaign.WorkGains(i)}";
         }
@@ -616,7 +624,7 @@ public class TownManager : MonoBehaviour
             {
                 string crystals = building.costsCrystals ? $" · {campaign.BuildingCrystalCost(b)} crystals" : "";
                 label = $"{building.name}  {level}/{config.maxBuildingLevel}\n{effect}\n" +
-                        $"{campaign.BuildingMaterialCost(b)} materials · {campaign.BuildingGoldCost(b)} gold{crystals}";
+                        $"{campaign.BuildingMaterialCost(b)} wood · {campaign.BuildingGoldCost(b)} gold{crystals}";
             }
             SetLabel(buildingButtons[slot], label);
             buildingButtons[slot].interactable = campaign.CanBuild(b);

@@ -125,7 +125,8 @@ public static class MenuBuilder
         Add(Sound.CrateBreak, "CrateBreak.mp3", 0.8f, 1f, 0.15f);     // wood crack, its first second: a crate breaks
         Add(Sound.GlassBreak, "GlassBreak.mp3", 0.7f);                // breaking glass: a crystal cluster breaks, an ore vein is mined
         Add(Sound.CrystalPickup, "CrystalPickup.aif", 0.5f);          // metal8: crystals picked up
-        Add(Sound.MaterialsPickup, "MaterialsPickup.aif", 0.5f);      // wood12: materials and supplies picked up
+        Add(Sound.MaterialsPickup, "MaterialsPickup.aif", 0.5f);      // wood12: wood (materials) picked up
+        Add(Sound.FoodPickup, "FoodPickup.wav", 0.5f);                // a warm pluck (made for the game): food (supplies) picked up
         Add(Sound.GoldPickup, "Coins", 0.5f);                         // the coin sounds: gold picked up
         Add(Sound.Swing, "Swing.mp3", 0.45f);                         // item swing: sword, spear
         Add(Sound.HammerSmash, "HammerSmash.mp3", 0.7f);              // hammer smash: a Quake Hammer slam (with HammerQuake)

@@ -318,7 +318,9 @@ public static class ArenaSceneBuilder
         // Crystals: the artist's crystal (the clusters' art), else a placeholder circle. XP gems: cyan circles.
         Sprite crystalArt = CrystalSprite();
         arena.xpSprite = a.circle;      // tinted cyan by Pickup
-        arena.materialSprite = a.square;
+        arena.foodSprite = ItemSprite("Food", 1f) ?? a.square; // the artist's drumstick, 1 unit tall (Pickup sizes it)
+        arena.woodSprites = new[] { ItemSprite("Log_1", 1f, byWidth: true), ItemSprite("Log_2", 1f, byWidth: true) }
+            .Where(s => s != null).ToArray(); // the artist's single logs, 1 unit wide (Pickup sizes them)
         arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
         arena.goldSprite = ItemSprite("Gold", 1f) ?? a.circle; // the artist's gold nugget, 1 unit tall (Pickup sizes it)
         arena.crystalColor = AverageColor(arena.crystalSprite); // the pickups' sparkles (and the crystal's glow)

@@ -23,7 +23,7 @@ public class Quest
     public int progress;     // kills so far (materials requests are paid in one go)
 
     public bool IsKill => target != null;
-    public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} materials";
+    public string Describe() => IsKill ? $"Kill {needed} {target.displayName}s" : $"Bring {needed} wood";
 }
 
 // The whole playthrough (endless: it ends when every faction is wiped out): day, materials / crystals / gold /
@@ -159,12 +159,12 @@ public class Campaign
         return Gains(WorkGain(definition.workGold, i), WorkGain(definition.workMaterials, i), WorkGain(definition.workCrystals, i));
     }
 
-    // "+20 gold, +8 materials, +1 crystal" (only the ones above 0).
+    // "+20 gold, +8 wood, +1 crystal" (only the ones above 0).
     static string Gains(int gold, int materials, int crystals)
     {
         List<string> parts = new List<string>();
         if (gold > 0) parts.Add($"+{gold} gold");
-        if (materials > 0) parts.Add($"+{materials} materials");
+        if (materials > 0) parts.Add($"+{materials} wood");
         if (crystals > 0) parts.Add($"+{crystals} crystal{(crystals == 1 ? "" : "s")}");
         return parts.Count > 0 ? string.Join(", ", parts) : "nothing";
     }
@@ -187,7 +187,7 @@ public class Campaign
                     if (npc.reinforced >= 100f)
                         lines.Add($"{faction} idled: homes already fully reinforced");
                     else if (materials < config.reinforceMaterials)
-                        lines.Add($"{faction} idled: no materials to reinforce (needs {config.reinforceMaterials})");
+                        lines.Add($"{faction} idled: no wood to reinforce (needs {config.reinforceMaterials})");
                     else
                     {
                         materials -= config.reinforceMaterials;
@@ -199,7 +199,7 @@ public class Campaign
                 case TownOrder.Stockpile:
                     int stock = StockpileGain(i);
                     supplies += stock;
-                    lines.Add($"{faction} stockpiled: +{stock} {(stock == 1 ? "supply" : "supplies")}");
+                    lines.Add($"{faction} stockpiled: +{stock} food");
                     break;
                 case TownOrder.Drill:
                     float faded = npc.readiness;
@@ -379,7 +379,7 @@ public class Campaign
             }
             else
             {
-                Report($"{definition.faction}: {npc.injured} hurt need supplies by day {npc.injuredDeadline}");
+                Report($"{definition.faction}: {npc.injured} hurt need food by day {npc.injuredDeadline}");
             }
         }
         CheckGameOver();

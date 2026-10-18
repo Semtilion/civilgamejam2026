@@ -10,7 +10,7 @@ public enum Sound
     HammerSmash, BombBreak, Flame, Zap,
     HeroHurt, HeroDeath, Revive, SpitterShot, Explosion, BossArrive, BossDash, BossDeath, Freeze, Ricochet,
     XpPickup, LevelUp, CardPick, RelicFound, Mining, ShrineDone, TeleporterOpen, TeleporterEnter,
-    Click, Descent, Build, TurnIn, LeaderSlide, Report, Evolution, Results, GameOver
+    Click, Descent, Build, TurnIn, LeaderSlide, Report, Evolution, Results, GameOver, FoodPickup
 }
 
 // The sound effects: Sfx.Play(sound) plays one of its clips (at random) at the settings' effects volume, with a

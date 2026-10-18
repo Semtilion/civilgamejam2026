@@ -6,9 +6,9 @@ public enum PickupKind { Xp, Materials, Crystal, Gold, Supplies, Relic }
 // Something an enemy dropped: an XP gem, materials, a crystal, gold, supplies or a relic (a variant's rare drop: a
 // big glowing star; collecting it shows a relic card). Once the hero comes within pickup range
 // it flies to the hero; touching it collects it (ArenaManager.Collect) with a little sparkle.
-// Look: a child sprite (unlit, so it shines in the dark cave) that bobs and spins; crystals also glow. Crystals and gold
-// use the artist's art (the crystal is the clusters' crystal, gold a nugget), drawn bigger, in their own colors and
-// only bobbing (painted art spinning flat looks odd).
+// Look: a child sprite (unlit, so it shines in the dark cave) that bobs and spins; crystals also glow. Crystals, gold,
+// wood and food use the artist's art (the crystal is the clusters' crystal, gold a nugget, wood one of two logs, food a
+// drumstick), drawn bigger, in their own colors and only bobbing (painted art spinning flat looks odd).
 public class Pickup : MonoBehaviour
 {
     public static readonly List<Pickup> All = new List<Pickup>();
@@ -18,7 +18,7 @@ public class Pickup : MonoBehaviour
     const float SpinSpeed = 120f; // degrees per second
     static readonly Color XpColor = new Color(0.30f, 0.90f, 1f);
     public static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f); // also the materials shrine's color
-    static readonly Color SuppliesColor = new Color(0.55f, 0.95f, 0.55f);
+    public static readonly Color SuppliesColor = new Color(0.85f, 0.55f, 0.42f); // the food art's warm brown, lifted
     static readonly Color RelicColor = new Color(1f, 0.90f, 0.60f);
 
     public PickupKind kind;
@@ -41,10 +41,13 @@ public class Pickup : MonoBehaviour
         Color color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor :
             kind == PickupKind.Crystal ? arena.crystalColor : kind == PickupKind.Supplies ? SuppliesColor :
             kind == PickupKind.Relic ? RelicColor : arena.goldColor;
-        bool paintedArt = kind == PickupKind.Crystal || kind == PickupKind.Gold;
+        bool paintedArt = kind == PickupKind.Crystal || kind == PickupKind.Gold || kind == PickupKind.Materials ||
+                          kind == PickupKind.Supplies;
         // World size (the sprites are 1 unit): bigger = worth more.
         float size = kind == PickupKind.Crystal ? 0.5f : kind == PickupKind.Relic ? 0.9f :
-            kind == PickupKind.Gold ? (amount >= 3 ? 0.5f : 0.4f) : amount >= 3 ? 0.35f : 0.25f;
+            kind == PickupKind.Gold || kind == PickupKind.Supplies ? (amount >= 3 ? 0.5f : 0.4f) :
+            kind == PickupKind.Materials ? (amount >= 3 ? 0.75f : 0.6f) : // (a log's width)
+            amount >= 3 ? 0.35f : 0.25f;
         SpriteRenderer renderer = new GameObject("Sprite").AddComponent<SpriteRenderer>();
         renderer.transform.SetParent(go.transform, false);
         renderer.transform.localScale = Vector3.one * size;
