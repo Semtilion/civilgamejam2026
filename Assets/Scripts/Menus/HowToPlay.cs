@@ -19,7 +19,7 @@ public class HowToPlay : MonoBehaviour
         "\u2022  Mine ores to weaken quakes. Crates give materials and supplies.\n" +
         "\u2022  Leaders: finish their requests and turn them in at the yellow !.\n" +
         "\u2022  Give each faction a daily order: Work, Reinforce, Stockpile or Drill.\n" +
-        "\u2022  Quakes every 3 days; every 2nd one brings a raid: survive the timer.\n" +
+        "\u2022  Quakes come every 3 days: prepare the town before they hit.\n" +
         "\u2022  Supplies treat the hurt. Untreated, they die in 2 days.\n" +
         "\u2022  The run ends when every faction is gone.",
     };

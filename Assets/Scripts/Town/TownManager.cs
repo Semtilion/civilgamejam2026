@@ -6,11 +6,11 @@ using UnityEngine.UI;
 
 // The town hub (Darkest Dungeon hamlet style): status bar, one button per faction leader (their banner hangs behind it,
 // grey once the faction is wiped out; the night village behind them all: TownScenery), the relics you own, a "?" button
-// (How to play, also shown once when a new game starts), and Dive ("Defend the town" on a raid day).
+// (How to play, also shown once when a new game starts), and Dive.
 // Clicking a leader opens their window (slides down from above: SlideIn): portrait on the left; on the right their situation in three boxes (people,
 // preparedness, request; their thanks typed out above them after a purchase or turn-in), their daily order, their
 // district's buildings and the turn-in button below (closes with X, Esc or a click outside).
-// A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive or raid shows the result
+// A yellow "!" marks a leader whose request is finished (turn it in). Coming back from a dive shows the result
 // screen, then the report (after a quake, or while the injured wait for care), then a popup for each evolution a leader
 // taught you (also right after you turn in their first request). State lives in Campaign.Current. When the run has
 // ended (every faction wiped out), the end screen covers the town (New game / Title screen).
@@ -78,7 +78,7 @@ public class TownManager : MonoBehaviour
     public Text leaderMark;
     [Tooltip("Hidden when the faction is wiped out (the section captions).")]
     public GameObject[] aliveOnly;
-    [Tooltip("Shown first when you come back from a dive or raid.")]
+    [Tooltip("Shown first when you come back from a dive.")]
     public ResultsScreen results;
     [Header("Report (what happened to the people while you were away)")]
     public GameObject reportPanel;
@@ -155,11 +155,11 @@ public class TownManager : MonoBehaviour
             int slot = i; // copy for the lambda
             buildingButtons[i].onClick.AddListener(() => { if (campaign.Build(shownBuildings[slot])) Thank(); });
         }
-        diveButton.onClick.AddListener(() => Leave(arenaScene)); // the arena runs the raid on a raid day
+        diveButton.onClick.AddListener(() => Leave(arenaScene));
         newGameButton.onClick.AddListener(() =>
         {
-            Campaign.StartNew(config);
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            Campaign campaign = Campaign.StartNew(config);
+            SceneTransition.Load(SceneManager.GetActiveScene().name, SceneTransition.Style.Fade, "Day 1", $"Quake on day {campaign.NextQuakeDay}");
         });
         titleButton.onClick.AddListener(() => Leave(titleScene));
         helpButton.onClick.AddListener(howToPlay.Open);
@@ -288,12 +288,14 @@ public class TownManager : MonoBehaviour
     }
 
     // Remembers the counters (so they roll from here next time), then loads the scene.
+    // A dive sinks through the rock into the depths (SceneTransition: Descent); the title screen fades in.
     void Leave(string scene)
     {
         campaign.shownMaterials = campaign.materials;
         campaign.shownCrystals = campaign.crystals;
         campaign.shownGold = campaign.gold;
-        SceneManager.LoadScene(scene);
+        if (scene == arenaScene) SceneTransition.Load(scene, SceneTransition.Style.Descent, "Depth 1", $"Day {campaign.day}");
+        else SceneTransition.Load(scene);
     }
 
     string StatusLine(float deltaTime)
@@ -317,7 +319,6 @@ public class TownManager : MonoBehaviour
         if (LeaderOpen) ShowLeader(false); // e.g. after building: new prices, no retyping
         relicsText.text = RelicsSummary();
 
-        SetLabel(diveButton, campaign.IsRaidDay ? "DEFEND\nTHE TOWN" : "DIVE");
         ShowEpilogue();
     }
 
@@ -329,19 +330,16 @@ public class TownManager : MonoBehaviour
 
         epilogueTitle.text = "THE TOWN HAS FALLEN";
         string body = campaign.endingReason;
-        body += $"\n\nHeld out until day {campaign.day}\nRaids: {campaign.raidsHeld} held, {campaign.raidsLost} lost";
+        body += $"\n\nHeld out until day {campaign.day}";
         body += $"\nDeepest depth {campaign.deepestDepth} · Kills {campaign.totalKills} · Ores {campaign.totalOres}";
         body += campaign.newBest ? "\n\nNEW RECORD!" : $"\n\nBest: day {Campaign.BestDay}";
         epilogueBody.text = body;
     }
 
-    // "RAID TODAY!" on a raid day, then the next quake (and whether a raid comes with it).
+    // The next quake and how strong it looks.
     string NextThreat()
     {
-        int quakeDay = campaign.NextQuakeDay;
-        string today = campaign.IsRaidDay ? "RAID TODAY!    " : "";
-        string raid = campaign.IsRaidOn(quakeDay) ? " + raid" : "";
-        return $"{today}Quake day {quakeDay}{raid}: {campaign.QuakeForecast:0}%";
+        return $"Quake day {campaign.NextQuakeDay}: {campaign.QuakeForecast:0}%";
     }
 
     string RelicsSummary()
@@ -370,7 +368,8 @@ public class TownManager : MonoBehaviour
         NpcState npc = campaign.npcs[i];
         if (!npc.Alive) return $"{definition.name}\n{definition.faction}: WIPED OUT";
 
-        string half = campaign.DistrictStrength(i) < 1f ? " · half" : "";
+        float strength = campaign.DistrictStrength(i);
+        string half = strength < 1f ? $" · buildings {strength * 100f:0}%" : "";
         string injured = npc.injured > 0 ? $" · {npc.injured} hurt" : "";
         string request = npc.quest == null ? "Request done" : $"{npc.quest.Describe()} {QuestProgress(npc.quest)}";
         return $"{definition.name}\n{definition.faction} {npc.population}/{definition.startPopulation}{half}{injured}\n" +
@@ -439,7 +438,7 @@ public class TownManager : MonoBehaviour
         NpcState npc = campaign.npcs[i];
 
         string people = $"{npc.population} / {definition.startPopulation}";
-        if (campaign.DistrictStrength(i) < 1f) people += "\nhalf strength";
+        if (campaign.DistrictStrength(i) < 1f) people += $"\nbuildings at {campaign.DistrictStrength(i) * 100f:0}%";
         if (npc.injured > 0) people += $"\n{npc.injured} hurt · die day {npc.injuredDeadline}";
         peopleText.text = people;
 
@@ -460,25 +459,16 @@ public class TownManager : MonoBehaviour
 
     static string ResultTitle(RunResult run)
     {
-        if (run.raid) return run.survived ? $"RAID {run.raidNumber} HELD" : $"RAID {run.raidNumber} LOST";
         return run.survived ? "BACK FROM THE DEPTHS" : $"DEFEATED ON DEPTH {run.depth}";
     }
 
-    // How the run went, line by line ("{0}" = a number that rolls up): time held or depths, kills by type, level and
+    // How the run went, line by line ("{0}" = a number that rolls up): depths, kills by type, level and
     // evolutions, the loot (brought home or lost), ores, and each leader's request.
     static List<ResultLine> ResultLines(RunResult run)
     {
         List<ResultLine> lines = new List<ResultLine>();
-        if (run.raid)
-        {
-            lines.Add(new ResultLine($"Held {{0}} / {Mathf.RoundToInt(run.raidLength)} s", Mathf.RoundToInt(run.secondsHeld)));
-            if (!run.survived) lines.Add(new ResultLine($"Every faction lost {run.lossPercent:0.#}%"));
-        }
-        else
-        {
-            lines.Add(new ResultLine("Depths cleared {0}", run.depthsCleared));
-            lines.Add(new ResultLine("Deepest {0}", run.depth));
-        }
+        lines.Add(new ResultLine("Depths cleared {0}", run.depthsCleared));
+        lines.Add(new ResultLine("Deepest {0}", run.depth));
         lines.Add(new ResultLine("Kills {0}", run.totalKills));
         foreach (KeyValuePair<EnemyData, int> pair in run.kills)
             lines.Add(new ResultLine($"      {pair.Key.displayName} {{0}}", pair.Value));
@@ -574,15 +564,20 @@ public class TownManager : MonoBehaviour
             int b = shownBuildings[slot];
             Building building = config.buildings[b];
             int level = campaign.buildingLevels[b];
+            // What it gives (the levels built; the first level's before it's built), and in red what the faction's
+            // lost people take off it (DistrictStrength)
+            float shown = building.amountPerLevel * Mathf.Max(1, level);
+            string lost = building.AmountText(shown * (1f - campaign.DistrictStrength(building.district)));
+            string effect = building.EffectText(shown) + (lost != "0" && lost != "0%" ? $"  <color=#FF6B5E>-{lost} lost</color>" : "");
             string label;
             if (level >= config.maxBuildingLevel)
             {
-                label = $"{building.name}  MAX\n{building.EffectText(building.amountPerLevel * level)}";
+                label = $"{building.name}  MAX\n{effect}";
             }
             else
             {
                 string crystals = building.costsCrystals ? $" · {campaign.BuildingCrystalCost(b)} crystals" : "";
-                label = $"{building.name}  {level}/{config.maxBuildingLevel}\n{building.EffectText(building.amountPerLevel)}\n" +
+                label = $"{building.name}  {level}/{config.maxBuildingLevel}\n{effect}\n" +
                         $"{campaign.BuildingMaterialCost(b)} materials · {campaign.BuildingGoldCost(b)} gold{crystals}";
             }
             SetLabel(buildingButtons[slot], label);

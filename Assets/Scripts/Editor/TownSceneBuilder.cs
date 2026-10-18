@@ -232,7 +232,7 @@ public static class TownSceneBuilder
         AddPopIn(evolutionWindow);
         evolution.gameObject.SetActive(false);
 
-        // The result screen after a dive or raid (before the report): lines appear one by one, numbers roll up.
+        // The result screen after a dive (before the report): lines appear one by one, numbers roll up.
         Image resultsPanel = NewImage("Results", canvas, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0.6f));
         Stretch(resultsPanel.rectTransform);
         Image resultsWindow = NewPanel("Window", resultsPanel.transform, Vector2.zero, new Vector2(1400, 820));
@@ -334,6 +334,7 @@ public static class TownSceneBuilder
         town.evolutionBurst = evolutionBurst;
         town.evolutionTexts = a.evolutionTexts;
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
+        MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
 
         EditorSceneManager.SaveScene(scene);
     }

@@ -2,7 +2,7 @@ using UnityEngine;
 
 // A flash that fades out and disappears (explosions, lightning, the Second Wind burst, the teleporter, the level-up
 // light), optionally growing from `startScale` of its size (easing out). Scaled time, so it freezes while the game is
-// paused, unless `unscaled` (the moments that freeze the game: the level-up, stepping into the teleporter).
+// paused, unless `unscaled` (the level-up moment, which freezes the game).
 public class FadeEffect : MonoBehaviour
 {
     SpriteRenderer sprite;

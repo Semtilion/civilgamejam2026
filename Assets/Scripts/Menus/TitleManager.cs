@@ -36,7 +36,7 @@ public class TitleManager : MonoBehaviour
         Time.timeScale = 1f;
         titleRest = title.anchoredPosition;
         if (titleText != null) titleText.text = gameTitle;
-        bestText.text = Campaign.BestDay > 0 ? $"Best: day {Campaign.BestDay} · {Campaign.BestRaids} raids held" : "";
+        bestText.text = Campaign.BestDay > 0 ? $"Best: day {Campaign.BestDay}" : "";
         playButton.GetComponentInChildren<Text>().text = GameRunning ? "Continue" : "Play";
         playButton.onClick.AddListener(Play);
         settingsButton.onClick.AddListener(settings.Open);
@@ -52,6 +52,7 @@ public class TitleManager : MonoBehaviour
     void Play()
     {
         if (!GameRunning) Campaign.StartNew(config);
-        SceneManager.LoadScene(townScene);
+        Campaign campaign = Campaign.Current;
+        SceneTransition.Load(townScene, SceneTransition.Style.Fade, $"Day {campaign.day}", $"Quake on day {campaign.NextQuakeDay}");
     }
 }

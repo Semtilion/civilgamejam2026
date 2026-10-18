@@ -7,7 +7,7 @@ public enum StatType { MaxHp, MoveSpeed, Damage, AttackSpeed, Area, PickupRange 
 
 // The hero: moves with the project's "Player/Move" action (WASD, arrow keys, gamepad stick), stays inside the arena,
 // has HP and a short invulnerability after each hit (he flashes red, then blinks; ArenaManager.OnHeroHit does the
-// rest). His body flash also shows his moments: a level-up, Second Wind's gold, rising into the teleporter.
+// rest). His body flash also shows his moments: a level-up, Second Wind's gold.
 // Base stats are where every dive starts; the dive stats below = base + town buffs + level-up cards.
 public class Player : MonoBehaviour
 {
@@ -71,7 +71,7 @@ public class Player : MonoBehaviour
 
     InputAction moveAction;
     float invulnerableTimer;
-    float flashTimer, shineTimer; // a short flash (a hit, a level-up), a longer shine (Second Wind, the teleporter)
+    float flashTimer, shineTimer; // a short flash (a hit, a level-up), a longer shine (Second Wind)
     Color flashColor, shineColor;
     float walkTime;
     float lean;
@@ -90,7 +90,7 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        UpdateFlash(); // also while the game is frozen for a moment (a level-up, the teleporter)
+        UpdateFlash(); // also while the game is frozen for a moment (a level-up)
         if (IsDead || !arena.IsPlaying) return;
 
         Vector2 input = moveAction != null ? Vector2.ClampMagnitude(moveAction.ReadValue<Vector2>(), 1f) : Vector2.zero;
@@ -170,16 +170,7 @@ public class Player : MonoBehaviour
         bodyFlash.On = flashTimer > 0f || shineTimer > 0f;
     }
 
-    // Stepping into the teleporter (`k`: 0 -> 1): the body rises and stretches thin into the light.
-    public void Ascend(float k)
-    {
-        if (!HasBody) return;
-        body.localPosition = bodyRestPosition + Vector3.up * 1.2f * k * k;
-        body.localRotation = Quaternion.identity;
-        body.localScale = new Vector3(1f - 0.85f * k, 1f + 0.6f * k, 1f);
-    }
-
-    // Back to normal (a new depth or run): the body in place, shown, no flash.
+    // Back to normal (a new depth or run): shown, no flash, the body in place.
     public void ResetLook()
     {
         flashTimer = shineTimer = 0f;

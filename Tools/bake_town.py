@@ -88,6 +88,11 @@ def village():
     draw.rectangle((1215, 680, 1265, GROUND), fill=house)
     draw.polygon([(1203, 680), (1240, 580), (1277, 680)], fill=house)
     windows.append((1232, 715, 1248, 740))
+    kept = []  # no windows inside each other (houses overlap): the tower's and the spire's stay, then the first ones
+    for a in windows[-2:] + windows[:-2]:
+        if not any(a[0] < b[2] + 6 and b[0] < a[2] + 6 and a[1] < b[3] + 6 and b[1] < a[3] + 6 for b in kept):
+            kept.append(a)
+    windows = kept
     draw.rectangle((0, GROUND, W, H), fill=(10, 7, 15, 255))
     for rect in windows:
         draw.rectangle(rect, fill=(70, 42, 24, 255))  # dark glass under the window lights

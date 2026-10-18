@@ -56,6 +56,7 @@ public static class TitleSceneBuilder
         Place(quit, new Vector2(0, -260));
 
         SettingsMenu settingsMenu = MenuBuilder.Settings(canvas);
+        MenuBuilder.TransitionUI(a.glow); // scene changes (the first scene's stays for the whole game)
 
         TitleManager manager = new GameObject("Title Manager").AddComponent<TitleManager>();
         manager.config = a.townConfig;

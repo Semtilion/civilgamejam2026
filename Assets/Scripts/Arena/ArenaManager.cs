@@ -14,7 +14,7 @@ public class SpawnEntry
     [Min(0f)] public float depth1Multiplier = 1f;
 }
 
-// Runs one dungeon dive (Vampire Survivors style), or a raid (every 2nd quake day).
+// Runs one dungeon dive (Vampire Survivors style).
 // Dive: every depth, kill N enemies while the horde builds up. Normal depth: reaching N opens a teleporter. Boss depth
 // (every `bossEvery` depths, endless): reaching N summons the boss while the horde keeps coming; killing it opens the
 // teleporter. Once the teleporter is open, spawning stops; stepping in clears the depth: go deeper or return to town.
@@ -23,9 +23,6 @@ public class SpawnEntry
 // Every boss drops a relic (Relics, on this object). A few normal enemies spawn as variants (`variants`, EnemyVariant:
 // blue tough, red fire trail, purple blast after death) worth more XP, with a small chance to drop a relic pickup
 // (collecting it shows a relic card).
-// Raid: the same cave, crystal monsters keep pouring in; hold out until the timer runs out (bigger and longer every
-// raid, a Colossus at the halfway mark from raid `raidBossFrom`). Held: like a dive's return. Lost: the town is hurt
-// (Campaign.RaidLost).
 // The hero starts with the town's buffs (Campaign).
 public class ArenaManager : MonoBehaviour
 {
@@ -127,9 +124,7 @@ public class ArenaManager : MonoBehaviour
     public Image dustHaze;
 
     [Header("Teleporter (opens when the depth's goal is done)")]
-    [Tooltip("The pulsing glow (placeholder circle).")]
-    public Sprite teleporterSprite;
-    [Tooltip("The portal swirling on top of the glow (FX_Swirl, tinted cyan).")]
+    [Tooltip("The swirling portal (FX_Swirl, tinted cyan).")]
     public Sprite teleporterSwirl;
     public float teleporterRadius = 1.2f;
 
@@ -143,22 +138,6 @@ public class ArenaManager : MonoBehaviour
     public Sprite fxGlow;    // a soft white blob (columns of light)
     [Tooltip("A red flash at the screen's edges when the hero is hit (a HUD image).")]
     public Image hurtFlash;
-
-    [Header("Raids (every 2nd quake day: hold out until the timer runs out)")]
-    [Tooltip("Raid 1 lasts this many seconds...")]
-    public float raidTime = 90f;
-    [Tooltip("...plus this many for every raid after it...")]
-    public float raidTimePerRaid = 15f;
-    [Tooltip("...up to this.")]
-    public float raidTimeMax = 180f;
-    [Tooltip("Raid 1's enemies are as strong (and come as fast) as on this depth...")]
-    public int raidDepth = 2;
-    [Tooltip("...plus this many depths for every raid after it.")]
-    public int raidDepthPerRaid = 2;
-    [Tooltip("From this raid on, a Colossus joins at the halfway mark.")]
-    public int raidBossFrom = 3;
-    [Tooltip("Free level-up picks at the start of a raid (every base weapon is also given at Lv 1).")]
-    public int raidFreePicks = 5;
 
     [Header("Scene references")]
     public Player player;
@@ -224,11 +203,10 @@ public class ArenaManager : MonoBehaviour
     public Rect Bounds { get; private set; }
     public bool PanelOpen => panel.activeSelf;
     // False = paused (or the scene is out of date and this component switched itself off): nothing should act.
-    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen && teleportAge < 0f;
+    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen;
 
     Campaign campaign;
-    bool raid;      // this run is a raid, not a dive
-    int depth;      // a raid: the depth its enemies are as strong as
+    int depth;
     int kills;      // whole dive
     int depthKills; // this depth, toward the goal
     int depthsCleared;
@@ -247,12 +225,9 @@ public class ArenaManager : MonoBehaviour
     bool relicDue; // a boss died; its relic is found in the next Update
     Enemy currentBoss;
     GameObject teleporter; // null = not open
-    Transform teleporterGlow, teleporterPortal;
+    Transform teleporterPortal;
     float sparkleTimer;      // the next speck rising from the open teleporter
-    float teleportAge = -1f; // stepping into the teleporter: seconds since (below 0 = not)
     float hurtAge = 99f;     // since the hero was last hit (the red at the screen's edges)
-
-    float raidLength, raidLeft; // seconds
 
     CameraFollow cameraFollow;
     Trap trap;          // what comes after the current tremor
@@ -289,9 +264,7 @@ public class ArenaManager : MonoBehaviour
         }
         cameraFollow = cam.GetComponent<CameraFollow>();
         campaign = Campaign.Current ?? Campaign.StartNew(config); // also lets you press Play in this scene directly
-        raid = campaign.IsRaidDay;
-        if (raid) StartRaid();
-        else StartDive();
+        StartDive();
     }
 
     // ---------- Dive flow ----------
@@ -310,7 +283,7 @@ public class ArenaManager : MonoBehaviour
         relics.ResetForNewRun(campaign.relicOwned); // after the loadout: Glass Cannon cuts the final max HP
         leveling.ResetForNewRun(campaign.evolutionUnlocked);
         leveling.XpGain = 1f + campaign.BuildingBonus(BuildingEffect.XpGain);
-        materialBonus = Mathf.FloorToInt(campaign.BuildingBonus(BuildingEffect.MaterialBonus) + 0.5f); // half strength rounds up
+        materialBonus = Mathf.FloorToInt(campaign.BuildingBonus(BuildingEffect.MaterialBonus) + 0.5f); // (scaled by people left: rounded)
         kills = 0;
         diveMaterials = 0;
         diveCrystals = 0;
@@ -329,8 +302,7 @@ public class ArenaManager : MonoBehaviour
         depth++;
         ClearField();
         player.transform.position = Bounds.center;
-        player.ResetLook(); // (he may have just risen into the teleporter)
-        teleportAge = -1f;
+        player.ResetLook(); // no flash left over
         depthKills = 0;
         spawnTimer = 0f;
         bossSpawned = false;
@@ -352,28 +324,58 @@ public class ArenaManager : MonoBehaviour
     // weaken the quake) and shrines (a random type each), scattered away from the middle where the hero starts.
     void PlaceCratesAndOres()
     {
-        for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
+        for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center, crate.radius), 1f, player, this);
         for (int i = 0; i < clustersPerDepth; i++)
-            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, crystalColor, 4f, 1.1f); // the crystals' color
+            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center, crystalCluster.radius), 1f, player, this).gameObject, crystalColor, 4f, 1.1f); // the crystals' color
         for (int i = 0; i < oresPerDepth; i++)
-            MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, blastRingSprite, RandomFloorPoint(Bounds.center), this);
+            MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, blastRingSprite, RandomFloorPoint(Bounds.center, SpotRadius), this);
         for (int i = 0; i < shrinesPerDepth; i++)
         {
             SpotKind kind = (SpotKind)Random.Range(1, 4); // XpShrine, MaterialsShrine or CrystalShrine
             Color color = kind == SpotKind.XpShrine ? XpShrineColor : kind == SpotKind.MaterialsShrine ? Pickup.MaterialsColor : CrystalShrineColor;
-            MineSpot.Place(kind, oreSprite, color, oreScale, shrineTime, blastRingSprite, RandomFloorPoint(Bounds.center), this);
+            MineSpot.Place(kind, oreSprite, color, oreScale, shrineTime, blastRingSprite, RandomFloorPoint(Bounds.center, SpotRadius), this);
         }
     }
 
-    // A random spot in the cave at least 6 units from `awayFrom` (the hero's start, or the hero for the teleporter).
-    Vector2 RandomFloorPoint(Vector2 awayFrom)
+    // A random spot in the cave at least 6 units from `awayFrom` (the hero's start, or the hero for the teleporter),
+    // with room for something `radius` big (IsFree).
+    Vector2 RandomFloorPoint(Vector2 awayFrom, float radius)
     {
         const float minDistance = 6f;
         Vector2 point = Vector2.zero;
-        for (int attempt = 0; attempt < 20; attempt++)
+        for (int attempt = 0; attempt < 30; attempt++)
         {
             point = new Vector2(Random.Range(Bounds.xMin + 2f, Bounds.xMax - 2f), Random.Range(Bounds.yMin + 2f, Bounds.yMax - 2f));
-            if ((point - awayFrom).sqrMagnitude >= minDistance * minDistance) break;
+            if ((point - awayFrom).sqrMagnitude >= minDistance * minDistance && IsFree(point, radius)) break;
+        }
+        return point;
+    }
+
+    const float SpotRadius = 1f;  // an ore vein's or shrine's footprint (its progress ring is 2.1 across)
+    const float SpawnGap = 0.5f;  // the least space left between something new and what's already there
+
+    // Room at `point` for something `radius` big: it wouldn't be inside a crate, cluster, enemy, ore vein, shrine or the
+    // teleporter.
+    bool IsFree(Vector2 point, float radius)
+    {
+        foreach (Enemy enemy in Enemy.All)
+            if (Vector2.Distance(point, enemy.transform.position) < radius + enemy.radius + SpawnGap) return false;
+        foreach (MineSpot spot in MineSpot.All)
+            if (Vector2.Distance(point, spot.transform.position) < radius + SpotRadius + SpawnGap) return false;
+        return teleporter == null || Vector2.Distance(point, teleporter.transform.position) >= radius + teleporterRadius + SpawnGap;
+    }
+
+    // `point` if there's room (IsFree), else the first spot with room up to 1.5 units around it in the cave (none in
+    // 20 tries: `point` anyway).
+    Vector2 FreeNear(Vector2 point, float radius)
+    {
+        Rect inside = InsideBounds;
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            Vector2 spot = attempt == 0 ? point : point + Random.insideUnitCircle * 1.5f;
+            spot.x = Mathf.Clamp(spot.x, inside.xMin, inside.xMax);
+            spot.y = Mathf.Clamp(spot.y, inside.yMin, inside.yMax);
+            if (IsFree(spot, radius)) return spot;
         }
         return point;
     }
@@ -382,18 +384,7 @@ public class ArenaManager : MonoBehaviour
     {
         UpdateHud();
         UpdateArrow();
-        if (teleportAge >= 0f)
-        {
-            UpdateTeleport();
-            return;
-        }
         if (!IsPlaying) return;
-
-        if (raid)
-        {
-            UpdateRaid();
-            return;
-        }
 
         UpdateTraps(); // traps still come after the teleporter opens
 
@@ -414,8 +405,6 @@ public class ArenaManager : MonoBehaviour
         // The horde keeps spawning until the teleporter opens; stepping into it clears the depth.
         if (teleporter != null)
         {
-            float pulse = 1f + 0.1f * Mathf.Sin(Time.time * 6f);
-            teleporterGlow.localScale = Vector3.one * teleporterRadius * 2f * pulse; // placeholder circle is 1 unit wide
             teleporterPortal.Rotate(0f, 0f, -PortalSpin * Time.deltaTime);
             sparkleTimer -= Time.deltaTime;
             if (sparkleTimer <= 0f) // specks of light rising from it
@@ -424,7 +413,7 @@ public class ArenaManager : MonoBehaviour
                 deathBursts.Rise((Vector2)teleporter.transform.position + Random.insideUnitCircle * teleporterRadius * 0.8f, PortalSparkle);
             }
             if (((Vector2)(player.transform.position - teleporter.transform.position)).sqrMagnitude <= teleporterRadius * teleporterRadius)
-                StartTeleport();
+                DepthCleared(); // the moment he touches it
             return; // no spawns while it's open
         }
 
@@ -438,7 +427,7 @@ public class ArenaManager : MonoBehaviour
 
     void SpawnBoss()
     {
-        ShowBoss(Enemy.Spawn(boss, OffscreenPoint(), StatScale, player, this));
+        ShowBoss(Enemy.Spawn(boss, FreeNear(OffscreenPoint(), boss.radius), StatScale, player, this));
     }
 
     void ShowBoss(Enemy enemy)
@@ -473,13 +462,6 @@ public class ArenaManager : MonoBehaviour
         diveKills[enemy.data] = diveKills.TryGetValue(enemy.data, out int count) ? count + 1 : 1;
         relics.OnKill(); // Bloodstone
 
-        if (raid)
-        {
-            if (enemy == currentBoss) bossBar.SetActive(false);
-            DropLoot(enemy);
-            return; // a raid only ends with its timer
-        }
-
         DropLoot(enemy); // a boss's loot lands on the floor too; what's left is collected at the teleporter
 
         if (enemy == currentBoss)
@@ -507,14 +489,9 @@ public class ArenaManager : MonoBehaviour
         }
     }
 
-    // Debug (F4): the depth's kill goal is met right away (or once it's already met: nothing). A raid: the timer ends.
+    // Debug (F4): the depth's kill goal is met right away (or once it's already met: nothing).
     public void DebugClearDepth()
     {
-        if (raid)
-        {
-            raidLeft = 0f;
-            return;
-        }
         if (bossSpawned || teleporter != null) return;
         depthKills = Mathf.Max(depthKills, KillsNeeded);
         GoalReached();
@@ -549,19 +526,11 @@ public class ArenaManager : MonoBehaviour
         foreach (Enemy enemy in Enemy.All)
             if (enemy.data.behavior == EnemyBehavior.Shooter && !OnScreen(enemy.transform.position)) Destroy(enemy.gameObject);
 
-        // A pulsing glow with a swirling portal on it; it opens with a burst, a ring and a flash of light.
+        // A swirling portal lighting up the cave around it; it opens with a burst, a ring and a flash of light.
+        Vector2 at = RandomFloorPoint(player.transform.position, teleporterRadius); // (picked before it exists)
         teleporter = new GameObject("Teleporter");
-        teleporter.transform.position = RandomFloorPoint(player.transform.position);
-
-        SpriteRenderer glow = new GameObject("Glow").AddComponent<SpriteRenderer>();
-        glow.transform.SetParent(teleporter.transform, false);
-        glow.transform.localScale = Vector3.one * teleporterRadius * 2f;
-        glow.sprite = teleporterSprite;
-        glow.color = TeleporterColor;
-        glow.sortingOrder = -2; // under the portal, pickups and enemies
-        Fx.Unlit(glow);
-        teleporterGlow = glow.transform;
-        Glow.Add(teleporter, TeleporterColor, 5f, 1.3f); // lights up the cave around it
+        teleporter.transform.position = at;
+        Glow.Add(teleporter, TeleporterColor, 5f, 1.3f);
 
         SpriteRenderer portal = new GameObject("Portal").AddComponent<SpriteRenderer>();
         portal.transform.SetParent(teleporter.transform, false);
@@ -572,36 +541,13 @@ public class ArenaManager : MonoBehaviour
         Fx.Unlit(portal);
         teleporterPortal = portal.transform;
 
-        Vector2 at = teleporter.transform.position;
         FadeEffect.Circle(fxBurst, at, teleporterRadius * 1.5f, new Color(0.5f, 0.95f, 1f, 0.9f), 0.45f);
         FadeEffect.Circle(fxRing, at, teleporterRadius * 1.8f, new Color(0.5f, 0.95f, 1f, 0.9f), 0.5f, 0.2f);
         FadeEffect.Circle(fxGlint, at, teleporterRadius * 1.6f, new Color(0.85f, 1f, 1f, 1f), 0.35f, 0.3f);
     }
 
-    const float TeleportTime = 0.6f; // the hero rising into the light before the depth is cleared
-    const float PortalSpin = 90f;    // degrees per second
+    const float PortalSpin = 90f; // degrees per second
     static readonly Color PortalSparkle = new Color(0.75f, 0.97f, 1f);
-    static readonly Color AscendColor = new Color(0.8f, 1f, 1f, 0.85f);
-
-    // Stepped into the teleporter: everything stops and the hero rises into a column of light (UpdateTeleport); then
-    // the depth is cleared.
-    void StartTeleport()
-    {
-        teleportAge = 0f;
-        Time.timeScale = 0f;
-        player.Shine(AscendColor, TeleportTime + 0.5f);
-        FadeEffect.Column(fxGlow, player.Feet, 1.3f, 6f, new Color(0.55f, 0.95f, 1f, 0.75f), TeleportTime + 0.15f, unscaled: true);
-        FadeEffect.Circle(fxGlint, player.transform.position, 1.4f, new Color(0.9f, 1f, 1f, 1f), 0.4f, 0.4f, unscaled: true);
-    }
-
-    void UpdateTeleport()
-    {
-        teleportAge += Time.unscaledDeltaTime;
-        player.Ascend(Mathf.Clamp01(teleportAge / TeleportTime));
-        if (teleportAge < TeleportTime) return;
-        teleportAge = -1f;
-        DepthCleared();
-    }
 
     // The hero took a hit (Player.TakeDamage): a jolt, red at the screen's edges, chips in his colors, the damage in red.
     public void OnHeroHit(int amount)
@@ -669,14 +615,7 @@ public class ArenaManager : MonoBehaviour
     {
         if (relics.TrySecondWind()) return; // back up, the fight goes on
 
-        if (raid)
-        {
-            float loss = campaign.day * config.raidLossPerDay * raidLeft / raidLength;
-            ShowPanel("THE RAIDERS BREAK THROUGH", $"Every faction loses {loss:0.#}%. The loot is lost.",
-                "Return to town", () => EndRaid(false));
-        }
-        else
-            ShowPanel("DEFEATED", "The loot is lost.", "Return to town", () => EndDive(false));
+        ShowPanel("DEFEATED", "The loot is lost.", "Return to town", () => EndDive(false));
     }
 
     public void Collect(PickupKind kind, int amount)
@@ -819,16 +758,11 @@ public class ArenaManager : MonoBehaviour
     // (it shows the result screen first).
     void EndDive(bool survived, string nextScene = null)
     {
-        campaign.RecordDive(kills, raid ? 0 : depth, diveOres);
+        campaign.RecordDive(kills, depth, diveOres);
         RunResult run = new RunResult
         {
-            raid = raid,
             survived = survived,
-            raidNumber = raid ? campaign.RaidNumber : 0,
-            raidLength = raidLength,
-            secondsHeld = raid ? raidLength - Mathf.Max(0f, raidLeft) : 0f,
-            lossPercent = raid && !survived ? campaign.day * config.raidLossPerDay * raidLeft / raidLength : 0f,
-            depth = raid ? 0 : depth,
+            depth = depth,
             depthsCleared = depthsCleared,
             level = leveling.Level,
             materials = diveMaterials,
@@ -844,91 +778,23 @@ public class ArenaManager : MonoBehaviour
             if (weapon.enabled && weapon.evolved) run.evolutions.Add(weapon.EvolutionName);
         campaign.EndDive(run);
         Time.timeScale = 1f;
-        SceneManager.LoadScene(nextScene ?? townScene);
+        if (nextScene != null) SceneTransition.Load(nextScene); // (the title screen)
+        else SceneTransition.Load(townScene, SceneTransition.Style.Fade, $"Day {campaign.day}", $"Quake on day {campaign.NextQuakeDay}");
     }
 
     // Pause menu > Quit to title. Counts as dying, so it can't be used to retry a bad dive: the dive's loot is lost and
-    // a day passes. During a raid, it counts as losing the raid.
+    // a day passes.
     public void QuitToTitle()
     {
-        if (raid) EndRaid(false, titleScene);
-        else EndDive(false, titleScene);
-    }
-
-    // ---------- Raids ----------
-
-    // Every base weapon (Sword, Dagger, Spear, Crystal Orbit) at Lv 1 plus some free level-up picks, in an empty cave
-    // (no crates or ores). Each raid is longer and its enemies stronger (and quicker to come) than the last.
-    void StartRaid()
-    {
-        ResetRun();
-        foreach (Weapon weapon in leveling.weapons)
-            if (!Weapon.IsRelicWeapon(weapon.id)) weapon.enabled = true;
-
-        int number = campaign.RaidNumber;
-        depth = raidDepth + raidDepthPerRaid * (number - 1);
-        raidLength = Mathf.Min(raidTimeMax, raidTime + raidTimePerRaid * (number - 1));
-        raidLeft = raidLength;
-        bossSpawned = number < raidBossFrom; // true = no Colossus coming
-        ClearField();
-        player.transform.position = Bounds.center;
-        bossBar.SetActive(false);
-        panel.SetActive(false);
-        Time.timeScale = 1f;
-        spawnTimer = 0f;
-        leveling.GrantPicks(raidFreePicks);
-    }
-
-    // Monsters keep coming (faster as the timer runs down); a Colossus at the halfway mark; the timer ends it.
-    void UpdateRaid()
-    {
-        raidLeft -= Time.deltaTime;
-        if (raidLeft <= 0f)
-        {
-            RaidHeld();
-            return;
-        }
-        if (!bossSpawned && raidLeft <= raidLength / 2f)
-        {
-            bossSpawned = true;
-            SpawnBoss();
-        }
-
-        spawnTimer -= Time.deltaTime;
-        if (spawnTimer <= 0f)
-        {
-            spawnTimer = CurrentSpawnInterval();
-            if (Enemy.All.Count < maxEnemies) SpawnRandomEnemy(OffscreenPoint());
-        }
-    }
-
-    // Held: everything still on the floor is collected, then back to town like after a dive.
-    void RaidHeld()
-    {
-        foreach (Pickup pickup in Pickup.All)
-        {
-            if (pickup.kind == PickupKind.Relic) relics.TryFind(out _); // no card: the raid is over
-            else if (pickup.kind != PickupKind.Xp) Collect(pickup.kind, pickup.amount);
-        }
-        ShowPanel("THE TOWN HOLDS", $"Raid {campaign.RaidNumber} held.", "Return to town", () => EndRaid(true));
-    }
-
-    // The campaign records the raid (a lost one hurts the town, more the more of the timer was left), then it ends
-    // like a dive (held: the loot is kept; lost: it's lost) and a day passes.
-    void EndRaid(bool held, string nextScene = null)
-    {
-        if (held) campaign.RaidHeld();
-        else campaign.RaidLost(Mathf.Clamp01(raidLeft / raidLength));
-        EndDive(held, nextScene);
+        EndDive(false, titleScene);
     }
 
     // ---------- Spawning ----------
 
-    // Spawns speed up as the kill count gets closer to the goal (a raid: as its timer runs down), and more on deeper
-    // levels.
+    // Spawns speed up as the kill count gets closer to the goal, and more on deeper levels.
     float CurrentSpawnInterval()
     {
-        float progress = raid ? 1f - raidLeft / raidLength : Mathf.Clamp01((float)depthKills / KillsNeeded);
+        float progress = Mathf.Clamp01((float)depthKills / KillsNeeded);
         float interval = Mathf.Lerp(spawnIntervalStart, spawnIntervalEnd, progress);
         return interval / (1f + spawnScalePerDepth * (depth - 1));
     }
@@ -957,7 +823,7 @@ public class ArenaManager : MonoBehaviour
                 break;
             }
         }
-        if (pick != null) Enemy.Spawn(pick, position, StatScale, player, this, RollVariant(pick));
+        if (pick != null) Enemy.Spawn(pick, FreeNear(position, pick.radius), StatScale, player, this, RollVariant(pick));
     }
 
     // Maybe a variant (variants.ChanceAt(depth)): blue, red or purple, equally likely; Spitters (they never move, so no
@@ -994,7 +860,8 @@ public class ArenaManager : MonoBehaviour
     }
 
     // Destroy every enemy, crate, shot, dagger, axe, fire bomb, variant hazard, pickup, ore, shrine, falling rock and the
-    // teleporter (lists empty at the end of the frame), and hide the damage numbers and death bursts.
+    // teleporter (lists empty at the end of the frame; enemies' and spots' now, so the new depth's crates and ores don't
+    // keep away from the old ones: IsFree), and hide the damage numbers and death bursts.
     void ClearField()
     {
         if (teleporter != null) Destroy(teleporter);
@@ -1009,6 +876,8 @@ public class ArenaManager : MonoBehaviour
         foreach (MineSpot spot in MineSpot.All) Destroy(spot.gameObject);
         foreach (FallingRock rock in FallingRock.All) Destroy(rock.gameObject);
         foreach (TremorEffect tremor in TremorEffect.All) Destroy(tremor.gameObject);
+        Enemy.All.Clear();
+        MineSpot.All.Clear();
         damageNumbers.Clear();
         deathBursts.Clear();
     }
@@ -1027,24 +896,12 @@ public class ArenaManager : MonoBehaviour
         float dt = Time.unscaledDeltaTime; // the loot counters roll up toward the real numbers
         lootText.text = $"Materials {materialsShown.Next(diveMaterials, dt)}     Crystals {crystalsShown.Next(diveCrystals, dt)}     " +
                         $"Gold {goldShown.Next(diveGold, dt)}     Supplies {suppliesShown.Next(diveSupplies, dt)}";
-        if (raid)
-        {
-            int seconds = Mathf.CeilToInt(Mathf.Max(0f, raidLeft));
-            depthText.text = $"Day {campaign.day}     RAID {campaign.RaidNumber}     Kills {kills}";
-            quakeText.text = "Survive until the timer runs out";
-            goalText.text = $"{seconds / 60}:{seconds % 60:00}";
-            goal = 1f - raidLeft / raidLength;
-        }
-        else
-        {
-            depthText.text = $"Day {campaign.day}     {(IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}")}     Kills {kills}";
-            float oreDrop = diveOres * config.orePercent;
-            string raidToo = campaign.IsRaidOn(campaign.NextQuakeDay) ? " + raid" : "";
-            quakeText.text = $"Quake day {campaign.NextQuakeDay}{raidToo}: {campaign.QuakeForecast:0}%     Ores {diveOres} (-{oreDrop:0}%)";
+        depthText.text = $"Day {campaign.day}     {(IsBossDepth ? $"Depth {depth} (boss)" : $"Depth {depth}")}     Kills {kills}";
+        float oreDrop = diveOres * config.orePercent;
+        quakeText.text = $"Quake day {campaign.NextQuakeDay}: {campaign.QuakeForecast:0}%     Ores {diveOres} (-{oreDrop:0}%)";
 
-            goalText.text = teleporter != null ? "Teleporter open!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
-            if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;
-        }
+        goalText.text = teleporter != null ? "Teleporter open!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
+        if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;
 
         // The boss bar takes the goal bar's place.
         bool showGoal = goal >= 0f && !bossBar.activeSelf;

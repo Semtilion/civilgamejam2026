@@ -7,8 +7,8 @@ public class NpcDefinition
     public string name = "NPC";
     [Tooltip("The group this NPC leads (e.g. Soldiers, Mages, Peasants).")]
     public string faction = "Faction";
-    [Tooltip("The faction's people at the start. Lost people never come back: below half = their district works at half " +
-             "strength, 0 = wiped out (the district stops).")]
+    [Tooltip("The faction's people at the start. Lost people never come back: their district works at the share left " +
+             "(68% of the people = 68% of every building's effect), 0 = wiped out (the district stops).")]
     public int startPopulation = 100;
     [Tooltip("Their first completed request unlocks this weapon's evolution (a card once it reaches Lv 5 in a dive).")]
     [FormerlySerializedAs("unlocksWeapon")] public bool unlocksEvolution;
@@ -58,6 +58,19 @@ public class Building
             default: return $"treats {amount:0.#} injured a day"; // TreatInjured
         }
     }
+
+    // Just EffectText's number (with its % where it has one): "6", "3.2%" (how much a smaller faction loses).
+    public string AmountText(float amount)
+    {
+        switch (effect)
+        {
+            case BuildingEffect.Stat: return stat == StatType.MaxHp ? $"{amount:0}" : $"{amount * 100f:0.#}%";
+            case BuildingEffect.QuakePassive:
+            case BuildingEffect.ReinforceBonus: return $"{amount:0.#}%";
+            case BuildingEffect.XpGain: return $"{amount * 100f:0}%";
+            default: return $"{amount:0.#}"; // MaterialBonus, TreatInjured
+        }
+    }
 }
 
 [System.Serializable]
@@ -75,8 +88,6 @@ public class TownConfig : ScriptableObject
     public NpcDefinition[] npcs;
 
     [Header("Factions")]
-    [Tooltip("Below this share of its starting people, a faction's district works at half strength.")]
-    [Range(0f, 1f)] public float halfHelpBelow = 0.5f;
 
     [Header("Requests (quests)")]
     [Tooltip("Every NPC gets a new request on day 1 and then every this many days. The deadline is the next request day.")]
@@ -114,11 +125,6 @@ public class TownConfig : ScriptableObject
     public int firstQuakeDay = 4;
     [Tooltip("...then one every this many days, forever (the game is endless).")]
     public int quakeEvery = 3;
-    [Tooltip("Every this-many-th quake brings a raid the same day (2: days 7, 13, 19...).")]
-    public int raidEveryQuakes = 2;
-    [Tooltip("A lost raid: every faction loses (day x this)% of its starting people, times the share of the raid's " +
-             "timer that was left.")]
-    public float raidLossPerDay = 1f;
 
     [Header("Earthquakes (meter in %)")]
     [Tooltip("Meter at the start of the game; after a quake it goes back to this plus all the passive rise so far.")]

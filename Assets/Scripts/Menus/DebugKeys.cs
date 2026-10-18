@@ -6,7 +6,7 @@ using UnityEngine.UI;
 //   F1  dungeon: a list of every relic; click one to get it (works right away, owned for good)
 //   F2  dungeon: level up once
 //   F3  town or dungeon: +200 gold, +100 materials, +10 crystals, +50 supplies (the town's stock)
-//   F4  dungeon: the depth's kill goal is met (teleporter, or the boss on a boss depth); a raid: its timer ends
+//   F4  dungeon: the depth's kill goal is met (teleporter, or the boss on a boss depth)
 //   F5  dungeon: the boss walks in (as on a boss depth)
 // A small hint in the corner lists the keys and the last one used.
 public class DebugKeys : MonoBehaviour

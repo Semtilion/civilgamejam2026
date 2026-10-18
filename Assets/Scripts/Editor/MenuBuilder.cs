@@ -97,6 +97,42 @@ public static class MenuBuilder
         return menu;
     }
 
+    // The scene transitions' overlay (SceneTransition): its own canvas on top of everything, hidden until a scene
+    // change; the snapshot, the rock (Assets/Art/UI/Descent.png, Tools/bake_descent.py), black, the arrival flash and
+    // the card. Every scene gets one; the first one stays for the whole game.
+    public static SceneTransition TransitionUI(Sprite glow)
+    {
+        Transform canvas = NewCanvas("Scene Transition", 1000, eventSystem: false);
+        SceneTransition transition = canvas.gameObject.AddComponent<SceneTransition>();
+        transition.group = canvas.gameObject.AddComponent<CanvasGroup>();
+        transition.group.alpha = 0f; // hidden (also in the editor)
+
+        RectTransform snapshot = NewUI("Snapshot", canvas, Vector2.zero, Vector2.zero);
+        Stretch(snapshot);
+        transition.snapshot = snapshot.gameObject.AddComponent<RawImage>();
+        Sprite rockArt = MenuArt("Descent");
+        transition.rock = NewImage("Rock", canvas, Vector2.zero, Vector2.zero, rockArt != null ? Color.white : new Color(0.06f, 0.04f, 0.09f));
+        transition.rock.sprite = rockArt;
+        Stretch(transition.rock.rectTransform);
+        transition.black = NewImage("Black", canvas, Vector2.zero, Vector2.zero, new Color(0.03f, 0.02f, 0.05f, 0f));
+        Stretch(transition.black.rectTransform);
+        transition.flash = NewImage("Arrival Flash", canvas, Vector2.zero, new Vector2(700, 700), new Color(0.6f, 0.95f, 1f, 0f));
+        transition.flash.sprite = glow;
+
+        Text title = NewText("Card Title", canvas, new Vector2(0, 30), new Vector2(1600, 150), 104, TextAnchor.MiddleCenter);
+        title.font = CardFont;
+        title.fontStyle = FontStyle.Bold; // (the font has no bold: Unity thickens it)
+        title.color = TitleColor;
+        Outline edge = title.gameObject.AddComponent<Outline>();
+        edge.effectColor = new Color(0.31f, 0.18f, 0.53f);
+        edge.effectDistance = new Vector2(4f, -4f);
+        transition.title = title;
+        transition.subtitle = Shadowed(NewText("Card Subtitle", canvas, new Vector2(0, -60), new Vector2(1400, 50), 34, TextAnchor.MiddleCenter));
+        transition.subtitle.color = new Color(0.82f, 0.78f, 0.9f);
+        foreach (Graphic graphic in canvas.GetComponentsInChildren<Graphic>()) graphic.raycastTarget = graphic == transition.black;
+        return transition;
+    }
+
     // Test keys (DebugKeys): a small hint in a corner, and in the dungeon (arena != null) the F1 relic list.
     // `hintCorner`: where the hint goes, e.g. (1,1) = top-right.
     public static DebugKeys DebugKeysUI(Transform canvas, ArenaManager arena, TownManager town, Vector2 hintCorner)

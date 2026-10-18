@@ -258,6 +258,7 @@ public static class ArenaSceneBuilder
         pauseMenu.settings = MenuBuilder.Settings(canvas);
         arena.pauseMenu = pauseMenu;
         arena.debugKeys = MenuBuilder.DebugKeysUI(canvas, arena, null, new Vector2(1f, 1f)); // hint top-right
+        MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
 
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();
@@ -286,7 +287,7 @@ public static class ArenaSceneBuilder
             new SpawnEntry { enemy = a.spitter, weight = 15f },
             new SpawnEntry { enemy = a.brute, weight = 15f, depth1Multiplier = 1f / 3f }, // rarer on depth 1
         };
-        arena.boss = a.colossus; // every 5th depth, and in raids from raid 3 (the raid numbers are the component's defaults)
+        arena.boss = a.colossus; // every 5th depth
         arena.crate = a.crate;
         arena.crystalCluster = a.crystalCluster;
         // Ores: the artist's crystal vein; without it the tileset's stone pillar, or a tinted, slightly bigger
@@ -334,7 +335,6 @@ public static class ArenaSceneBuilder
         arena.goalFill = goalFill;
         arena.lootText = lootText;
         arena.teleporterArrow = arrow.rectTransform;
-        arena.teleporterSprite = a.circle;
         arena.teleporterSwirl = Fx("FX_Swirl", a.arc); // the swirling portal
         // The effects' shared sprites (Kenney Particle Pack, white; the generated ones if a file is missing)
         arena.fxBurst = Fx("FX_Burst", a.circle);

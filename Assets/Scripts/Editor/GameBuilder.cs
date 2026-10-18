@@ -80,10 +80,11 @@ public static class GameBuilder
     // Unity's built-in font.
     const string FontsFolder = "Assets/Fonts";
     const float AlegreyaLineSpacing = 0.88f; // its lines are ~20% taller than the built-in font's: keeps them about the same
-    static Font font, titleFont;
+    static Font font, titleFont, cardFont;
     static Sprite[] framePieces; // the frame's 12 pieces, in FramePieceNames order (loaded when building starts; null = thin outlines instead)
     static float lineSpacing = 1f;
     public static Font TitleFont => titleFont;
+    public static Font CardFont => cardFont; // the transitions' cards (IM Fell English SC, like the game's name)
 
     [MenuItem("Jam/Build Game Scenes")]
     static void BuildAll()
@@ -129,6 +130,7 @@ public static class GameBuilder
             Debug.LogWarning($"{FontsFolder}/MedievalSharp.ttf not found: titles use the text font.");
             titleFont = font;
         }
+        cardFont = AssetDatabase.LoadAssetAtPath<Font>($"{FontsFolder}/IMFellEnglishSC.ttf") ?? titleFont;
     }
 
     // ---------- Assets ----------

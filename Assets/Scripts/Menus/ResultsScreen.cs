@@ -25,7 +25,7 @@ public struct ResultLine
     }
 }
 
-// The town's result screen after a dive or raid: the lines appear one after another and their numbers roll up
+// The town's result screen after a dive: the lines appear one after another and their numbers roll up
 // (unscaled time). Continue (or Esc, via TownManager) first shows everything at once, then closes and runs `then`.
 // Lines not shown yet are already in the text, invisible, so the best-fit font size doesn't change as they appear.
 public class ResultsScreen : MonoBehaviour

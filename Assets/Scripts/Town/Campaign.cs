@@ -28,7 +28,7 @@ public class Quest
 
 // The whole playthrough (endless: it ends when every faction is wiped out): day, materials / crystals / gold /
 // supplies, NPCs (faction leaders) with their requests, people, preparedness (daily orders) and district buildings,
-// unlocked evolutions, relics, the quake meter, raids and the report of what happened to the people while you were
+// unlocked evolutions, relics, the quake meter and the report of what happened to the people while you were
 // away. Kept in a static so it survives switching between the Town and Arena scenes. Rules come from
 // TownConfig. The best run (the day the town fell) is kept in PlayerPrefs.
 public class Campaign
@@ -69,32 +69,25 @@ public class Campaign
     // when you get back, then clears it.
     public readonly List<string> report = new List<string>();
     public string reportTitle;
-    // The last dive or raid, for the town's result screen (shown first when you get back, then cleared).
+    // The last dive, for the town's result screen (shown first when you get back, then cleared).
     public RunResult lastResult;
 
     // Run stats for the ending screen (every dive counts, lost ones too).
     public int totalKills;
     public int totalOres;
     public int deepestDepth;
-    public int raidsHeld, raidsLost;
 
     // The game is over (every faction wiped out; the Town shows the end screen), and why.
     public bool Ended { get; private set; }
     public string endingReason;
     public bool newBest; // this run beat the best record
 
-    // The best run so far (PlayerPrefs, survives restarts): the day the town fell, and the raids it held.
-    const string BestDayKey = "BestDay", BestRaidsKey = "BestRaids";
+    // The best run so far (PlayerPrefs, survives restarts): the day the town fell.
+    const string BestDayKey = "BestDay";
     public static int BestDay => PlayerPrefs.GetInt(BestDayKey, 0);
-    public static int BestRaids => PlayerPrefs.GetInt(BestRaidsKey, 0);
 
-    // Quakes: on firstQuakeDay, then every quakeEvery days, forever. Every raidEveryQuakes-th quake brings a raid
-    // that day: the day's dive becomes defending the town (the arena runs the raid).
+    // Quakes: on firstQuakeDay, then every quakeEvery days, forever.
     public bool IsQuakeDay(int d) => d >= config.firstQuakeDay && (d - config.firstQuakeDay) % config.quakeEvery == 0;
-    int QuakeNumber(int d) => (d - config.firstQuakeDay) / config.quakeEvery + 1; // 1 = the first quake
-    public bool IsRaidOn(int d) => IsQuakeDay(d) && QuakeNumber(d) % config.raidEveryQuakes == 0;
-    public bool IsRaidDay => IsRaidOn(day) && !Ended;
-    public int RaidNumber => QuakeNumber(day) / config.raidEveryQuakes; // on a raid day: 1, 2, 3...
 
     // The day the current requests are due (and new ones arrive).
     public int NextQuestDay => day + config.questInterval - (day - 1) % config.questInterval;
@@ -143,12 +136,11 @@ public class Campaign
         }
     }
 
-    // How strongly a leader's district buildings work: 1 = full, 0.5 = their faction is below half, 0 = wiped out.
+    // How strongly a leader's district buildings work: the share of their faction's people left (the injured count),
+    // e.g. 34 of 50 Mages = 0.68; 0 = wiped out.
     public float DistrictStrength(int npcIndex)
     {
-        NpcState npc = npcs[npcIndex];
-        if (!npc.Alive) return 0f;
-        return npc.population < config.npcs[npcIndex].startPopulation * config.halfHelpBelow ? 0.5f : 1f;
+        return (float)npcs[npcIndex].population / config.npcs[npcIndex].startPopulation;
     }
 
     // ---------- Orders (what each faction does every day) ----------
@@ -238,45 +230,12 @@ public class Campaign
         if (day <= BestDay) return;
         newBest = true;
         PlayerPrefs.SetInt(BestDayKey, day);
-        PlayerPrefs.SetInt(BestRaidsKey, raidsHeld);
         PlayerPrefs.Save();
-    }
-
-    // ---------- Raids ----------
-
-    // The raid was held: a report line (then the arena ends it like a dive: the loot is kept, a day passes).
-    public void RaidHeld()
-    {
-        raidsHeld++;
-        reportTitle = $"RAID HELD: DAY {day}";
-        Report($"Raid {RaidNumber} held.");
-    }
-
-    // The raid was lost with `timeLeftShare` (0-1) of its timer left: every faction loses (day x raidLossPerDay)% of
-    // its starting people, times that share (they never come back). Then the arena ends it like a lost dive.
-    public void RaidLost(float timeLeftShare)
-    {
-        raidsLost++;
-        reportTitle = $"RAID LOST: DAY {day}";
-        float share = day * config.raidLossPerDay / 100f * timeLeftShare;
-        Report($"Raid {RaidNumber} lost ({timeLeftShare * 100f:0}% of it left).");
-        for (int i = 0; i < npcs.Length; i++)
-        {
-            NpcState npc = npcs[i];
-            NpcDefinition definition = config.npcs[i];
-            if (!npc.Alive) continue;
-            bool wasFull = DistrictStrength(i) == 1f;
-            int lost = Mathf.Min(npc.population, Mathf.RoundToInt(definition.startPopulation * share));
-            npc.population -= lost;
-            npc.injured = Mathf.Min(npc.injured, npc.population);
-            Report($"{definition.faction}: -{lost} ({npc.population}/{definition.startPopulation}){LossNote(i, wasFull)}");
-        }
-        CheckGameOver();
     }
 
     // ---------- Days ----------
 
-    // Called by the arena when a dive or raid ends. Survived: keep the materials, crystals, gold, supplies and relics,
+    // Called by the arena when a dive ends. Survived: keep the materials, crystals, gold, supplies and relics,
     // kills count for requests, mined ores lower the quake meter, 1 day passes. Defeated: everything found is lost,
     // `daysLostOnDefeat` (1) days pass. The run is kept for the result screen (lastResult).
     public void EndDive(RunResult run)
@@ -303,7 +262,7 @@ public class Campaign
 
     // Each day: the factions do their orders (so today's preparation counts for tomorrow's quake), the quake meter
     // rises (cycle + passive), on a quake day the quake hits, the injured are cared for, on a request day the requests
-    // are refreshed, and a raid day is announced.
+    // are refreshed.
     void AdvanceDays(int count)
     {
         for (int i = 0; i < count; i++)
@@ -315,7 +274,6 @@ public class Campaign
             if (IsQuakeDay(day)) Earthquake();
             CareForInjured();
             if ((day - 1) % config.questInterval == 0) RefreshQuests();
-            if (IsRaidDay) Report("RAID TODAY: defend the town!");
         }
     }
 
@@ -352,7 +310,6 @@ public class Campaign
     {
         NpcState npc = npcs[i];
         NpcDefinition definition = config.npcs[i];
-        bool wasFull = DistrictStrength(i) == 1f;
 
         int unprepared = Mathf.RoundToInt(definition.startPopulation * strength * config.lossPerQuakePercent / 100f);
         int sparedByHomes = Mathf.RoundToInt(unprepared * npc.reinforced / 100f);
@@ -368,7 +325,7 @@ public class Campaign
         string line = $"{definition.faction}: {killed} dead, {injured} hurt ({npc.population}/{definition.startPopulation})";
         if (sparedByHomes > 0) line += $" · homes saved {sparedByHomes}";
         if (sparedByDrills > 0) line += $" · drills saved {sparedByDrills}";
-        Report(line + LossNote(i, wasFull));
+        Report(line + LossNote(i));
 
         float damageChance = 1f - npc.reinforced / 100f;
         npc.reinforced = Mathf.Max(0f, npc.reinforced - strength * config.reinforceCrack);
@@ -397,11 +354,10 @@ public class Campaign
             if (npc.injured == 0) continue;
             if (day >= npc.injuredDeadline)
             {
-                bool wasFull = DistrictStrength(i) == 1f;
                 int died = npc.injured;
                 npc.population -= died;
                 npc.injured = 0;
-                Report($"{definition.faction}: {died} hurt died untreated ({npc.population}/{definition.startPopulation}){LossNote(i, wasFull)}");
+                Report($"{definition.faction}: {died} hurt died untreated ({npc.population}/{definition.startPopulation}){LossNote(i)}");
             }
             else
             {
@@ -411,11 +367,10 @@ public class Campaign
         CheckGameOver();
     }
 
-    // After a faction lost people: wiped out, or newly under half.
-    string LossNote(int i, bool wasFull)
+    // After a faction lost people: wiped out?
+    string LossNote(int i)
     {
-        if (!npcs[i].Alive) return " · WIPED OUT";
-        return wasFull && DistrictStrength(i) < 1f ? " · half strength" : "";
+        return npcs[i].Alive ? "" : " · WIPED OUT";
     }
 
     void CheckGameOver()
@@ -564,7 +519,7 @@ public class Campaign
 
     // Every dive starts with just the Sword at Lv 1 (other unlocked weapons come from level-up cards in the dive,
     // relic weapons are added after this by Relics.ResetForNewRun), plus the stat buildings of every district
-    // (half strength under half, none if wiped out). Call after Player.ResetForNewRun.
+    // (scaled by its faction's share of people left, none if wiped out). Call after Player.ResetForNewRun.
     // XP and materials are read by the arena; the quake, reinforcing and injured ones are used here.
     public void ApplyLoadout(Player player, Weapon[] weapons)
     {
