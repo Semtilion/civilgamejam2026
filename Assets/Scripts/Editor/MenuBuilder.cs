@@ -97,6 +97,12 @@ public static class MenuBuilder
         return menu;
     }
 
+    // The scene's song (Music, Assets/Audio/Music/<file>). Every scene gets one; the first one stays for the whole game.
+    public static void MusicPlayer(string file)
+    {
+        new GameObject("Music").AddComponent<Music>().song = GameBuilder.Song(file);
+    }
+
     // The scene transitions' overlay (SceneTransition): its own canvas on top of everything, hidden until a scene
     // change; the snapshot, the rock (Assets/Art/UI/Descent.png, Tools/bake_descent.py), black, the arrival flash and
     // the card. Every scene gets one; the first one stays for the whole game.

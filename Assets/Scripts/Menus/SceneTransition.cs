@@ -9,7 +9,8 @@ using UnityEngine.UI;
 //   Fade:    to black, a card ("Day 4" / "Quake on day 6"; none without a title), the next scene fades in.
 //   Descent: the screen sinks out of view (a snapshot slides up) into dark rock with glowing crystal veins and the
 //            card, then the rock slides up revealing the next scene, with a flash where the hero arrives (the middle).
-// Any key or click skips the card. The next scene is frozen (timeScale 0) until it's revealed. Unscaled time.
+// Any key or click skips the card. The next scene is frozen (timeScale 0) until it's revealed. The music fades out
+// with the screen and the next scene's song in as it's revealed (Music). Unscaled time.
 // Without one in the scene (e.g. pressing Play in a scene that wasn't rebuilt), Load just loads the scene.
 public class SceneTransition : MonoBehaviour
 {
@@ -68,8 +69,10 @@ public class SceneTransition : MonoBehaviour
     IEnumerator Fade(string scene, string cardTitle, string cardSubtitle)
     {
         Begin(cardTitle, cardSubtitle);
+        Music.FadeOut(FadeTime);
         yield return Animate(FadeTime, t => SetAlpha(black, t));
         yield return LoadAndHold(scene, cardTitle != null);
+        Music.FadeIn(FadeTime);
         yield return Animate(FadeTime, t =>
         {
             SetAlpha(black, 1f - t);
@@ -86,6 +89,7 @@ public class SceneTransition : MonoBehaviour
         snapshot.texture = shot;
         snapshot.enabled = true;
         rock.enabled = true;
+        Music.FadeOut(SinkTime);
         float height = ((RectTransform)transform).rect.height;
         yield return Animate(SinkTime, t => // the view sinks: the screen slides up, the rock comes up from below
         {
@@ -96,6 +100,7 @@ public class SceneTransition : MonoBehaviour
         snapshot.enabled = false;
         Destroy(shot);
         yield return LoadAndHold(scene, cardTitle != null);
+        Music.FadeIn(RiseTime);
         yield return Animate(RiseTime, t => // the rock slides on up: the new scene is underneath
         {
             rock.rectTransform.anchoredPosition = new Vector2(0f, height * Smooth(t));

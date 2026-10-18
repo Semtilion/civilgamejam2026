@@ -259,6 +259,7 @@ public static class ArenaSceneBuilder
         arena.pauseMenu = pauseMenu;
         arena.debugKeys = MenuBuilder.DebugKeysUI(canvas, arena, null, new Vector2(1f, 1f)); // hint top-right
         MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
+        MenuBuilder.MusicPlayer("HyperUltraRacing.wav"); // Hyper Ultra Racing (AugustUltraAmbience)
 
         // ---------- Leveling ----------
         LevelUp leveling = new GameObject("Leveling").AddComponent<LevelUp>();

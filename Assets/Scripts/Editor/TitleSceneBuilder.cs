@@ -57,6 +57,7 @@ public static class TitleSceneBuilder
 
         SettingsMenu settingsMenu = MenuBuilder.Settings(canvas);
         MenuBuilder.TransitionUI(a.glow); // scene changes (the first scene's stays for the whole game)
+        MenuBuilder.MusicPlayer("CrystalCave.mp3"); // Crystal Cave (song18)
 
         TitleManager manager = new GameObject("Title Manager").AddComponent<TitleManager>();
         manager.config = a.townConfig;

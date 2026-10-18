@@ -384,6 +384,7 @@ public class ArenaManager : MonoBehaviour
     {
         UpdateHud();
         UpdateArrow();
+        Music.Dimmed = !IsPlaying; // half volume while paused: level-up cards, the pause menu, the panels
         if (!IsPlaying) return;
 
         UpdateTraps(); // traps still come after the teleporter opens

@@ -335,6 +335,7 @@ public static class TownSceneBuilder
         town.evolutionTexts = a.evolutionTexts;
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
         MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
+        MenuBuilder.MusicPlayer("ANewTown.mp3"); // A New Town
 
         EditorSceneManager.SaveScene(scene);
     }

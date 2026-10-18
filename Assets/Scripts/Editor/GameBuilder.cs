@@ -45,6 +45,7 @@ public static class GameBuilder
     const string EffectsFolder = "Assets/Art/Effects"; // weapon effects: Kenney Particle Pack textures (CC0), white
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
     const string UiFolder = "Assets/Art/UI";             // the title / town screens' art (Tools/bake_title.py, bake_town.py)
+    const string MusicFolder = "Assets/Audio/Music";     // the songs (cynicmusic, CC0)
     const string FrameFolder = "Assets/Art/UI/Frame";    // the artist's ornate frame in 12 pieces, white lines (tinted)
     // The frame art's sizes in px: the top / bottom bands and the side columns, and the bands' fixed pieces (the end
     // pieces with the corners, and the centered ornament); the strips between them stretch.
@@ -416,6 +417,29 @@ public static class GameBuilder
     // pickup 1 unit tall (Pickup sizes it). Return null if the file isn't there.
     public static Sprite OreSprite() => SizedSprite($"{DungeonArtFolder}/Ore.png", OreHeight);
     public static Sprite CrystalSprite() => SizedSprite($"{DungeonArtFolder}/Crystal.png", 1f);
+
+    // A song (Assets/Audio/Music/<file>), streamed and compressed (Vorbis) so the long ones don't fill the memory or
+    // the build. Returns null (no music) if the file isn't there.
+    public static AudioClip Song(string file)
+    {
+        string path = $"{MusicFolder}/{file}";
+        AudioImporter importer = AssetImporter.GetAtPath(path) as AudioImporter;
+        if (importer == null)
+        {
+            Debug.LogWarning($"{path} not found: no music in this scene.");
+            return null;
+        }
+        AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+        if (settings.loadType != AudioClipLoadType.Streaming)
+        {
+            settings.loadType = AudioClipLoadType.Streaming;
+            settings.compressionFormat = AudioCompressionFormat.Vorbis;
+            settings.quality = 0.7f;
+            importer.defaultSampleSettings = settings;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+    }
 
     // The title and town screens' art (Assets/Art/UI/<name>.png, baked by Tools/bake_title.py and bake_town.py; `name`
     // may include a folder, e.g. "Town/TownBackground"): smooth, no mipmaps, uncompressed (a compressed dark gradient
