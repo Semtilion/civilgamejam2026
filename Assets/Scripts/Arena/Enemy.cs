@@ -67,10 +67,12 @@ public class Enemy : MonoBehaviour
     float walked; // units walked (walk cycle)
     float speed;  // data.moveSpeed (slower for a tough variant)
     Color tint;   // data.color (toward the variant's color for a variant)
+    Color particleColor; // data.particleColor, toward the variant's color like the tint
     float trailTimer;      // red variant: the next fire patch
     int hazardDamage;      // red variant: per fire tick; purple: the blast (scaled with depth)
 
-    public Color Tint => tint;
+    // Its death pieces, hit sparks and spawn dust are in this color (its art's, tinted like the enemy).
+    public Color ParticleColor => particleColor;
 
     public bool IsDead => hp <= 0;
 
@@ -104,7 +106,10 @@ public class Enemy : MonoBehaviour
         transform.localScale = Vector3.one * radius * 2f; // placeholder sprite is 1 unit wide
         speed = data.moveSpeed * (variant == EnemyVariant.Tough ? settings.toughSpeed : 1f);
         Color variantColor = settings.ColorOf(variant);
-        tint = isVariant ? data.color * Color.Lerp(Color.white, variantColor, 0.55f) : data.color;
+        Color variantTint = isVariant ? Color.Lerp(Color.white, variantColor, 0.55f) : Color.white;
+        tint = data.color * variantTint;
+        particleColor = (data.particleColor.a > 0f ? data.particleColor : data.color) * variantTint;
+        particleColor.a = 1f;
         sprite = GetComponent<SpriteRenderer>();
         if (isVariant) GetComponent<SpriteOutline>().SetColor(variantColor);
         bodyFlash = GetComponent<HitFlash>();
@@ -153,7 +158,7 @@ public class Enemy : MonoBehaviour
             dangerZone.enabled = false;
             Fx.Unlit(dangerZone);
         }
-        arena.deathBursts.Puff(transform.position, radius);
+        arena.deathBursts.Puff(transform.position, radius, particleColor);
         All.Add(this);
     }
 
@@ -408,7 +413,7 @@ public class Enemy : MonoBehaviour
                 float degrees = tip + turn; // the flower's tips, turned with it
                 Vector2 direction = new Vector2(Mathf.Cos(degrees * Mathf.Deg2Rad), Mathf.Sin(degrees * Mathf.Deg2Rad));
                 Vector2 from = (Vector2)transform.position + direction * radius;
-                Projectile.Fire(shot, data.color, from, direction, data.projectileSpeed, projectileDamage, player);
+                Projectile.Fire(shot, data.color, particleColor, from, direction, data.projectileSpeed, projectileDamage, player);
             }
         }
     }
@@ -428,7 +433,7 @@ public class Enemy : MonoBehaviour
             // The impact spark, on the side the hit came from
             Vector2 toHit = hitFrom - (Vector2)transform.position;
             Vector2 at = toHit.sqrMagnitude > 0.0001f ? (Vector2)transform.position + toHit.normalized * radius * 0.7f : (Vector2)transform.position;
-            arena.deathBursts.Spark(at);
+            arena.deathBursts.Spark(at, particleColor);
         }
         if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)

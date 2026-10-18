@@ -56,6 +56,7 @@ public static class ArenaSceneBuilder
             hasArt ? Color.white : new Color(0.30f, 0.55f, 0.95f), 5);
         body.transform.SetParent(hero.transform, false);
         body.gameObject.AddComponent<SpriteOutline>(); // black outline, like enemies, ores and pickups
+        HitFlash bodyFlash = body.gameObject.AddComponent<HitFlash>(); // red when hit, his moments' colors
         // A small health bar just under the feet: a world-space canvas on the hero, so it follows; over everything in
         // the cave, and unlit (UI).
         RectTransform barCanvas = new GameObject("Health Bar", typeof(RectTransform), typeof(Canvas)).GetComponent<RectTransform>();
@@ -75,6 +76,8 @@ public static class ArenaSceneBuilder
         Player player = hero.AddComponent<Player>();
         player.arena = arena;
         player.sprite = body;
+        player.bodyFlash = bodyFlash;
+        player.particleColor = AverageColor(body.sprite) * body.color; // his chips when hit
         player.body = body.transform;
         player.idleSprite = a.heroIdle;
         player.walkSprites = a.heroWalk;
@@ -97,6 +100,7 @@ public static class ArenaSceneBuilder
         spear.thrustVisual = NewFlashSprite("Thrust", Fx("FX_Streak", a.square), hero.transform, a.unlit);
         spear.tipVisual = NewFlashSprite("Thrust Tip", Fx("FX_Glint", a.circle), hero.transform, a.unlit);
         orbit.crystalSprite = CrystalSprite() ?? a.circle;
+        orbit.glowColor = AverageColor(orbit.crystalSprite); // its glow and Shatter burst
         orbit.burstSprite = Fx("FX_Burst", a.circle);
         orbit.burstRingSprite = Fx("FX_Ring", a.ring);
         // Evolution cards (after Lv 5; the names are Weapon.EvolutionNames)
@@ -120,6 +124,7 @@ public static class ArenaSceneBuilder
         bomb.bombSprite = ItemSprite("Bomb", 1f) ?? Fx("FX_Orb", a.circle); // the artist's bomb, centered on its ball
         bomb.fireSprite = Fx("FX_Fire", a.circle);
         bomb.scorchSprite = EffectSprite("FX_Scorch");
+        bomb.shardColor = AverageColor(bomb.bombSprite); // its shards when it breaks
         axe.axeSprite = ItemSprite("Axe", 1f) ?? Fx("FX_Whirl", a.square); // the artist's axe, 1 unit tall
         foreach (Weapon weapon in new Weapon[] { dagger, spear, orbit, hammer, staff, bomb, axe }) weapon.enabled = false;
 
@@ -156,6 +161,19 @@ public static class ArenaSceneBuilder
         // ---------- HUD ----------
         Transform canvas = NewCanvas("HUD");
         Color backing = new Color(0.05f, 0.04f, 0.07f, 0.6f); // dark, so the text reads over the floor
+
+        // A tremor's dusty haze at the screen's edges (behind the rest of the HUD; shown by ArenaManager)
+        Image dustHaze = NewImage("Dust Haze", canvas, Vector2.zero, Vector2.zero, new Color(0.43f, 0.36f, 0.29f, 0f));
+        Stretch(dustHaze.rectTransform);
+        dustHaze.sprite = EffectSprite("DustHaze");
+        dustHaze.raycastTarget = false;
+        arena.dustHaze = dustHaze;
+        // A red flash at the screen's edges when the hero is hit
+        Image hurtFlash = NewImage("Hurt Flash", canvas, Vector2.zero, Vector2.zero, new Color(0.75f, 0.08f, 0.08f, 0f));
+        Stretch(hurtFlash.rectTransform);
+        hurtFlash.sprite = EffectSprite("DustHaze"); // (white at the edges, clear in the middle)
+        hurtFlash.raycastTarget = false;
+        arena.hurtFlash = hurtFlash;
 
         // Top-left: day / depth / kills, then the dive's loot (the hero's health is the bar under their feet)
         Image topLeft = NewImage("Top-Left Backing", canvas, new Vector2(20, -20), new Vector2(620, 100), backing);
@@ -248,6 +266,12 @@ public static class ArenaSceneBuilder
         leveling.xpHud = xpHud.gameObject;
         leveling.xpBar = xpDynamic;
         leveling.levelText = levelText;
+        // "LEVEL UP!" over the hero for a moment before the cards (LevelUp moves it)
+        Text levelUpText = InTitleFont(Shadowed(NewText("Level Up Text", canvas, Vector2.zero, new Vector2(600, 90), 56, TextAnchor.MiddleCenter)));
+        levelUpText.text = "LEVEL UP!";
+        levelUpText.color = new Color(1f, 0.88f, 0.45f);
+        levelUpText.gameObject.SetActive(false);
+        leveling.levelUpText = levelUpText;
         leveling.cardPanel = cardPanel.gameObject;
         leveling.panelTitle = levelUpTitle;
         leveling.cardButtons = cardButtons;
@@ -273,13 +297,17 @@ public static class ArenaSceneBuilder
         arena.oreColor = oreArt != null ? Color.white : new Color(0.45f, 0.55f, 0.75f);
         arena.oreScale = oreArt != null ? 1f : 1.2f;
         arena.whiteSquare = a.square;
-        arena.rockSprite = a.circle;
+        arena.rockTargetSprite = a.circle;
+        // The tremor's art (Tools/bake_tremor.py, Assets/Art/Effects): the rocks, the cracks, the ripples
+        arena.rockSprites = Enumerable.Range(0, 3).Select(i => EffectSprite($"CaveRock_{i}")).Where(s => s != null).ToArray();
+        arena.rockColor = AverageColor(arena.rockSprites);
+        arena.tremorCrackSprites = Enumerable.Range(0, 3).Select(i => EffectSprite($"TremorCracks_{i}")).Where(s => s != null).ToArray();
+        arena.rippleSprite = EffectSprite("Ripple");
+        arena.oreArtColor = AverageColor(arena.oreSprite);
         arena.unlitMaterial = a.unlit;
         arena.flashMaterial = a.flash;
         Relics relics = arena.gameObject.AddComponent<Relics>();
         relics.arena = arena;
-        relics.circleSprite = a.circle;
-        relics.squareSprite = a.square;
         arena.relics = relics;
         arena.quakeText = quakeText;
         arena.player = player;
@@ -290,6 +318,8 @@ public static class ArenaSceneBuilder
         arena.materialSprite = a.square;
         arena.crystalSprite = crystalArt != null ? crystalArt : a.circle;
         arena.goldSprite = ItemSprite("Gold", 1f) ?? a.circle; // the artist's gold nugget, 1 unit tall (Pickup sizes it)
+        arena.crystalColor = AverageColor(arena.crystalSprite); // the pickups' sparkles (and the crystal's glow)
+        arena.goldColor = AverageColor(arena.goldSprite);
         arena.relicSprite = Fx("FX_Glint", a.circle); // a star, tinted pale gold by Pickup
         arena.fireTrailSprite = Fx("FX_Fire", a.circle);
         arena.blastCoreSprite = a.circle;
@@ -305,7 +335,15 @@ public static class ArenaSceneBuilder
         arena.lootText = lootText;
         arena.teleporterArrow = arrow.rectTransform;
         arena.teleporterSprite = a.circle;
-        arena.teleporterStairs = PropSprite("Prop_Stairs"); // null = glow only
+        arena.teleporterSwirl = Fx("FX_Swirl", a.arc); // the swirling portal
+        // The effects' shared sprites (Kenney Particle Pack, white; the generated ones if a file is missing)
+        arena.fxBurst = Fx("FX_Burst", a.circle);
+        arena.fxRing = Fx("FX_Ring", a.ring);
+        arena.fxGlint = Fx("FX_Glint", a.circle);
+        arena.fxScorch = Fx("FX_Scorch", a.circle);
+        arena.fxBolt = Fx("FX_Bolt", a.square);
+        arena.fxCrackle = Fx("FX_Crackle", a.circle);
+        arena.fxGlow = a.glow;
         arena.bossBar = bossBar.gameObject;
         arena.bossFill = bossFill;
         arena.bossName = bossName;

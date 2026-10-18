@@ -225,6 +225,7 @@ public static class GameBuilder
             a.crystalCluster.color = Color.white;
             EditorUtility.SetDirty(a.crystalCluster);
         }
+        ParticleColors(a.crawler, a.brute, a.spitter, a.colossus, a.crate, a.crystalCluster); // after their art is set
         a.townConfig = TownConfigAsset(a);
         // The artist's portraits go on the leaders that don't have one yet.
         foreach (NpcDefinition npc in a.townConfig.npcs)
@@ -356,6 +357,44 @@ public static class GameBuilder
         enemy.artFacesLeft = true;
         enemy.color = Color.white;
         EditorUtility.SetDirty(enemy);
+    }
+
+    // Every enemy's particle color (EnemyData.particleColor: death pieces, hit sparks, spawn dust): its art's average
+    // color (sprite + flower) times its tint. Recomputed on every build, so it follows new art.
+    static void ParticleColors(params EnemyData[] enemies)
+    {
+        foreach (EnemyData enemy in enemies)
+        {
+            Color color = AverageColor(enemy.sprite, enemy.flower) * enemy.color;
+            color.a = 1f;
+            if (enemy.particleColor == color) continue;
+            enemy.particleColor = color;
+            EditorUtility.SetDirty(enemy);
+        }
+    }
+
+    // The average color of the sprites' image files: opaque pixels only, the dark outlines left out (white if none).
+    public static Color AverageColor(params Sprite[] sprites)
+    {
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        foreach (Sprite sprite in sprites)
+        {
+            string path = sprite != null ? AssetDatabase.GetAssetPath(sprite) : null;
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
+            Texture2D texture = new Texture2D(2, 2);
+            texture.LoadImage(File.ReadAllBytes(path));
+            foreach (Color32 pixel in texture.GetPixels32())
+            {
+                if (pixel.a < 128 || pixel.r + pixel.g + pixel.b < 120) continue;
+                sum += new Vector3(pixel.r, pixel.g, pixel.b);
+                count++;
+            }
+            Object.DestroyImmediate(texture);
+        }
+        if (count == 0) return Color.white;
+        sum /= count * 255f;
+        return new Color(sum.x, sum.y, sum.z);
     }
 
     // An enemy's shadow (EnemyData.shadowSize / shadowOffset), set once: values tuned in the asset are kept.

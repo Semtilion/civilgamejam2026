@@ -20,6 +20,9 @@ public class EnemyData : ScriptableObject
     [Tooltip("The art faces left: mirrored while walking right (off: faces right, mirrored walking left). Only with walk frames.")]
     public bool artFacesLeft;
     public Color color = Color.white;
+    [Tooltip("Its particles' color (death pieces, hit sparks, spawn dust): its art's average color x Color, set by the " +
+             "builder on every build. Clear = Color.")]
+    public Color particleColor = Color.clear;
     [Tooltip("Size in world units (hit size and sprite size).")]
     public float radius = 0.4f;
     [Tooltip("A flat black ellipse (35%, like the hero's) under its feet, in its own size (radius x 2 = 1): how wide and " +

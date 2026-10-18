@@ -19,6 +19,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: df3f62af476dc024f9756a8d11281eea, type: 3}
   artFacesLeft: 1
   color: {r: 1, g: 1, b: 1, a: 1}
+  particleColor: {r: 0.57327944, g: 0.5528071, b: 0.8828047, a: 1}
   radius: 0.6
   shadowSize: {x: 1.05, y: 0.34}
   shadowOffset: {x: 0.12, y: -0.88}

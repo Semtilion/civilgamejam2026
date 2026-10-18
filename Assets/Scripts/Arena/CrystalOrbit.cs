@@ -7,7 +7,7 @@ using UnityEngine;
 public class CrystalOrbit : Weapon
 {
     const int MaxRememberedHits = 1000;
-    static readonly Color ShatterColor = new Color(0.75f, 0.45f, 1f, 0.6f);
+    const float ShatterAlpha = 0.6f;
 
     [Header("Crystal Orbit")]
     public int baseCrystals = 2;
@@ -20,7 +20,8 @@ public class CrystalOrbit : Weapon
     public Sprite crystalSprite;
     [Tooltip("Tint (white = the art's own colors).")]
     public Color crystalColor = Color.white;
-    public Color glowColor = new Color(0.75f, 0.45f, 1f);
+    [Tooltip("The crystals' glow and their Shatter burst: the crystal art's average color (set by the builder).")]
+    public Color glowColor = new Color(0.51f, 0.50f, 0.84f);
     [Header("Shatter (evolved)")]
     [Tooltip("Chance per crystal hit to burst.")]
     [Range(0f, 1f)] public float shatterChance = 0.25f;
@@ -82,8 +83,9 @@ public class CrystalOrbit : Weapon
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, 0f, false);
         }
-        FadeEffect.Circle(burstSprite, center, radius, ShatterColor, 0.3f);
-        FadeEffect.Circle(burstRingSprite, center, radius, ShatterColor, 0.25f);
+        Color shatter = new Color(glowColor.r, glowColor.g, glowColor.b, ShatterAlpha); // the crystal's color
+        FadeEffect.Circle(burstSprite, center, radius, shatter, 0.3f);
+        FadeEffect.Circle(burstRingSprite, center, radius, shatter, 0.25f);
     }
 
     // One crystal object per crystal; more are added when the level bonus kicks in.

@@ -112,15 +112,37 @@ public class ArenaManager : MonoBehaviour
     public float rockRadius = 1f;
     [Tooltip("Damage to the hero (depth 1; scaled like enemy damage). Enemies are never hurt.")]
     public int rockDamage = 15;
-    [Tooltip("Shadow and rock (placeholder circle).")]
-    public Sprite rockSprite;
+    [Tooltip("A falling rock's target on the floor (a circle; its edge is blastRingSprite).")]
+    public Sprite rockTargetSprite;
+    [Tooltip("The falling rocks: lumps of the cave's stone (Tools/bake_tremor.py), one at random each.")]
+    public Sprite[] rockSprites;
+    [Tooltip("The rocks' pieces when they land: their art's average color (set by the builder).")]
+    public Color rockColor = new Color(0.35f, 0.34f, 0.40f);
+    [Tooltip("A tremor's cracks (from the mined ore; small under a landed rock) and its ripples across the floor.")]
+    public Sprite[] tremorCrackSprites;
+    public Sprite rippleSprite;
+    [Tooltip("The ore art's average color: a tremor's rubble (times Ore Color).")]
+    public Color oreArtColor = Color.white;
+    [Tooltip("The dusty haze at the screen's edges during a tremor (a HUD image).")]
+    public Image dustHaze;
 
     [Header("Teleporter (opens when the depth's goal is done)")]
     [Tooltip("The pulsing glow (placeholder circle).")]
     public Sprite teleporterSprite;
-    [Tooltip("Optional art drawn on top of the glow (the stairs down).")]
-    public Sprite teleporterStairs;
+    [Tooltip("The portal swirling on top of the glow (FX_Swirl, tinted cyan).")]
+    public Sprite teleporterSwirl;
     public float teleporterRadius = 1.2f;
+
+    [Header("Effects (Kenney's white textures and generated sprites, tinted where used)")]
+    public Sprite fxBurst;   // a bright burst
+    public Sprite fxRing;    // a soft ring
+    public Sprite fxGlint;   // a 4-point star
+    public Sprite fxScorch;  // a scorch mark
+    public Sprite fxBolt;    // a jagged bolt along its length
+    public Sprite fxCrackle; // an electric crackle
+    public Sprite fxGlow;    // a soft white blob (columns of light)
+    [Tooltip("A red flash at the screen's edges when the hero is hit (a HUD image).")]
+    public Image hurtFlash;
 
     [Header("Raids (every 2nd quake day: hold out until the timer runs out)")]
     [Tooltip("Raid 1 lasts this many seconds...")]
@@ -157,6 +179,9 @@ public class ArenaManager : MonoBehaviour
     public Sprite materialSprite;
     public Sprite crystalSprite;
     public Sprite goldSprite;
+    [Tooltip("The crystal and gold pickups' sparkle (and the crystal's glow): their art's average colors, set by the builder.")]
+    public Color crystalColor = new Color(0.51f, 0.50f, 0.84f);
+    public Color goldColor = new Color(0.91f, 0.76f, 0.45f);
     [Tooltip("A variant's relic drop (a star, tinted by Pickup).")]
     public Sprite relicSprite;
     [Tooltip("Enemy shadows (a circle, squashed and darkened by Enemy).")]
@@ -199,7 +224,7 @@ public class ArenaManager : MonoBehaviour
     public Rect Bounds { get; private set; }
     public bool PanelOpen => panel.activeSelf;
     // False = paused (or the scene is out of date and this component switched itself off): nothing should act.
-    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen;
+    public bool IsPlaying => enabled && !PanelOpen && !leveling.IsChoosing && !pauseMenu.IsOpen && !debugKeys.IsOpen && teleportAge < 0f;
 
     Campaign campaign;
     bool raid;      // this run is a raid, not a dive
@@ -222,7 +247,10 @@ public class ArenaManager : MonoBehaviour
     bool relicDue; // a boss died; its relic is found in the next Update
     Enemy currentBoss;
     GameObject teleporter; // null = not open
-    Transform teleporterGlow;
+    Transform teleporterGlow, teleporterPortal;
+    float sparkleTimer;      // the next speck rising from the open teleporter
+    float teleportAge = -1f; // stepping into the teleporter: seconds since (below 0 = not)
+    float hurtAge = 99f;     // since the hero was last hit (the red at the screen's edges)
 
     float raidLength, raidLeft; // seconds
 
@@ -231,11 +259,11 @@ public class ArenaManager : MonoBehaviour
     float trapDelay;    // seconds until it comes (0 = no tremor going on)
     float rockRainLeft; // seconds of rock rain left
     float rockTimer;
+    float hazeAge = 99f;     // since the tremor's dusty haze started (HazeEnd or more = not showing)
 
     static readonly Color TeleporterColor = new Color(0.4f, 0.9f, 1f, 0.8f);
     static readonly Color XpShrineColor = new Color(0.55f, 0.80f, 1f);    // light blue
     static readonly Color CrystalShrineColor = new Color(0.65f, 0.35f, 0.95f); // purple
-    static readonly Color CrystalGlowColor = new Color(0.80f, 0.60f, 1f);     // light violet, around crystal clusters
 
     int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
     bool IsBossDepth => depth % bossEvery == 0;
@@ -252,7 +280,7 @@ public class ArenaManager : MonoBehaviour
     {
         if (leveling == null || config == null || quakeText == null || crate == null || teleporterArrow == null ||
             whiteSquare == null || crystalCluster == null || crystalSprite == null ||
-            rockSprite == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
+            rockTargetSprite == null || dustHaze == null || hurtFlash == null || fxBurst == null || relics == null || goldSprite == null || pauseMenu == null || damageNumbers == null ||
             deathBursts == null || lootText == null || goalBar == null || debugKeys == null || heroHpBar == null)
         {
             Debug.LogError("The Arena scene is out of date. Rebuild it with Jam > Build Game Scenes.");
@@ -301,6 +329,8 @@ public class ArenaManager : MonoBehaviour
         depth++;
         ClearField();
         player.transform.position = Bounds.center;
+        player.ResetLook(); // (he may have just risen into the teleporter)
+        teleportAge = -1f;
         depthKills = 0;
         spawnTimer = 0f;
         bossSpawned = false;
@@ -309,6 +339,8 @@ public class ArenaManager : MonoBehaviour
         currentBoss = null;
         trapDelay = 0f;
         rockRainLeft = 0f;
+        hazeAge = HazeEnd;
+        SetHaze(0f);
         bossBar.SetActive(false);
         panel.SetActive(false);
         Time.timeScale = 1f;
@@ -322,14 +354,14 @@ public class ArenaManager : MonoBehaviour
     {
         for (int i = 0; i < cratesPerDepth; i++) Enemy.Spawn(crate, RandomFloorPoint(Bounds.center), 1f, player, this);
         for (int i = 0; i < clustersPerDepth; i++)
-            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, CrystalGlowColor, 4f, 1.1f);
+            Glow.Add(Enemy.Spawn(crystalCluster, RandomFloorPoint(Bounds.center), 1f, player, this).gameObject, crystalColor, 4f, 1.1f); // the crystals' color
         for (int i = 0; i < oresPerDepth; i++)
-            MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
+            MineSpot.Place(SpotKind.Ore, oreSprite, oreColor, oreScale, oreMineTime, blastRingSprite, RandomFloorPoint(Bounds.center), this);
         for (int i = 0; i < shrinesPerDepth; i++)
         {
             SpotKind kind = (SpotKind)Random.Range(1, 4); // XpShrine, MaterialsShrine or CrystalShrine
             Color color = kind == SpotKind.XpShrine ? XpShrineColor : kind == SpotKind.MaterialsShrine ? Pickup.MaterialsColor : CrystalShrineColor;
-            MineSpot.Place(kind, oreSprite, color, oreScale, shrineTime, whiteSquare, RandomFloorPoint(Bounds.center), this);
+            MineSpot.Place(kind, oreSprite, color, oreScale, shrineTime, blastRingSprite, RandomFloorPoint(Bounds.center), this);
         }
     }
 
@@ -350,6 +382,11 @@ public class ArenaManager : MonoBehaviour
     {
         UpdateHud();
         UpdateArrow();
+        if (teleportAge >= 0f)
+        {
+            UpdateTeleport();
+            return;
+        }
         if (!IsPlaying) return;
 
         if (raid)
@@ -379,8 +416,15 @@ public class ArenaManager : MonoBehaviour
         {
             float pulse = 1f + 0.1f * Mathf.Sin(Time.time * 6f);
             teleporterGlow.localScale = Vector3.one * teleporterRadius * 2f * pulse; // placeholder circle is 1 unit wide
+            teleporterPortal.Rotate(0f, 0f, -PortalSpin * Time.deltaTime);
+            sparkleTimer -= Time.deltaTime;
+            if (sparkleTimer <= 0f) // specks of light rising from it
+            {
+                sparkleTimer = 0.1f;
+                deathBursts.Rise((Vector2)teleporter.transform.position + Random.insideUnitCircle * teleporterRadius * 0.8f, PortalSparkle);
+            }
             if (((Vector2)(player.transform.position - teleporter.transform.position)).sqrMagnitude <= teleporterRadius * teleporterRadius)
-                DepthCleared();
+                StartTeleport();
             return; // no spawns while it's open
         }
 
@@ -407,7 +451,7 @@ public class ArenaManager : MonoBehaviour
     public void OnEnemyKilled(Enemy enemy)
     {
         bool isBoss = enemy.data.behavior == EnemyBehavior.Boss;
-        deathBursts.Burst(enemy.transform.position, enemy.Tint, enemy.radius, isBoss);
+        deathBursts.Burst(enemy.transform.position, enemy.ParticleColor, enemy.radius, isBoss);
         if (isBoss) cameraFollow.Shake(0.4f, 0.3f);
 
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
@@ -505,7 +549,7 @@ public class ArenaManager : MonoBehaviour
         foreach (Enemy enemy in Enemy.All)
             if (enemy.data.behavior == EnemyBehavior.Shooter && !OnScreen(enemy.transform.position)) Destroy(enemy.gameObject);
 
-        // A pulsing glow, with the stairs down drawn on top of it (if there's art for them).
+        // A pulsing glow with a swirling portal on it; it opens with a burst, a ring and a flash of light.
         teleporter = new GameObject("Teleporter");
         teleporter.transform.position = RandomFloorPoint(player.transform.position);
 
@@ -514,20 +558,62 @@ public class ArenaManager : MonoBehaviour
         glow.transform.localScale = Vector3.one * teleporterRadius * 2f;
         glow.sprite = teleporterSprite;
         glow.color = TeleporterColor;
-        glow.sortingOrder = -2; // under the stairs, pickups and enemies
+        glow.sortingOrder = -2; // under the portal, pickups and enemies
         Fx.Unlit(glow);
         teleporterGlow = glow.transform;
         Glow.Add(teleporter, TeleporterColor, 5f, 1.3f); // lights up the cave around it
 
-        if (teleporterStairs != null)
-        {
-            SpriteRenderer stairs = new GameObject("Stairs").AddComponent<SpriteRenderer>();
-            stairs.transform.SetParent(teleporter.transform, false);
-            stairs.sprite = teleporterStairs;
-            stairs.sortingOrder = -1;
-            stairs.gameObject.AddComponent<SpriteOutline>();
-        }
+        SpriteRenderer portal = new GameObject("Portal").AddComponent<SpriteRenderer>();
+        portal.transform.SetParent(teleporter.transform, false);
+        portal.transform.localScale = Vector3.one * teleporterRadius * 2.2f;
+        portal.sprite = teleporterSwirl;
+        portal.color = new Color(TeleporterColor.r, TeleporterColor.g, TeleporterColor.b, 0.9f);
+        portal.sortingOrder = -1;
+        Fx.Unlit(portal);
+        teleporterPortal = portal.transform;
+
+        Vector2 at = teleporter.transform.position;
+        FadeEffect.Circle(fxBurst, at, teleporterRadius * 1.5f, new Color(0.5f, 0.95f, 1f, 0.9f), 0.45f);
+        FadeEffect.Circle(fxRing, at, teleporterRadius * 1.8f, new Color(0.5f, 0.95f, 1f, 0.9f), 0.5f, 0.2f);
+        FadeEffect.Circle(fxGlint, at, teleporterRadius * 1.6f, new Color(0.85f, 1f, 1f, 1f), 0.35f, 0.3f);
     }
+
+    const float TeleportTime = 0.6f; // the hero rising into the light before the depth is cleared
+    const float PortalSpin = 90f;    // degrees per second
+    static readonly Color PortalSparkle = new Color(0.75f, 0.97f, 1f);
+    static readonly Color AscendColor = new Color(0.8f, 1f, 1f, 0.85f);
+
+    // Stepped into the teleporter: everything stops and the hero rises into a column of light (UpdateTeleport); then
+    // the depth is cleared.
+    void StartTeleport()
+    {
+        teleportAge = 0f;
+        Time.timeScale = 0f;
+        player.Shine(AscendColor, TeleportTime + 0.5f);
+        FadeEffect.Column(fxGlow, player.Feet, 1.3f, 6f, new Color(0.55f, 0.95f, 1f, 0.75f), TeleportTime + 0.15f, unscaled: true);
+        FadeEffect.Circle(fxGlint, player.transform.position, 1.4f, new Color(0.9f, 1f, 1f, 1f), 0.4f, 0.4f, unscaled: true);
+    }
+
+    void UpdateTeleport()
+    {
+        teleportAge += Time.unscaledDeltaTime;
+        player.Ascend(Mathf.Clamp01(teleportAge / TeleportTime));
+        if (teleportAge < TeleportTime) return;
+        teleportAge = -1f;
+        DepthCleared();
+    }
+
+    // The hero took a hit (Player.TakeDamage): a jolt, red at the screen's edges, chips in his colors, the damage in red.
+    public void OnHeroHit(int amount)
+    {
+        cameraFollow.Shake(0.15f, 0.15f);
+        hurtAge = 0f;
+        deathBursts.Burst(player.transform.position, player.particleColor, 0.4f, false);
+        damageNumbers.Show((Vector2)player.transform.position + Vector2.up * 1.3f, $"-{amount}", HeroDamageColor);
+    }
+
+    const float HurtTime = 0.35f, HurtAlpha = 0.5f;
+    static readonly Color HeroDamageColor = new Color(1f, 0.35f, 0.3f);
 
     public bool OnScreen(Vector2 worldPosition)
     {
@@ -607,14 +693,15 @@ public class ArenaManager : MonoBehaviour
         else leveling.AddXp(amount);
     }
 
-    // An ore or a shrine was used up (MineSpot). Shrine loot goes straight into the dive's loot (lost if the hero dies).
-    public void SpotMined(SpotKind kind)
+    // An ore or a shrine at `at` was used up (MineSpot). Shrine loot goes straight into the dive's loot (lost if the hero
+    // dies).
+    public void SpotMined(SpotKind kind, Vector2 at)
     {
         switch (kind)
         {
             case SpotKind.Ore:
                 diveOres++;
-                Tremor();
+                Tremor(at);
                 break;
             case SpotKind.XpShrine:
                 leveling.AddLevelShare(shrineXpShare);
@@ -630,17 +717,39 @@ public class ArenaManager : MonoBehaviour
 
     // ---------- Tremors and traps ----------
 
-    // A destroyed ore shakes the cave; when the shaking ends: nothing, an ambush or a rock rain (equal chance).
-    void Tremor()
+    // A destroyed ore (at `at`) shakes the cave: rubble, ripples and cracks spread from the spot (TremorEffect) and a
+    // dusty haze fills the screen's edges; when the shaking ends: nothing, an ambush or a rock rain (equal chance).
+    void Tremor(Vector2 at)
     {
         cameraFollow.Shake(tremorTime, tremorStrength);
-        deathBursts.Debris(CameraView); // pebbles and dust fall from the ceiling
+        Sprite cracks = tremorCrackSprites.Length > 0 ? tremorCrackSprites[Random.Range(0, tremorCrackSprites.Length)] : null;
+        TremorEffect.Spawn(at, cracks, rippleSprite, oreArtColor * oreColor, deathBursts);
+        hazeAge = 0f;
         trap = (Trap)Random.Range(0, 3);
         trapDelay = tremorTime;
     }
 
+    const float HazeIn = 0.3f, HazeOut = 0.6f, HazeAlpha = 0.55f; // the haze: fades in, holds, fades out after the shake
+    float HazeEnd => tremorTime + HazeOut;
+
+    void UpdateHaze()
+    {
+        if (hazeAge >= HazeEnd) return;
+        hazeAge += Time.deltaTime;
+        float fadeOut = 1f - Mathf.Clamp01((hazeAge - (HazeEnd - HazeOut)) / HazeOut);
+        SetHaze(HazeAlpha * Mathf.Clamp01(hazeAge / HazeIn) * fadeOut);
+    }
+
+    void SetHaze(float alpha)
+    {
+        Color color = dustHaze.color;
+        color.a = alpha;
+        dustHaze.color = color;
+    }
+
     void UpdateTraps()
     {
+        UpdateHaze();
         if (trapDelay > 0f)
         {
             trapDelay -= Time.deltaTime;
@@ -658,7 +767,7 @@ public class ArenaManager : MonoBehaviour
             if (rockTimer <= 0f)
             {
                 rockTimer = rockInterval;
-                FallingRock.Drop(rockSprite, RandomScreenPoint(), rockRadius, rockWarning, Mathf.RoundToInt(rockDamage * StatScale), player);
+                FallingRock.Drop(RandomScreenPoint(), rockRadius, rockWarning, Mathf.RoundToInt(rockDamage * StatScale), this);
             }
         }
     }
@@ -685,18 +794,6 @@ public class ArenaManager : MonoBehaviour
             point.x = Mathf.Clamp(point.x, inside.xMin, inside.xMax);
             point.y = Mathf.Clamp(point.y, inside.yMin, inside.yMax);
             SpawnRandomEnemy(point);
-        }
-    }
-
-    // The part of the world the camera shows.
-    Rect CameraView
-    {
-        get
-        {
-            float halfHeight = cam.orthographicSize;
-            float halfWidth = halfHeight * cam.aspect;
-            Vector2 center = cam.transform.position;
-            return new Rect(center.x - halfWidth, center.y - halfHeight, halfWidth * 2f, halfHeight * 2f);
         }
     }
 
@@ -911,6 +1008,7 @@ public class ArenaManager : MonoBehaviour
         foreach (Pickup pickup in Pickup.All) Destroy(pickup.gameObject);
         foreach (MineSpot spot in MineSpot.All) Destroy(spot.gameObject);
         foreach (FallingRock rock in FallingRock.All) Destroy(rock.gameObject);
+        foreach (TremorEffect tremor in TremorEffect.All) Destroy(tremor.gameObject);
         damageNumbers.Clear();
         deathBursts.Clear();
     }
@@ -920,6 +1018,10 @@ public class ArenaManager : MonoBehaviour
     void UpdateHud()
     {
         heroHpBar.Set((float)player.Hp / player.maxHp);
+        hurtAge += Time.unscaledDeltaTime;
+        Color hurt = hurtFlash.color;
+        hurt.a = HurtAlpha * Mathf.Clamp01(1f - hurtAge / HurtTime);
+        hurtFlash.color = hurt;
 
         float goal = -1f; // the goal bar's fill; below 0 = hidden
         float dt = Time.unscaledDeltaTime; // the loot counters roll up toward the real numbers

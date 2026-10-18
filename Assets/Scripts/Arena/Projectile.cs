@@ -1,21 +1,26 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Enemy shot: flies straight (its art turned to face that way: drawn pointing right), hurts the hero on touch,
-// disappears after a few seconds.
+// Enemy shot: flies straight (its art turned to face that way: drawn pointing right), hurts the hero on touch and
+// shatters (pieces in its shooter's color and a spark); after a few seconds it fades out with a sparkle.
 public class Projectile : MonoBehaviour
 {
     public static readonly List<Projectile> All = new List<Projectile>();
 
     public const float Radius = 0.2f; // hit size; the sprite is drawn Radius x 2 per unit of its size
     const float Lifetime = 5f;
+    const float FadeTime = 0.3f; // its last moments
 
+    SpriteRenderer sprite;
+    Color particleColor;
     Vector2 velocity;
     int damage;
     float age;
     Player player;
 
-    public static void Fire(Sprite sprite, Color color, Vector2 from, Vector2 direction, float speed, int damage, Player player)
+    // `particleColor`: its pieces when it shatters (its shooter's).
+    public static void Fire(Sprite sprite, Color color, Color particleColor, Vector2 from, Vector2 direction, float speed,
+        int damage, Player player)
     {
         GameObject go = new GameObject("Projectile");
         go.transform.position = from;
@@ -29,6 +34,8 @@ public class Projectile : MonoBehaviour
         Fx.Unlit(renderer); // shots must stay visible in the dark
 
         Projectile projectile = go.AddComponent<Projectile>();
+        projectile.sprite = renderer;
+        projectile.particleColor = particleColor;
         projectile.velocity = direction * speed;
         projectile.damage = damage;
         projectile.player = player;
@@ -48,14 +55,24 @@ public class Projectile : MonoBehaviour
         age += Time.deltaTime;
 
         float touch = Radius + player.radius;
+        DeathBursts bursts = player.arena.deathBursts;
         if (((Vector2)(player.transform.position - transform.position)).sqrMagnitude < touch * touch)
         {
             player.TakeDamage(damage);
+            bursts.Burst(transform.position, particleColor, 0.25f, false); // shatters
+            bursts.Spark(transform.position, Color.Lerp(particleColor, Color.white, 0.5f));
             Destroy(gameObject);
         }
         else if (age >= Lifetime)
         {
+            bursts.Sparkle(transform.position, particleColor);
             Destroy(gameObject);
+        }
+        else if (age > Lifetime - FadeTime)
+        {
+            Color color = sprite.color;
+            color.a = (Lifetime - age) / FadeTime;
+            sprite.color = color;
         }
     }
 }

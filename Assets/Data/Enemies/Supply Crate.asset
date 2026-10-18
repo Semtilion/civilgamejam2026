@@ -17,6 +17,7 @@ MonoBehaviour:
   walkFrames: []
   artFacesLeft: 0
   color: {r: 1, g: 1, b: 1, a: 1}
+  particleColor: {r: 0.36823484, g: 0.26375893, b: 0.16030967, a: 1}
   radius: 0.5
   shadowSize: {x: 0, y: 0}
   shadowOffset: {x: 0, y: 0}

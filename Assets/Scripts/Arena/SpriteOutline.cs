@@ -18,8 +18,6 @@ public class SpriteOutline : MonoBehaviour
         new Vector2(0.7071f, 0.7071f), new Vector2(-0.7071f, 0.7071f), new Vector2(0.7071f, -0.7071f), new Vector2(-0.7071f, -0.7071f),
     };
 
-    static readonly Dictionary<Color, Material> SolidMaterials = new Dictionary<Color, Material>(); // one per color, made once
-
     SpriteRenderer source;
     readonly SpriteRenderer[] copies = new SpriteRenderer[8];
     // What the copies show now
@@ -47,12 +45,8 @@ public class SpriteOutline : MonoBehaviour
     // no longer follows the sprite's). Stays black if there's no silhouette material.
     public void SetColor(Color color)
     {
-        if (HitFlash.Material == null) return;
-        if (!SolidMaterials.TryGetValue(color, out Material material))
-        {
-            material = new Material(HitFlash.Material) { color = color };
-            SolidMaterials[color] = material;
-        }
+        Material material = HitFlash.Colored(color); // (one per color, shared)
+        if (material == null) return;
         foreach (SpriteRenderer copy in copies) copy.sharedMaterial = material;
     }
 

@@ -1,9 +1,9 @@
 using UnityEngine;
 
 // Small pooled pieces for quick effects: death bursts (enemies and crates pop into pieces of their color; bosses into
-// many bigger, slower ones), spawn puffs (dust when an enemy appears), pickup sparkles, and tremor debris (pebbles and
-// dust falling from the ceiling). Pieces fly, slow down (or fall), shrink and fade; the oldest is reused when they
-// run out. They freeze while the game is paused.
+// many bigger, slower ones; a tremor's rubble, a landed rock's pieces), dust puffs (an enemy appearing, in its color;
+// ground dust), pickup sparkles, and hit sparks. Pieces fly, slow down (or fall), shrink and fade; the oldest is reused
+// when they run out. They freeze while the game is paused.
 public class DeathBursts : MonoBehaviour
 {
     const int MaxPieces = 400;
@@ -76,8 +76,8 @@ public class DeathBursts : MonoBehaviour
         }
     }
 
-    // An enemy is hit: a quick white star at `position` that pops up and fades (sparkTime).
-    public void Spark(Vector2 position)
+    // An enemy is hit: a quick star in its color at `position` that pops up and fades (sparkTime).
+    public void Spark(Vector2 position, Color color)
     {
         if (sparkSprite == null) return;
         SpriteRenderer spark = sparks[nextSpark];
@@ -86,7 +86,7 @@ public class DeathBursts : MonoBehaviour
         spark.transform.position = position;
         spark.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 90f));
         spark.transform.localScale = Vector3.one * sparkSize * 0.5f;
-        spark.color = Color.white;
+        spark.color = color;
         spark.enabled = true;
     }
 
@@ -102,14 +102,26 @@ public class DeathBursts : MonoBehaviour
         }
     }
 
-    // An enemy appears: a little dust ring at its feet.
+    // A little dust ring: ground dust (the hammer's cracks), or in an enemy's color as it appears.
     public void Puff(Vector2 position, float radius)
     {
+        Puff(position, radius, DustColor);
+    }
+
+    public void Puff(Vector2 position, float radius, Color color)
+    {
+        color.a = DustColor.a;
         for (int i = 0; i < 4; i++)
         {
             Vector2 direction = Random.insideUnitCircle.normalized;
-            Emit(position + direction * radius * 0.6f, direction * 1.5f, 0.35f, 0.18f + radius * 0.2f, DustColor, 0f);
+            Emit(position + direction * radius * 0.6f, direction * 1.5f, 0.35f, 0.18f + radius * 0.2f, color, 0f);
         }
+    }
+
+    // A speck of light drifting up and fading (the teleporter, Second Wind).
+    public void Rise(Vector2 position, Color color)
+    {
+        Emit(position, new Vector2(Random.Range(-0.2f, 0.2f), Random.Range(0.8f, 1.4f)), Random.Range(0.6f, 1f), 0.09f, color, 0f);
     }
 
     // A pickup is collected: a few bright specks of its color.
@@ -117,23 +129,6 @@ public class DeathBursts : MonoBehaviour
     {
         for (int i = 0; i < 4; i++)
             Emit(position, Random.insideUnitCircle.normalized * 3f, 0.25f, 0.1f, Color.Lerp(color, Color.white, 0.4f), 0f);
-    }
-
-    // A tremor: pebbles and dust fall from the ceiling all over `view` (the camera's view, in world units).
-    public void Debris(Rect view)
-    {
-        for (int i = 0; i < 45; i++)
-        {
-            Vector2 at = new Vector2(Random.Range(view.xMin, view.xMax), Random.Range(view.yMin, view.yMax));
-            float shade = Random.Range(0.35f, 0.6f);
-            Emit(at, new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(-1f, -3f)), Random.Range(0.5f, 0.9f),
-                Random.Range(0.08f, 0.18f), new Color(shade, shade * 0.92f, shade * 0.85f), -14f); // pebbles drop
-        }
-        for (int i = 0; i < 12; i++)
-        {
-            Vector2 at = new Vector2(Random.Range(view.xMin, view.xMax), Random.Range(view.yMin, view.yMax));
-            Emit(at, new Vector2(0f, -0.6f), Random.Range(0.8f, 1.2f), Random.Range(0.5f, 0.9f), DustColor, 0f); // dust clouds
-        }
     }
 
     void Emit(Vector2 position, Vector2 velocity, float life, float size, Color color, float gravity)

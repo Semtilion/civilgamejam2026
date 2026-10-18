@@ -24,8 +24,10 @@ public class Relics : MonoBehaviour
     // The weapons the first relics give, in RelicId order.
     static readonly WeaponId[] RelicWeapons = { WeaponId.QuakeHammer, WeaponId.LightningStaff, WeaponId.FireBomb, WeaponId.Axe };
 
-    static readonly Color BurstColor = new Color(1f, 1f, 1f, 0.5f);
-    static readonly Color ExplosionColor = new Color(1f, 0.55f, 0.15f, 0.6f);
+    static readonly Color Gold = new Color(1f, 0.85f, 0.45f);             // Second Wind
+    static readonly Color ExplosionColor = new Color(1f, 0.75f, 0.4f, 0.9f); // Volatile Core: the burst...
+    static readonly Color FireRingColor = new Color(1f, 0.55f, 0.15f, 0.8f); // ...its ring and sparks...
+    static readonly Color ScorchColor = new Color(0.12f, 0.07f, 0.05f, 0.6f); // ...and the scorch mark
     static readonly Color LightningColor = new Color(1f, 0.95f, 0.5f);
 
     [Header("Glass Cannon")]
@@ -63,9 +65,8 @@ public class Relics : MonoBehaviour
     public float bossSlowAmount = 0.25f;
 
     [Header("Scene references")]
+    [Tooltip("Also the effects' sprites (fxBurst, fxRing, fxBolt...).")]
     public ArenaManager arena;
-    public Sprite circleSprite;
-    public Sprite squareSprite;
 
     readonly bool[] active = new bool[Names.Length]; // owned + found on this dive
     readonly List<RelicId> foundThisDive = new List<RelicId>();
@@ -206,7 +207,12 @@ public class Relics : MonoBehaviour
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(0, center, secondWindPush, false); // a push, no damage (only chasers get pushed)
         }
-        FadeEffect.Circle(circleSprite, center, secondWindRadius, BurstColor, 0.4f);
+        // A white flash, a pillar of gold light, a gold shockwave (the push), specks rising; gold while invulnerable
+        player.Flash(Color.white, 0.15f);
+        player.Shine(new Color(Gold.r, Gold.g, Gold.b, 0.5f), secondWindInvulnerable);
+        FadeEffect.Column(arena.fxGlow, player.Feet, 1.4f, 5f, new Color(Gold.r, Gold.g, Gold.b, 0.6f), 0.6f);
+        FadeEffect.Circle(arena.fxRing, center, secondWindRadius, new Color(Gold.r, Gold.g, Gold.b, 0.9f), 0.5f, 0.1f);
+        for (int i = 0; i < 12; i++) arena.deathBursts.Rise(center + Random.insideUnitCircle * 1.2f, Color.Lerp(Gold, Color.white, 0.5f));
         return true;
     }
 
@@ -232,7 +238,12 @@ public class Relics : MonoBehaviour
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(damage, center, 0f, false);
         }
-        FadeEffect.Circle(circleSprite, center, explosionRadius, ExplosionColor, 0.25f);
+        // A fiery burst and ring with sparks, a scorch mark left behind, a little smoke
+        FadeEffect.Circle(arena.fxScorch, center, explosionRadius * 0.9f, ScorchColor, 1.2f, 1f, false, -2);
+        FadeEffect.Circle(arena.fxBurst, center, explosionRadius, ExplosionColor, 0.3f);
+        FadeEffect.Circle(arena.fxRing, center, explosionRadius, FireRingColor, 0.35f, 0.3f);
+        arena.deathBursts.Burst(center, FireRingColor, explosionRadius * 0.5f, false);
+        for (int i = 0; i < 3; i++) arena.deathBursts.Puff(center + Random.insideUnitCircle * explosionRadius * 0.5f, 0.6f);
     }
 
     // Storm Orb: lightning jumps from the hit enemy to the nearest enemy not struck yet, `chainTargets` times.
@@ -257,7 +268,9 @@ public class Relics : MonoBehaviour
             if (next == null) return;
 
             Vector2 target = next.transform.position;
-            FadeEffect.Line(squareSprite, current, target, 0.12f, LightningColor, 0.15f);
+            FadeEffect.Line(arena.fxBolt, current, target, 0.7f, LightningColor, 0.2f); // a jagged bolt...
+            FadeEffect.Circle(arena.fxCrackle, target, 0.6f, LightningColor, 0.2f);      // ...crackling on the enemy
+            arena.deathBursts.Sparkle(target, LightningColor);
             next.TakeDamage(damage, current, 0f, false);
             struck.Add(next);
             current = target;

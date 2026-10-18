@@ -6,6 +6,9 @@ using UnityEngine.Rendering.Universal;
 // parent's scale, so it works on scaled objects too.
 public class Glow : MonoBehaviour
 {
+    [Tooltip("Times the light's strength (an ore glows brighter while it's being mined).")]
+    public float boost = 1f;
+
     Light2D glowLight;
     float baseIntensity;
     float phase;
@@ -29,6 +32,6 @@ public class Glow : MonoBehaviour
 
     void Update()
     {
-        glowLight.intensity = baseIntensity * (0.7f + 0.3f * Mathf.Sin(Time.time * 3f + phase)); // freezes when paused
+        glowLight.intensity = baseIntensity * boost * (0.7f + 0.3f * Mathf.Sin(Time.time * 3f + phase)); // freezes when paused
     }
 }

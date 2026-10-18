@@ -53,13 +53,16 @@ public class LevelUp : MonoBehaviour
     public DynamicBar xpBar;
     public Text levelText;
     public GameObject cardPanel;
+    [Tooltip("\"LEVEL UP!\" popping up above the hero before the cards (a HUD text).")]
+    public Text levelUpText;
     [Tooltip("The panel's title: LEVEL UP! or RELIC FOUND.")]
     public Text panelTitle;
     public Button[] cardButtons;
     public Text[] cardTitles;
     public Text[] cardDescriptions;
 
-    public bool IsChoosing => cardPanel.activeSelf;
+    // The cards are up, or the level-up moment before them is playing (the game is frozen either way).
+    public bool IsChoosing => cardPanel.activeSelf || celebrate > 0f;
     public int Level => level;
     // XP gem multiplier (the Scrying Pool building), set by the arena at the start of every dive.
     public float XpGain { get; set; } = 1f;
@@ -72,6 +75,12 @@ public class LevelUp : MonoBehaviour
     bool[] evolutionUnlocked = new bool[0]; // by WeaponId, from the town
     int evolutionsTaken;
     Color cardColor, frameColor; // a common card's background and frame (as built)
+    float celebrate;             // the level-up moment: seconds left (the game is frozen), then the cards
+    List<Card> celebrated;       // the cards it will show
+
+    const float CelebrateTime = 0.45f;
+    static readonly Color LevelLight = new Color(0.55f, 0.95f, 1f, 0.6f);
+    static readonly Color LevelRing = new Color(1f, 0.88f, 0.45f, 0.9f);
 
     int XpToNext => xpBase + xpPerLevel * level;
 
@@ -93,6 +102,8 @@ public class LevelUp : MonoBehaviour
         pendingPicks = 0;
         System.Array.Clear(statRanks, 0, statRanks.Length);
         cardPanel.SetActive(false);
+        celebrate = 0f;
+        levelUpText.gameObject.SetActive(false);
         xpBar.Snap(0f);
     }
 
@@ -102,7 +113,19 @@ public class LevelUp : MonoBehaviour
         xpBar.Set(xp / XpToNext);
         levelText.text = $"Lv {level}";
 
-        if (IsChoosing) PickWithKeys();
+        if (celebrate > 0f)
+        {
+            celebrate -= Time.unscaledDeltaTime;
+            float t = 1f - celebrate / CelebrateTime;
+            levelUpText.rectTransform.position = player.arena.cam.WorldToScreenPoint(player.transform.position + Vector3.up * 2.1f);
+            levelUpText.transform.localScale = Vector3.one * Fx.EaseOutBack(t * 2f); // pops in
+            if (celebrate <= 0f)
+            {
+                levelUpText.gameObject.SetActive(false);
+                Show("LEVEL UP!", celebrated);
+            }
+        }
+        if (cardPanel.activeSelf) PickWithKeys();
     }
 
     void PickWithKeys()
@@ -177,7 +200,22 @@ public class LevelUp : MonoBehaviour
         Shuffle(cards);
         int evolution = cards.FindIndex(c => c.evolution); // an evolution always gets the first slot
         if (evolution > 0) (cards[0], cards[evolution]) = (cards[evolution], cards[0]);
-        Show("LEVEL UP!", cards);
+        Celebrate(cards);
+    }
+
+    // The level-up moment before the cards: the game freezes, a pillar of light and a ring rise at the hero, he flashes,
+    // "LEVEL UP!" pops up above him (Update); then the cards.
+    void Celebrate(List<Card> cards)
+    {
+        celebrated = cards;
+        celebrate = CelebrateTime;
+        Time.timeScale = 0f;
+        ArenaManager arena = player.arena;
+        player.Flash(new Color(0.85f, 1f, 1f, 0.8f), 0.25f);
+        FadeEffect.Column(arena.fxGlow, player.Feet, 1.2f, 4.5f, LevelLight, CelebrateTime, unscaled: true);
+        FadeEffect.Circle(arena.fxRing, player.Feet, 2.2f, LevelRing, CelebrateTime + 0.1f, 0.2f, unscaled: true);
+        FadeEffect.Circle(arena.fxGlint, player.transform.position, 1.2f, Color.white, 0.3f, 0.4f, unscaled: true);
+        levelUpText.gameObject.SetActive(true);
     }
 
     // A relic pickup was collected (the relic already works): one Gold card with it; taking it just closes the panel.

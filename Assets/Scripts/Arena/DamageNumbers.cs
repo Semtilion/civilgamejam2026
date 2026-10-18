@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // Damage numbers that pop up over hit enemies, float up and fade. Weapon hits are white (25+ big and yellow), relic
-// effect damage (explosions, lightning) is orange. Lives on its own screen canvas below the HUD; the numbers are pooled
+// effect damage (explosions, lightning) is orange; the hero's are red (any color: Show with a color). Lives on its own screen canvas below the HUD; the numbers are pooled
 // (the oldest is reused when they run out) and freeze while the game is paused.
 public class DamageNumbers : MonoBehaviour
 {
@@ -34,13 +34,18 @@ public class DamageNumbers : MonoBehaviour
 
     public void Show(Vector2 position, int amount, bool weaponHit)
     {
-        Number number = Take();
         bool big = amount >= BigHit;
+        Show(position, amount.ToString(), !weaponHit ? EffectColor : big ? BigColor : NormalColor, big);
+    }
+
+    public void Show(Vector2 position, string label, Color color, bool big = false)
+    {
+        Number number = Take();
         number.world = position + Random.insideUnitCircle * 0.25f;
         number.age = 0f;
-        number.text.text = amount.ToString();
+        number.text.text = label;
         number.text.fontSize = big ? bigFontSize : fontSize;
-        number.text.color = !weaponHit ? EffectColor : big ? BigColor : NormalColor;
+        number.text.color = color;
         number.text.enabled = true;
         Place(number);
     }

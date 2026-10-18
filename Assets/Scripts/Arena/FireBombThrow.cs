@@ -22,6 +22,8 @@ public class FireBombThrow : Weapon
     public Sprite scorchSprite;
     [Tooltip("The flames' color (and their light).")]
     public Color fireColor = new Color(1f, 0.5f, 0.15f);
+    [Tooltip("The shards when it breaks: the bomb art's average color (set by the builder).")]
+    public Color shardColor = new Color(0.47f, 0.41f, 0.38f);
 
     protected override bool Attack()
     {

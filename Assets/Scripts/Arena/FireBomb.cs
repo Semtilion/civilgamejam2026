@@ -21,7 +21,6 @@ public class FireBomb : MonoBehaviour
     const float PatchGrowTime = 0.2f; // the patch pops up after the break
     static readonly Color ScorchColor = new Color(0.12f, 0.06f, 0.04f, 0.7f);
     static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.35f); // like the hero's
-    static readonly Color ShardColor = new Color(0.55f, 0.55f, 0.58f);
 
     FireBombThrow weapon;
     Player player;
@@ -129,7 +128,7 @@ public class FireBomb : MonoBehaviour
         transform.position = to;
         Destroy(bomb.gameObject); // (its light too)
         Destroy(shadow.gameObject);
-        player.arena.deathBursts.Burst(to, ShardColor, 0.3f, false);
+        player.arena.deathBursts.Burst(to, weapon.shardColor, 0.3f, false);
         player.arena.deathBursts.Burst(to, weapon.fireColor, 0.3f, false);
 
         flames.transform.localPosition = Vector3.zero;

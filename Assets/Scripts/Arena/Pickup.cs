@@ -18,8 +18,6 @@ public class Pickup : MonoBehaviour
     const float SpinSpeed = 120f; // degrees per second
     static readonly Color XpColor = new Color(0.30f, 0.90f, 1f);
     public static readonly Color MaterialsColor = new Color(0.85f, 0.65f, 0.35f); // also the materials shrine's color
-    static readonly Color CrystalColor = new Color(0.85f, 0.55f, 1f);
-    static readonly Color GoldColor = new Color(1f, 0.85f, 0.15f);
     static readonly Color SuppliesColor = new Color(0.55f, 0.95f, 0.55f);
     static readonly Color RelicColor = new Color(1f, 0.90f, 0.60f);
 
@@ -38,9 +36,11 @@ public class Pickup : MonoBehaviour
         GameObject go = new GameObject(kind.ToString());
         go.transform.position = position;
 
+        // Its color: the sparkle when it's collected (and the tint of the plain shapes, the crystal's glow); the
+        // crystal and gold are the artist's art, so theirs come from it (ArenaManager).
         Color color = kind == PickupKind.Xp ? XpColor : kind == PickupKind.Materials ? MaterialsColor :
-            kind == PickupKind.Crystal ? CrystalColor : kind == PickupKind.Supplies ? SuppliesColor :
-            kind == PickupKind.Relic ? RelicColor : GoldColor;
+            kind == PickupKind.Crystal ? arena.crystalColor : kind == PickupKind.Supplies ? SuppliesColor :
+            kind == PickupKind.Relic ? RelicColor : arena.goldColor;
         bool paintedArt = kind == PickupKind.Crystal || kind == PickupKind.Gold;
         // World size (the sprites are 1 unit): bigger = worth more.
         float size = kind == PickupKind.Crystal ? 0.5f : kind == PickupKind.Relic ? 0.9f :
@@ -53,7 +53,7 @@ public class Pickup : MonoBehaviour
         renderer.sortingOrder = 0;
         Fx.Unlit(renderer);
         if (kind != PickupKind.Relic) renderer.gameObject.AddComponent<SpriteOutline>(); // (the relic star is all soft glow)
-        if (kind == PickupKind.Crystal) Glow.Add(go, CrystalColor, 1.8f, 0.8f);
+        if (kind == PickupKind.Crystal) Glow.Add(go, color, 1.8f, 0.8f);
         if (kind == PickupKind.Relic) Glow.Add(go, RelicColor, 2.2f, 1f);
 
         Pickup pickup = go.AddComponent<Pickup>();

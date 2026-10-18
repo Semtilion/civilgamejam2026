@@ -1,43 +1,60 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// One rock of the rock rain trap: a shadow grows on the floor for `warning` seconds, then the rock lands and hurts
-// the hero if they're under it (enemies are never hurt). The landed rock stays a moment, then disappears.
+// One rock of the rock rain trap. For `warning` seconds its target grows on the floor (a dark red circle with a bright
+// edge) while the rock (a lump of the cave's stone, one of the arena's rockSprites) falls into it from above, growing
+// as it comes. Then it lands: it hurts the hero if they're under it (enemies are never hurt), pieces fly and dust puffs
+// up around it, the floor cracks under it, the camera bumps if the hero is close; the rock then fades away.
 public class FallingRock : MonoBehaviour
 {
     public static readonly List<FallingRock> All = new List<FallingRock>();
 
-    const float LandedTime = 0.3f;
-    static readonly Color ShadowColor = new Color(0.30f, 0.04f, 0.04f, 0.6f); // dark red: reads as danger on the dark floor
-    static readonly Color RockColor = new Color(0.50f, 0.45f, 0.40f);
+    const float FallHeight = 6f;   // units above its target when it starts falling
+    const float FadeTime = 0.5f;   // after landing
+    const float BumpRange = 3f;    // units from the hero
+    const float CrackSize = 1.2f;  // the cracks under it reach this far (x its radius)
+    static readonly Color TargetColor = new Color(0.43f, 0.08f, 0.08f, 0.7f);
+    static readonly Color EdgeColor = new Color(1f, 0.35f, 0.27f, 0.8f);
 
-    SpriteRenderer sprite;
-    Player player;
-    float radius;
-    float warning;
+    ArenaManager arena;
+    SpriteRenderer target, edge, rock, cracks;
+    float radius, warning, age;
     int damage;
-    float age;
     bool landed;
 
-    public static void Drop(Sprite sprite, Vector2 position, float radius, float warning, int damage, Player player)
+    public static void Drop(Vector2 position, float radius, float warning, int damage, ArenaManager arena)
     {
-        GameObject go = new GameObject("Falling Rock");
-        go.transform.position = position;
+        FallingRock falling = new GameObject("Falling Rock").AddComponent<FallingRock>();
+        falling.transform.position = position;
+        falling.arena = arena;
+        falling.radius = radius;
+        falling.warning = warning;
+        falling.damage = damage;
+        falling.target = falling.Layer("Target", arena.rockTargetSprite, TargetColor, -1);
+        falling.edge = falling.Layer("Edge", arena.blastRingSprite, EdgeColor, -1); // (the plain ring)
+        bool art = arena.rockSprites.Length > 0;
+        falling.rock = falling.Layer("Rock", art ? arena.rockSprites[Random.Range(0, arena.rockSprites.Length)] : arena.rockTargetSprite,
+            art ? Color.white : arena.rockColor, 6); // over everyone while it falls and as it lands
+        if (arena.tremorCrackSprites.Length > 0)
+        {
+            falling.cracks = falling.Layer("Cracks", arena.tremorCrackSprites[Random.Range(0, arena.tremorCrackSprites.Length)], Color.white, -1);
+            falling.cracks.transform.localRotation = Quaternion.Euler(0f, 0f, Random.value * 360f);
+            falling.cracks.transform.localScale = Vector3.one * radius * CrackSize * 2f / TremorEffect.PatternReach;
+            falling.cracks.enabled = false; // until it lands
+        }
+        falling.Draw();
+        All.Add(falling);
+    }
 
-        SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
-        renderer.sprite = sprite;
-        renderer.color = ShadowColor;
-        renderer.sortingOrder = -1; // on the floor, under everyone
-        Fx.Unlit(renderer); // the warning must stay visible in the dark
-
-        FallingRock rock = go.AddComponent<FallingRock>();
-        rock.sprite = renderer;
-        rock.player = player;
-        rock.radius = radius;
-        rock.warning = warning;
-        rock.damage = damage;
-        rock.UpdateShadow();
-        All.Add(rock);
+    SpriteRenderer Layer(string name, Sprite sprite, Color color, int sortingOrder)
+    {
+        SpriteRenderer layer = new GameObject(name).AddComponent<SpriteRenderer>();
+        layer.transform.SetParent(transform, false);
+        layer.sprite = sprite;
+        layer.color = color;
+        layer.sortingOrder = sortingOrder;
+        Fx.Unlit(layer); // the warning and the rock must stay readable in the dark
+        return layer;
     }
 
     void OnDestroy()
@@ -47,35 +64,66 @@ public class FallingRock : MonoBehaviour
 
     void Update()
     {
-        if (!player.arena.IsPlaying) return;
+        if (!arena.IsPlaying) return;
 
         age += Time.deltaTime;
-        if (!landed)
-        {
-            UpdateShadow();
-            if (age >= warning) Land();
-        }
-        else if (age >= warning + LandedTime)
+        if (!landed && age >= warning) Land();
+        if (landed && age >= warning + FadeTime)
         {
             Destroy(gameObject);
+            return;
         }
+        Draw();
     }
 
-    // The shadow grows from a third of the rock's size as it comes down (placeholder circle is 1 unit wide).
-    void UpdateShadow()
+    void Draw()
     {
-        transform.localScale = Vector3.one * radius * 2f * Mathf.Lerp(0.33f, 1f, age / warning);
+        if (!landed)
+        {
+            // The target grows from 40%; the rock comes down from FallHeight (faster and faster), from half its size.
+            float k = Mathf.Clamp01(age / warning);
+            Vector3 targetSize = Vector3.one * radius * 2f * Mathf.Lerp(0.4f, 1f, k); // the circle and ring are 1 unit wide
+            target.transform.localScale = targetSize;
+            edge.transform.localScale = targetSize;
+            target.color = new Color(TargetColor.r, TargetColor.g, TargetColor.b, TargetColor.a * Mathf.Lerp(0.7f, 1f, k));
+            rock.transform.localPosition = new Vector3(0f, (1f - k) * (1f - k) * FallHeight, 0f);
+            rock.transform.localScale = Vector3.one * radius * 2f * Mathf.Lerp(0.5f, 1f, k);
+            return;
+        }
+        // Landed: the rock and its cracks fade, the rock sinking a little.
+        float fade = Mathf.Clamp01((age - warning) / FadeTime);
+        rock.transform.localPosition = new Vector3(0f, -0.1f * fade, 0f);
+        SetAlpha(rock, 1f - fade);
+        if (cracks != null) SetAlpha(cracks, 1f - fade);
     }
 
     void Land()
     {
         landed = true;
-        transform.localScale = Vector3.one * radius * 2f;
-        sprite.color = RockColor;
-        sprite.sortingOrder = 6; // on top of the hero
+        target.enabled = false;
+        edge.enabled = false;
+        rock.transform.localScale = Vector3.one * radius * 2f;
+        if (cracks != null) cracks.enabled = true;
 
+        Player player = arena.player;
+        Vector2 at = transform.position;
+        Vector2 toHero = (Vector2)player.transform.position - at;
         float reach = radius + player.radius;
-        if (((Vector2)(player.transform.position - transform.position)).sqrMagnitude < reach * reach)
-            player.TakeDamage(damage);
+        if (toHero.sqrMagnitude < reach * reach) player.TakeDamage(damage);
+        if (toHero.sqrMagnitude < BumpRange * BumpRange) arena.ShakeCamera(0.12f, 0.12f);
+
+        arena.deathBursts.Burst(at, arena.rockColor, radius * 0.6f, false); // pieces of the rock
+        for (int i = 0; i < 6; i++) // dust all around it
+        {
+            float angle = i * Mathf.PI / 3f;
+            arena.deathBursts.Puff(at + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius * 0.9f, 0.5f);
+        }
+    }
+
+    static void SetAlpha(SpriteRenderer renderer, float alpha)
+    {
+        Color color = renderer.color;
+        color.a = alpha;
+        renderer.color = color;
     }
 }
