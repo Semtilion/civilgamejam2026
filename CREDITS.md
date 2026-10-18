@@ -52,7 +52,24 @@ Made for Civil Game Jam 2026.
 | [Catching Fire](https://opengameart.org/content/catching-fire) | themightyglider | Fire bomb flames |
 | [Level up, power up, Coin get (13 sounds)](https://opengameart.org/content/level-up-power-up-coin-get-13-sounds) | wobbleboxx ("WobbleBoxx Workshop") | Level-up, relics, shrines, teleporter, defeat, reports, turn-ins |
 
-Made for the game (synthesized by our tools): the button click, XP pickup, monster hit and food pickup sounds.
+Made for the game: the button click, XP pickup, monster hit and food pickup sounds (synthesized by Python tools written with Claude Code).
+
+### Not in this repository: the Pixabay sounds
+
+The Pixabay Content License doesn't allow sharing the raw files on their own, so these 8 sounds are left out of the repo (and git-ignored); the playable build includes them. To get them, download each one from its page above and save it under this name (their `.meta` files are already in the repo, so Unity hooks them up as they were):
+
+| Sound | Save as |
+|---|---|
+| Wood Crack 1 | `Assets/Audio/Sounds/CrateBreak.mp3` |
+| Breaking Glass 1 | `Assets/Audio/Sounds/GlassBreak.mp3` |
+| Small Rock Break | `Assets/Audio/Sounds/RockBreak.mp3` |
+| Earthquake Loop | `Assets/Audio/Sounds/Earthquake.mp3` |
+| Item Swing SFX 2 | `Assets/Audio/Sounds/Swing.mp3` |
+| Swing Whoosh 4 | `Assets/Audio/Sounds/Whooshes/SwingWhoosh.mp3` |
+| Hammer Smash Effect | `Assets/Audio/Sounds/HammerSmash.mp3` |
+| Simple Zaps | `Assets/Audio/Sounds/Zap.mp3` |
+
+Then open the project and run **Jam → Build Game Scenes** (without the files, those sounds are just silent).
 
 ## Engine and tools
 

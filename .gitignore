@@ -112,3 +112,13 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Pixabay sounds: their license doesn't allow sharing the raw files (CREDITS.md says where to get them)
+/Assets/Audio/Sounds/CrateBreak.mp3
+/Assets/Audio/Sounds/GlassBreak.mp3
+/Assets/Audio/Sounds/RockBreak.mp3
+/Assets/Audio/Sounds/Earthquake.mp3
+/Assets/Audio/Sounds/Swing.mp3
+/Assets/Audio/Sounds/Whooshes/SwingWhoosh.mp3
+/Assets/Audio/Sounds/HammerSmash.mp3
+/Assets/Audio/Sounds/Zap.mp3
