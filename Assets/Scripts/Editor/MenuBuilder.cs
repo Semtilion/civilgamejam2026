@@ -148,7 +148,7 @@ public static class MenuBuilder
         Add(Sound.TeleporterEnter, "SoundPack01/Rise05.aif", 0.7f);   // stepping into it
 
         // Menus, transitions, town
-        Add(Sound.Click, "Wood1.aif", 0.5f);                          // every button, the pause menu (Esc)
+        Add(Sound.Click, "Click.wav", 0.5f);                          // a tiny tap (made for the game): every button, the pause menu (Esc)
         Add(Sound.Descent, "RockFalling", 0.6f);                      // sinking through the rock into the depths
         Add(Sound.Build, "WoodHits", 0.6f);                           // a building level is built
         Add(Sound.TurnIn, "SoundPack01/Coin01.aif", 0.6f);            // a request is turned in
