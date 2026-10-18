@@ -443,6 +443,7 @@ public class ArenaManager : MonoBehaviour
         bool isBoss = enemy.data.behavior == EnemyBehavior.Boss;
         deathBursts.Burst(enemy.transform.position, enemy.ParticleColor, enemy.radius, isBoss);
         if (isBoss) cameraFollow.Shake(0.4f, 0.3f);
+        if (enemy.data.behavior == EnemyBehavior.Crate) Sfx.Play(enemy.data == crystalCluster ? Sound.GlassBreak : Sound.CrateBreak);
 
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
 
@@ -621,6 +622,9 @@ public class ArenaManager : MonoBehaviour
 
     public void Collect(PickupKind kind, int amount)
     {
+        if (kind == PickupKind.Materials || kind == PickupKind.Supplies) Sfx.Play(Sound.MaterialsPickup);
+        else if (kind == PickupKind.Crystal) Sfx.Play(Sound.CrystalPickup);
+        else if (kind == PickupKind.Gold) Sfx.Play(Sound.GoldPickup);
         if (kind == PickupKind.Materials) diveMaterials += amount;
         else if (kind == PickupKind.Crystal) diveCrystals += amount;
         else if (kind == PickupKind.Gold) diveGold += amount;
@@ -641,6 +645,7 @@ public class ArenaManager : MonoBehaviour
         {
             case SpotKind.Ore:
                 diveOres++;
+                Sfx.Play(Sound.GlassBreak);
                 Tremor(at);
                 break;
             case SpotKind.XpShrine:
@@ -662,6 +667,7 @@ public class ArenaManager : MonoBehaviour
     void Tremor(Vector2 at)
     {
         cameraFollow.Shake(tremorTime, tremorStrength);
+        Sfx.Play(Sound.Tremor);
         Sprite cracks = tremorCrackSprites.Length > 0 ? tremorCrackSprites[Random.Range(0, tremorCrackSprites.Length)] : null;
         TremorEffect.Spawn(at, cracks, rippleSprite, oreArtColor * oreColor, deathBursts);
         hazeAge = 0f;

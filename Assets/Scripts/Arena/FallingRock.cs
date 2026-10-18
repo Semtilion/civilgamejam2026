@@ -111,6 +111,7 @@ public class FallingRock : MonoBehaviour
         float reach = radius + player.radius;
         if (toHero.sqrMagnitude < reach * reach) player.TakeDamage(damage);
         if (toHero.sqrMagnitude < BumpRange * BumpRange) arena.ShakeCamera(0.12f, 0.12f);
+        Sfx.Play(Sound.RockLand);
 
         arena.deathBursts.Burst(at, arena.rockColor, radius * 0.6f, false); // pieces of the rock
         for (int i = 0; i < 6; i++) // dust all around it

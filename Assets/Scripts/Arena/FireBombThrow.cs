@@ -32,6 +32,7 @@ public class FireBombThrow : Weapon
 
         float radius = (patchRadius + bonusRadius * BonusCount) * player.areaMultiplier;
         FireBomb.Throw(this, transform.position, target.transform.position, radius, Damage, player);
+        Sfx.Play(Sound.Whoosh);
         return true;
     }
 }

@@ -52,12 +52,14 @@ public class SwordSweep : Weapon
             if (((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, knockback);
         }
+        Sfx.Play(Sound.Swing);
         sinceSweep = 0f;
         turn = direction;
         startAngle = player.sprite.flipX ? 180f : 0f; // the slash starts where he faces
         if (style == SweepStyle.Shockwave)
         {
             player.arena.ShakeCamera(0.15f, 0.15f);
+            Sfx.Play(Sound.HammerQuake);
             if (crackSprites.Length > 0)
                 GroundCracks.Spawn(crackSprites[Random.Range(0, crackSprites.Length)], center, reachBase, player.arena.deathBursts);
         }

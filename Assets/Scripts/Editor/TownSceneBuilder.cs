@@ -336,6 +336,7 @@ public static class TownSceneBuilder
         MenuBuilder.DebugKeysUI(canvas, null, town, new Vector2(0f, 0f)); // F3 resources; hint bottom-left
         MenuBuilder.TransitionUI(a.glow); // scene changes (for when the game starts in this scene)
         MenuBuilder.MusicPlayer("ANewTown.mp3"); // A New Town
+        MenuBuilder.SoundPlayer(); // (the quake)
 
         EditorSceneManager.SaveScene(scene);
     }

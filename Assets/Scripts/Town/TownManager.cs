@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -173,13 +174,21 @@ public class TownManager : MonoBehaviour
         if (campaign.quakeSinceTown) // the quake hit while you were away
         {
             campaign.quakeSinceTown = false;
-            quakeShake.Play(0.9f, 24f);
+            StartCoroutine(QuakeInView());
         }
         // The run's result first (unless the run is over: the end screen covers everything), then the report.
         RunResult run = campaign.lastResult;
         campaign.lastResult = null;
         if (run != null && !campaign.Ended) results.Show(ResultTitle(run), ResultLines(run), ShowReport);
         else ShowReport();
+    }
+
+    // The quake: the town shakes with a rumble, once it's in view (after the scene transition).
+    IEnumerator QuakeInView()
+    {
+        while (SceneTransition.Busy) yield return null;
+        quakeShake.Play(0.9f, 24f);
+        Sfx.Play(Sound.Quake);
     }
 
     // What happened to the people while you were away (the epilogue covers it if the game has ended), shown once;

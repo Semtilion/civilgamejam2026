@@ -54,6 +54,7 @@ public class SpearThrust : Weapon
             if (evolved) enemy.Pin(pinTime);
         }
 
+        Sfx.Play(Sound.Swing);
         thrustDirection = direction;
         thrustReach = reach;
         thrustVisual.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);

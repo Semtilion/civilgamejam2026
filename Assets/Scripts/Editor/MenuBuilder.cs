@@ -103,6 +103,29 @@ public static class MenuBuilder
         new GameObject("Music").AddComponent<Music>().song = GameBuilder.Song(file);
     }
 
+    // The scene's sound effects (Sfx): which files (Assets/Audio/Sounds, a folder = one at random) play for each Sound,
+    // how loud, and for the cut ones how long (fading out over the last `fade` seconds; the rest play whole).
+    public static void SoundPlayer()
+    {
+        Sfx sfx = new GameObject("Sound Effects").AddComponent<Sfx>();
+        sfx.sounds = new Sfx.Entry[System.Enum.GetValues(typeof(Sound)).Length];
+        void Add(Sound sound, string path, float volume, float length = 0f, float fade = 0f) => sfx.sounds[(int)sound] =
+            new Sfx.Entry { name = sound.ToString(), clips = GameBuilder.SoundClips(path), volume = volume, length = length, fade = fade };
+
+        Add(Sound.CrateBreak, "CrateBreak.mp3", 0.8f, 1f, 0.15f);     // wood crack, its first second: a crate breaks
+        Add(Sound.GlassBreak, "GlassBreak.mp3", 0.7f);                // breaking glass: a crystal cluster breaks, an ore vein is mined
+        Add(Sound.CrystalPickup, "CrystalPickup.aif", 0.5f);          // metal8: crystals picked up
+        Add(Sound.MaterialsPickup, "MaterialsPickup.aif", 0.5f);      // wood12: materials and supplies picked up
+        Add(Sound.GoldPickup, "Coins", 0.5f);                         // the coin sounds: gold picked up
+        Add(Sound.Swing, "Swing.mp3", 0.45f);                         // item swing: sword, spear, quake hammer
+        Add(Sound.Whoosh, "Whooshes", 0.45f);                         // swing whoosh + swishes: dagger, axe, fire bomb, lightning
+        Add(Sound.Hit, "Punches", 0.35f);                             // punches 2 and 3: an enemy is hit
+        Add(Sound.Tremor, "RockBreak.mp3", 0.4f);                     // small rock break, lowered: a mined ore's tremor
+        Add(Sound.RockLand, "RockBreak.mp3", 0.25f);                  // ... quieter: each rock of a rock rain lands
+        Add(Sound.Quake, "Earthquake.mp3", 0.9f, 3f, 1.5f);           // the earthquake loop, a piece: the town's quake
+        Add(Sound.HammerQuake, "Earthquake.mp3", 0.5f, 1.2f, 0.6f);   // ... a shorter piece: a Quake Hammer slam
+    }
+
     // The scene transitions' overlay (SceneTransition): its own canvas on top of everything, hidden until a scene
     // change; the snapshot, the rock (Assets/Art/UI/Descent.png, Tools/bake_descent.py), black, the arrival flash and
     // the card. Every scene gets one; the first one stays for the whole game.

@@ -46,6 +46,7 @@ public static class GameBuilder
     const string CaveFolder = "Assets/Art/Cave";       // the artist's cave textures, cut into 1-unit tiles
     const string UiFolder = "Assets/Art/UI";             // the title / town screens' art (Tools/bake_title.py, bake_town.py)
     const string MusicFolder = "Assets/Audio/Music";     // the songs (cynicmusic, CC0)
+    const string SoundsFolder = "Assets/Audio/Sounds";   // the sound effects (Sfx)
     const string FrameFolder = "Assets/Art/UI/Frame";    // the artist's ornate frame in 12 pieces, white lines (tinted)
     // The frame art's sizes in px: the top / bottom bands and the side columns, and the bands' fixed pieces (the end
     // pieces with the corners, and the centered ornament); the strips between them stretch.
@@ -439,6 +440,20 @@ public static class GameBuilder
             importer.SaveAndReimport();
         }
         return AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+    }
+
+    // A sound effect's clips: Assets/Audio/Sounds/<path>, one file or every clip in a folder (Sfx picks one at random).
+    // Empty (silent) if it isn't there.
+    public static AudioClip[] SoundClips(string path)
+    {
+        path = $"{SoundsFolder}/{path}";
+        if (AssetDatabase.IsValidFolder(path))
+            return AssetDatabase.FindAssets("t:AudioClip", new[] { path })
+                .Select(guid => AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid))).ToArray();
+        AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+        if (clip != null) return new[] { clip };
+        Debug.LogWarning($"{path} not found: that sound is silent.");
+        return new AudioClip[0];
     }
 
     // The title and town screens' art (Assets/Art/UI/<name>.png, baked by Tools/bake_title.py and bake_town.py; `name`

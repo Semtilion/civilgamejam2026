@@ -434,6 +434,7 @@ public class Enemy : MonoBehaviour
             Vector2 toHit = hitFrom - (Vector2)transform.position;
             Vector2 at = toHit.sqrMagnitude > 0.0001f ? (Vector2)transform.position + toHit.normalized * radius * 0.7f : (Vector2)transform.position;
             arena.deathBursts.Spark(at, particleColor);
+            if (data.behavior != EnemyBehavior.Crate) Sfx.Play(Sound.Hit); // (crates and clusters just break)
         }
         if (weaponHit) arena.relics.OnWeaponHit(this, amount);
         if (IsDead)

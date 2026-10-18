@@ -32,6 +32,7 @@ public class AxeThrow : Weapon
             Axe.Throw(axeSprite, axeColor, transform.position, direction, speed, distance, axeRadius * player.areaMultiplier,
                 Damage, knockback, player);
         }
+        Sfx.Play(Sound.Whoosh);
         return true;
     }
 }

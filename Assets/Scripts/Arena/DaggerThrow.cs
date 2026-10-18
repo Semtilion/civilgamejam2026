@@ -34,6 +34,7 @@ public class DaggerThrow : Weapon
             Dagger.Throw(daggerSprite, daggerColor, transform.position, direction, speed, range, Damage, knockback, player,
                 evolved ? maxBounces : 0, bounceChance, bounceRange);
         }
+        Sfx.Play(Sound.Whoosh);
         return true;
     }
 }

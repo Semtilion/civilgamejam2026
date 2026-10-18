@@ -37,6 +37,7 @@ public class LightningStaff : Weapon
             FadeEffect.Circle(impactSprite, at, impactRadius, boltColor, 0.2f);
             target.TakeDamage(Damage, at, 0f);
         }
+        Sfx.Play(Sound.Whoosh);
         return true;
     }
 }

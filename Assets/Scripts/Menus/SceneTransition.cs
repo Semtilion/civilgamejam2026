@@ -20,6 +20,7 @@ public class SceneTransition : MonoBehaviour
     const float SinkTime = 0.7f, RiseTime = 0.6f, FlashTime = 0.45f;
 
     public static SceneTransition Instance { get; private set; }
+    public static bool Busy => Instance != null && Instance.busy; // a scene change is on screen
 
     [Header("Scene references (children, made by the scene builders)")]
     public CanvasGroup group;      // the whole overlay (blocks clicks while it's up)
