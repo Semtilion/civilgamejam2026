@@ -808,6 +808,8 @@ public static class GameBuilder
         return image;
     }
 
+    // A line taller than the box isn't drawn at all (not even clipped): give `size.y` at least 1.36 x fontSize per line
+    // for the text font (Alegreya), 1.13 x for the title font (MedievalSharp).
     public static Text NewText(string name, Transform parent, Vector2 position, Vector2 size, int fontSize, TextAnchor alignment)
     {
         Text text = NewUI(name, parent, position, size).gameObject.AddComponent<Text>();

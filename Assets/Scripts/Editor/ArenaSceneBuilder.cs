@@ -181,14 +181,14 @@ public static class ArenaSceneBuilder
         AddFrame(topLeft.transform, HudFrameThickness, FrameColor);
         Text depthText = Shadowed(NewText("Depth", canvas, new Vector2(40, -36), new Vector2(600, 36), 26, TextAnchor.MiddleLeft));
         Pin(depthText.rectTransform, new Vector2(0f, 1f));
-        Text lootText = Shadowed(NewText("Loot", canvas, new Vector2(40, -72), new Vector2(600, 32), 24, TextAnchor.MiddleLeft));
+        Text lootText = Shadowed(NewText("Loot", canvas, new Vector2(40, -72), new Vector2(600, 34), 24, TextAnchor.MiddleLeft));
         Pin(lootText.rectTransform, new Vector2(0f, 1f));
 
         // Bottom-left (above the level): quake meter + ores mined this dive
         Image bottomLeft = NewImage("Bottom-Left Backing", canvas, new Vector2(14, 78), new Vector2(460, 44), backing); // fits its longest line
         Pin(bottomLeft.rectTransform, new Vector2(0f, 0f));
         AddFrame(bottomLeft.transform, HudFrameThickness * 2f, FrameColor); // a thin strip: a thinner frame
-        Text quakeText = Shadowed(NewText("Quake", canvas, new Vector2(24, 84), new Vector2(440, 32), 24, TextAnchor.MiddleLeft));
+        Text quakeText = Shadowed(NewText("Quake", canvas, new Vector2(24, 84), new Vector2(440, 34), 24, TextAnchor.MiddleLeft));
         Pin(quakeText.rectTransform, new Vector2(0f, 0f));
 
         // Top-center: kill goal + its progress bar, boss bar
@@ -229,7 +229,7 @@ public static class ArenaSceneBuilder
         DynamicBar xpDynamic = xpBar.gameObject.AddComponent<DynamicBar>();
         xpDynamic.kind = DynamicBar.Kind.Experience;
         xpDynamic.fill = xpFill;
-        Text levelText = Shadowed(NewText("Level", xpHud, new Vector2(24, 40), new Vector2(200, 36), 28, TextAnchor.MiddleLeft));
+        Text levelText = Shadowed(NewText("Level", xpHud, new Vector2(24, 40), new Vector2(200, 40), 28, TextAnchor.MiddleLeft));
         Pin(levelText.rectTransform, new Vector2(0f, 0f));
 
         // Center: level-up cards (drawn above everything else)
