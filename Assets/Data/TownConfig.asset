@@ -16,10 +16,10 @@ MonoBehaviour:
   - name: Guard
     faction: Soldiers
     startPopulation: 100
-    unlocksWeapon: 1
+    unlocksEvolution: 1
     weapon: 2
     portrait: {fileID: 21300000, guid: 8b267f7ab18c4724db375f46cd377dd1, type: 3}
-    thanks: "Good. My soldiers will put it to use."
+    thanks: Good. My soldiers will put it to use.
     color: {r: 1, g: 0.8, b: 0.3, a: 1}
     workGold: 20
     workMaterials: 0
@@ -27,10 +27,10 @@ MonoBehaviour:
   - name: Shaman
     faction: Mages
     startPopulation: 50
-    unlocksWeapon: 1
+    unlocksEvolution: 1
     weapon: 3
     portrait: {fileID: 21300000, guid: e84a8475e799acb4dacbfdb9201464ab, type: 3}
-    thanks: "The crystals approve. So do I."
+    thanks: The crystals approve. So do I.
     color: {r: 0.65, g: 0.45, b: 0.95, a: 1}
     workGold: 10
     workMaterials: 0
@@ -38,15 +38,14 @@ MonoBehaviour:
   - name: Elder
     faction: Peasants
     startPopulation: 200
-    unlocksWeapon: 1
+    unlocksEvolution: 1
     weapon: 1
     portrait: {fileID: 21300000, guid: 8bfd9def369a90c46bedce41a68f0bf8, type: 3}
-    thanks: "Bless you. That will hold a while longer."
+    thanks: Bless you. That will hold a while longer.
     color: {r: 0.85, g: 0.65, b: 0.35, a: 1}
     workGold: 0
     workMaterials: 8
     workCrystals: 0
-  halfHelpBelow: 0.5
   questInterval: 3
   questGold: 50
   killQuests:
@@ -120,8 +119,6 @@ MonoBehaviour:
   daysLostOnDefeat: 1
   firstQuakeDay: 4
   quakeEvery: 3
-  raidEveryQuakes: 2
-  raidLossPerDay: 1
   quakeStart: 30
   quakePerDay: 10
   quakePassivePerDay: 5
@@ -137,3 +134,5 @@ MonoBehaviour:
   killedUnready: 0.7
   killedReady: 0.2
   injuredDays: 2
+  glassCannonEnabled: 0
+  footageMode: 1

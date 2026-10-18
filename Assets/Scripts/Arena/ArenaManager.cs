@@ -244,6 +244,8 @@ public class ArenaManager : MonoBehaviour
     static readonly Color CrystalShrineColor = new Color(0.65f, 0.35f, 0.95f); // purple
 
     int KillsNeeded => killsToClear + extraKillsPerDepth * (depth - 1);
+    const float FootageGoalTime = 15f; // Town Config > Footage Mode: seconds of fighting instead of the kill goal
+    float depthTime;                   // seconds played on this depth
     bool IsBossDepth => depth % bossEvery == 0;
     float StatScale => 1f + statScalePerDepth * (depth - 1);
 
@@ -307,6 +309,7 @@ public class ArenaManager : MonoBehaviour
         player.transform.position = Bounds.center;
         player.ResetLook(); // no flash left over
         depthKills = 0;
+        depthTime = 0f;
         spawnTimer = 0f;
         bossSpawned = false;
         bossDue = false;
@@ -392,6 +395,9 @@ public class ArenaManager : MonoBehaviour
 
         UpdateTraps(); // traps still come after the teleporter opens
 
+        depthTime += Time.deltaTime;
+        if (config.footageMode && !bossSpawned && teleporter == null && depthTime >= FootageGoalTime) GoalReached();
+
         // Set by OnEnemyKilled, done here: a weapon may still be looping over Enemy.All when the kill happens
         // (spawning would change the list mid-loop), and the relic pauses the game with a panel.
         if (bossDue)
@@ -418,7 +424,7 @@ public class ArenaManager : MonoBehaviour
             }
             if (((Vector2)(player.transform.position - teleporter.transform.position)).sqrMagnitude <= teleporterRadius * teleporterRadius)
                 DepthCleared(); // the moment he touches it
-            return; // no spawns while it's open
+            if (!IsPlaying || !config.footageMode) return; // no spawns while it's open (Footage Mode: they keep coming)
         }
 
         spawnTimer -= Time.deltaTime;
@@ -479,7 +485,7 @@ public class ArenaManager : MonoBehaviour
             if (teleporter == null) OpenTeleporter(); // (already open: a boss summoned with the debug key)
             relicDue = true; // every boss drops a relic
         }
-        else if (!bossSpawned && teleporter == null && depthKills >= KillsNeeded)
+        else if (!config.footageMode && !bossSpawned && teleporter == null && depthKills >= KillsNeeded)
         {
             GoalReached();
         }
@@ -816,10 +822,11 @@ public class ArenaManager : MonoBehaviour
 
     // ---------- Spawning ----------
 
-    // Spawns speed up as the kill count gets closer to the goal, and more on deeper levels.
+    // Spawns speed up as the kill count gets closer to the goal (Footage Mode: as the 15 seconds pass), and more on
+    // deeper levels.
     float CurrentSpawnInterval()
     {
-        float progress = Mathf.Clamp01((float)depthKills / KillsNeeded);
+        float progress = Mathf.Clamp01(config.footageMode ? depthTime / FootageGoalTime : (float)depthKills / KillsNeeded);
         float interval = Mathf.Lerp(spawnIntervalStart, spawnIntervalEnd, progress);
         return interval / (1f + spawnScalePerDepth * (depth - 1));
     }
@@ -925,8 +932,10 @@ public class ArenaManager : MonoBehaviour
         float oreDrop = diveOres * config.orePercent;
         quakeText.text = $"Quake day {campaign.NextQuakeDay}: {campaign.QuakeForecast:0}%     Ores {diveOres} (-{oreDrop:0}%)";
 
-        goalText.text = teleporter != null ? "Teleporter open!" : bossSpawned ? "BOSS" : $"Kills {depthKills} / {KillsNeeded}";
-        if (teleporter == null && !bossSpawned) goal = (float)depthKills / KillsNeeded;
+        goalText.text = teleporter != null ? "Teleporter open!" : bossSpawned ? "BOSS" :
+            config.footageMode ? $"Kills {depthKills}" : $"Kills {depthKills} / {KillsNeeded}";
+        if (teleporter == null && !bossSpawned)
+            goal = Mathf.Clamp01(config.footageMode ? depthTime / FootageGoalTime : (float)depthKills / KillsNeeded);
 
         // The boss bar takes the goal bar's place.
         bool showGoal = goal >= 0f && !bossBar.activeSelf;

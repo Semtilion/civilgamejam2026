@@ -32,6 +32,7 @@ public class LevelUp : MonoBehaviour
         public bool evolution;
         public int rarity; // 0 common, 1 Blue, 2 Gold
         public bool relic; // a relic card: taking it doesn't use up a level-up pick
+        public bool newWeapon; // "NEW: Dagger" (Footage Mode always shows one)
     }
 
     [Tooltip("XP gems and level-up cards during dives. Off = the Sword only, all other power from the town.")]
@@ -200,6 +201,9 @@ public class LevelUp : MonoBehaviour
         Shuffle(cards);
         int evolution = cards.FindIndex(c => c.evolution); // an evolution always gets the first slot
         if (evolution > 0) (cards[0], cards[evolution]) = (cards[evolution], cards[0]);
+        // Footage Mode: a weapon you don't have yet is always among the three (in the last slot, if it wasn't)
+        int newWeapon = cards.FindIndex(c => c.newWeapon);
+        if (player.arena.config.footageMode && newWeapon > 2) (cards[2], cards[newWeapon]) = (cards[newWeapon], cards[2]);
         Celebrate(cards);
     }
 
@@ -273,13 +277,15 @@ public class LevelUp : MonoBehaviour
 
         foreach (Weapon weapon in weapons)
         {
-            if (!weapon.enabled && !Weapon.IsRelicWeapon(weapon.id)) // relic weapons only come from relics
+            // Relic weapons only come from relics (Footage Mode: from cards too, for that dive)
+            if (!weapon.enabled && (!Weapon.IsRelicWeapon(weapon.id) || player.arena.config.footageMode))
             {
                 cards.Add(new Card
                 {
                     title = "NEW: " + weapon.DisplayName,
                     description = weapon.description,
                     apply = () => { weapon.level = 1; weapon.enabled = true; },
+                    newWeapon = true,
                 });
             }
             else if (weapon.enabled && weapon.level < Weapon.MaxLevel)

@@ -167,6 +167,12 @@ public class TownConfig : ScriptableObject
              "debug list can still give it.")]
     public bool glassCannonEnabled;
 
+    [Header("Trailer")]
+    [Tooltip("Only for recording footage (a separate trailer build): every depth's teleporter (or boss) comes after " +
+             "15 seconds of fighting instead of the kill goal, monsters keep spawning after it opens, and every level-up " +
+             "offers a weapon you don't have yet (relic weapons too, for that dive). Off for the real game.")]
+    public bool footageMode;
+
     public Quest NewQuest()
     {
         if (killQuests.Length == 0 || Random.value < materialQuestChance)
