@@ -332,6 +332,7 @@ public class Enemy : MonoBehaviour
                 {
                     bossState = BossState.Charge;
                     dangerZone.enabled = false;
+                    Sfx.Play(Sound.BossDash);
                 }
                 return Vector2.zero;
 
@@ -415,6 +416,7 @@ public class Enemy : MonoBehaviour
                 Vector2 from = (Vector2)transform.position + direction * radius;
                 Projectile.Fire(shot, data.color, particleColor, from, direction, data.projectileSpeed, projectileDamage, player);
             }
+            Sfx.Play(Sound.SpitterShot);
         }
     }
 

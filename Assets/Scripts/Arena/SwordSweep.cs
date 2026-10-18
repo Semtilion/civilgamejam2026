@@ -52,7 +52,7 @@ public class SwordSweep : Weapon
             if (((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(Damage, center, knockback);
         }
-        Sfx.Play(Sound.Swing);
+        Sfx.Play(style == SweepStyle.Shockwave ? Sound.HammerSmash : Sound.Swing);
         sinceSweep = 0f;
         turn = direction;
         startAngle = player.sprite.flipX ? 180f : 0f; // the slash starts where he faces

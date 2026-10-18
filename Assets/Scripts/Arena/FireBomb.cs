@@ -130,6 +130,8 @@ public class FireBomb : MonoBehaviour
         Destroy(shadow.gameObject);
         player.arena.deathBursts.Burst(to, weapon.shardColor, 0.3f, false);
         player.arena.deathBursts.Burst(to, weapon.fireColor, 0.3f, false);
+        Sfx.Play(Sound.BombBreak);
+        Sfx.Play(Sound.Flame);
 
         flames.transform.localPosition = Vector3.zero;
         flames.sortingOrder = -1;

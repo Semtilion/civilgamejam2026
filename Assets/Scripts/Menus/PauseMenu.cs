@@ -41,6 +41,7 @@ public class PauseMenu : MonoBehaviour
     {
         panel.SetActive(true);
         Time.timeScale = 0f;
+        Sfx.Play(Sound.Click);
     }
 
     void Resume()
@@ -49,5 +50,6 @@ public class PauseMenu : MonoBehaviour
         settings.Close();
         panel.SetActive(false);
         Time.timeScale = 1f;
+        Sfx.Play(Sound.Click); // (Esc; the Resume button clicks anyway)
     }
 }

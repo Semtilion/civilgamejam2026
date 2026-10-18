@@ -91,6 +91,7 @@ public class SceneTransition : MonoBehaviour
         snapshot.enabled = true;
         rock.enabled = true;
         Music.FadeOut(SinkTime);
+        Sfx.Play(Sound.Descent);
         float height = ((RectTransform)transform).rect.height;
         yield return Animate(SinkTime, t => // the view sinks: the screen slides up, the rock comes up from below
         {

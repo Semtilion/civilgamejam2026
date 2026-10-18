@@ -103,8 +103,9 @@ public static class MenuBuilder
         new GameObject("Music").AddComponent<Music>().song = GameBuilder.Song(file);
     }
 
-    // The scene's sound effects (Sfx): which files (Assets/Audio/Sounds, a folder = one at random) play for each Sound,
-    // how loud, and for the cut ones how long (fading out over the last `fade` seconds; the rest play whole).
+    // The sound effects (Sfx): which files (Assets/Audio/Sounds, a folder = one at random) play for each Sound, how
+    // loud, and for the cut ones how long (fading out over the last `fade` seconds; the rest play whole). Every scene
+    // gets one; the first one stays for the whole game.
     public static void SoundPlayer()
     {
         Sfx sfx = new GameObject("Sound Effects").AddComponent<Sfx>();
@@ -117,8 +118,45 @@ public static class MenuBuilder
         Add(Sound.CrystalPickup, "CrystalPickup.aif", 0.5f);          // metal8: crystals picked up
         Add(Sound.MaterialsPickup, "MaterialsPickup.aif", 0.5f);      // wood12: materials and supplies picked up
         Add(Sound.GoldPickup, "Coins", 0.5f);                         // the coin sounds: gold picked up
-        Add(Sound.Swing, "Swing.mp3", 0.45f);                         // item swing: sword, spear, quake hammer
+        Add(Sound.Swing, "Swing.mp3", 0.45f);                         // item swing: sword, spear
+        Add(Sound.HammerSmash, "HammerSmash.mp3", 0.7f);              // hammer smash: a Quake Hammer slam (with HammerQuake)
         Add(Sound.Whoosh, "Whooshes", 0.45f);                         // swing whoosh + swishes: dagger, axe, fire bomb, lightning
+        Add(Sound.BombBreak, "BombBreak.ogg", 0.6f);                  // glass breaking 2: a fire bomb lands and breaks
+        Add(Sound.Flame, "Flame.ogg", 0.5f);                          // catching fire: its fire patch lights
+        Add(Sound.Zap, "Zap.mp3", 0.5f, 0.3f, 0.08f);                 // simple zaps, a short piece: Lightning Staff, Storm Orb
+
+        // Dungeon: combat
+        Add(Sound.HeroHurt, "HeroHurt.ogg", 0.7f);                    // punch 1: the hero is hit
+        Add(Sound.HeroDeath, "SoundPack01/Downer01.aif", 0.8f);       // DEFEATED
+        Add(Sound.Revive, "SoundPack01/Rise01.aif", 0.8f);            // Second Wind
+        Add(Sound.SpitterShot, "Whooshes", 0.25f);                    // a Spitter's volley (quiet)
+        Add(Sound.Explosion, "RockBreaking", 0.6f);                   // a Volatile enemy's blast, Volatile Core
+        Add(Sound.BossArrive, "SoundPack01/Alarm.aif", 0.7f, 1.5f, 0.4f); // the alarm, a piece: a boss walks in
+        Add(Sound.BossDash, "Whooshes/SwingWhoosh.mp3", 0.6f);        // a boss dashes
+        Add(Sound.BossDeath, "Breaking", 0.8f);                       // a boss dies
+        Add(Sound.Freeze, "GlassHits", 0.4f);                         // Frost Shard slows an enemy
+        Add(Sound.Ricochet, "MetalHits", 0.35f);                      // a dagger bounces (Ricochet)
+
+        // Dungeon: progress
+        Add(Sound.XpPickup, "Metal1.aif", 0.15f);                     // XP picked up (very quiet: it's constant)
+        Add(Sound.LevelUp, "SoundPack01/Upper01.aif", 0.7f);          // the level-up moment
+        Add(Sound.CardPick, "WoodHits", 0.6f);                        // a level-up card is picked
+        Add(Sound.RelicFound, "SoundPack01/Rise03.aif", 0.8f);        // a relic is found
+        Add(Sound.Mining, "RockHit.ogg", 0.35f);                      // each chip while mining an ore or shrine
+        Add(Sound.ShrineDone, "SoundPack01/Rise04.aif", 0.7f);        // a shrine is used up
+        Add(Sound.TeleporterOpen, "SoundPack01/FX01.aif", 0.7f);      // the teleporter opens
+        Add(Sound.TeleporterEnter, "SoundPack01/Rise05.aif", 0.7f);   // stepping into it
+
+        // Menus, transitions, town
+        Add(Sound.Click, "Wood1.aif", 0.5f);                          // every button, the pause menu (Esc)
+        Add(Sound.Descent, "RockFalling", 0.6f);                      // sinking through the rock into the depths
+        Add(Sound.Build, "WoodHits", 0.6f);                           // a building level is built
+        Add(Sound.TurnIn, "SoundPack01/Coin01.aif", 0.6f);            // a request is turned in
+        Add(Sound.LeaderSlide, "Whooshes", 0.35f);                    // the leader window slides in / out
+        Add(Sound.Report, "SoundPack01/Downer01.aif", 0.6f);          // the quake report
+        Add(Sound.Evolution, "SoundPack01/Upper01.aif", 0.7f);        // a leader taught an evolution
+        Add(Sound.Results, "Coins", 0.5f);                            // a dive's results
+        Add(Sound.GameOver, "SoundPack01/Downer01.aif", 0.8f);        // the town has fallen
         Add(Sound.Hit, "Punches", 0.35f);                             // punches 2 and 3: an enemy is hit
         Add(Sound.Tremor, "RockBreak.mp3", 0.4f);                     // small rock break, lowered: a mined ore's tremor
         Add(Sound.RockLand, "RockBreak.mp3", 0.25f);                  // ... quieter: each rock of a rock rain lands

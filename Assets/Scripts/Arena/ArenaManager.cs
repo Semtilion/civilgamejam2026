@@ -433,6 +433,7 @@ public class ArenaManager : MonoBehaviour
 
     void ShowBoss(Enemy enemy)
     {
+        Sfx.Play(Sound.BossArrive);
         currentBoss = enemy;
         bossName.text = enemy.data.displayName;
         bossBar.SetActive(true);
@@ -442,7 +443,11 @@ public class ArenaManager : MonoBehaviour
     {
         bool isBoss = enemy.data.behavior == EnemyBehavior.Boss;
         deathBursts.Burst(enemy.transform.position, enemy.ParticleColor, enemy.radius, isBoss);
-        if (isBoss) cameraFollow.Shake(0.4f, 0.3f);
+        if (isBoss)
+        {
+            cameraFollow.Shake(0.4f, 0.3f);
+            Sfx.Play(Sound.BossDeath);
+        }
         if (enemy.data.behavior == EnemyBehavior.Crate) Sfx.Play(enemy.data == crystalCluster ? Sound.GlassBreak : Sound.CrateBreak);
 
         if (!IsPlaying) return; // the depth already ended this frame (e.g. several enemies died in one sweep)
@@ -529,6 +534,7 @@ public class ArenaManager : MonoBehaviour
             if (enemy.data.behavior == EnemyBehavior.Shooter && !OnScreen(enemy.transform.position)) Destroy(enemy.gameObject);
 
         // A swirling portal lighting up the cave around it; it opens with a burst, a ring and a flash of light.
+        Sfx.Play(Sound.TeleporterOpen);
         Vector2 at = RandomFloorPoint(player.transform.position, teleporterRadius); // (picked before it exists)
         teleporter = new GameObject("Teleporter");
         teleporter.transform.position = at;
@@ -555,6 +561,7 @@ public class ArenaManager : MonoBehaviour
     public void OnHeroHit(int amount)
     {
         cameraFollow.Shake(0.15f, 0.15f);
+        Sfx.Play(Sound.HeroHurt);
         hurtAge = 0f;
         deathBursts.Burst(player.transform.position, player.particleColor, 0.4f, false);
         damageNumbers.Show((Vector2)player.transform.position + Vector2.up * 1.3f, $"-{amount}", HeroDamageColor);
@@ -572,6 +579,7 @@ public class ArenaManager : MonoBehaviour
     // Stepped into the teleporter: everything still on the floor is collected, then: go deeper or go home.
     void DepthCleared()
     {
+        Sfx.Play(Sound.TeleporterEnter);
         depthsCleared++;
         int foundMaterials = 0;
         int foundCrystals = 0;
@@ -610,6 +618,7 @@ public class ArenaManager : MonoBehaviour
     void FindRelic()
     {
         if (!relics.TryFind(out RelicId relic)) return; // you have them all
+        Sfx.Play(Sound.RelicFound);
         ShowNotice($"RELIC: {Relics.Names[(int)relic]}", relics.Describe(relic));
     }
 
@@ -617,6 +626,7 @@ public class ArenaManager : MonoBehaviour
     {
         if (relics.TrySecondWind()) return; // back up, the fight goes on
 
+        Sfx.Play(Sound.HeroDeath);
         ShowPanel("DEFEATED", "The loot is lost.", "Return to town", () => EndDive(false));
     }
 
@@ -625,6 +635,7 @@ public class ArenaManager : MonoBehaviour
         if (kind == PickupKind.Materials || kind == PickupKind.Supplies) Sfx.Play(Sound.MaterialsPickup);
         else if (kind == PickupKind.Crystal) Sfx.Play(Sound.CrystalPickup);
         else if (kind == PickupKind.Gold) Sfx.Play(Sound.GoldPickup);
+        else if (kind == PickupKind.Xp) Sfx.Play(Sound.XpPickup);
         if (kind == PickupKind.Materials) diveMaterials += amount;
         else if (kind == PickupKind.Crystal) diveCrystals += amount;
         else if (kind == PickupKind.Gold) diveGold += amount;
@@ -641,11 +652,11 @@ public class ArenaManager : MonoBehaviour
     // dies).
     public void SpotMined(SpotKind kind, Vector2 at)
     {
+        Sfx.Play(kind == SpotKind.Ore ? Sound.GlassBreak : Sound.ShrineDone);
         switch (kind)
         {
             case SpotKind.Ore:
                 diveOres++;
-                Sfx.Play(Sound.GlassBreak);
                 Tremor(at);
                 break;
             case SpotKind.XpShrine:

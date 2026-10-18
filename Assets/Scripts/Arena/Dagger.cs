@@ -71,6 +71,7 @@ public class Dagger : MonoBehaviour
             {
                 enemy.TakeDamage(damage, (Vector2)transform.position - velocity, knockback); // pushed along the flight
                 if (bouncesLeft <= 0 || Random.value >= bounceChance || !BounceFrom(enemy)) Destroy(gameObject);
+                else Sfx.Play(Sound.Ricochet);
                 return;
             }
         }

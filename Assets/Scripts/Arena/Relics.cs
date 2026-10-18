@@ -197,6 +197,7 @@ public class Relics : MonoBehaviour
     {
         if (!Has(RelicId.SecondWind) || secondWindUsed) return false;
         secondWindUsed = true;
+        Sfx.Play(Sound.Revive);
 
         Player player = arena.player;
         player.Revive(secondWindHp, secondWindInvulnerable);
@@ -224,7 +225,10 @@ public class Relics : MonoBehaviour
         if (Has(RelicId.StormOrb) && Random.value < procChance)
             ChainLightning(enemy, Share(damage, chainShare));
         if (Has(RelicId.FrostShard) && Random.value < procChance)
+        {
             enemy.Slow(slowTime, enemy.data.behavior == EnemyBehavior.Boss ? bossSlowAmount : slowAmount);
+            Sfx.Play(Sound.Freeze);
+        }
     }
 
     static int Share(int damage, float share) => Mathf.Max(1, Mathf.RoundToInt(damage * share));
@@ -238,6 +242,7 @@ public class Relics : MonoBehaviour
             if (!enemy.IsDead && ((Vector2)enemy.transform.position - center).sqrMagnitude <= reach * reach)
                 enemy.TakeDamage(damage, center, 0f, false);
         }
+        Sfx.Play(Sound.Explosion);
         // A fiery burst and ring with sparks, a scorch mark left behind, a little smoke
         FadeEffect.Circle(arena.fxScorch, center, explosionRadius * 0.9f, ScorchColor, 1.2f, 1f, false, -2);
         FadeEffect.Circle(arena.fxBurst, center, explosionRadius, ExplosionColor, 0.3f);
@@ -268,6 +273,7 @@ public class Relics : MonoBehaviour
             if (next == null) return;
 
             Vector2 target = next.transform.position;
+            Sfx.Play(Sound.Zap); // (the jumps are all at once: one zap)
             FadeEffect.Line(arena.fxBolt, current, target, 0.7f, LightningColor, 0.2f); // a jagged bolt...
             FadeEffect.Circle(arena.fxCrackle, target, 0.6f, LightningColor, 0.2f);      // ...crackling on the enemy
             arena.deathBursts.Sparkle(target, LightningColor);

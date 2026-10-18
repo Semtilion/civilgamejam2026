@@ -1,12 +1,24 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 // Every sound effect in the game (which files, how loud: MenuBuilder.SoundPlayer).
-public enum Sound { CrateBreak, GlassBreak, CrystalPickup, MaterialsPickup, GoldPickup, Swing, Whoosh, Hit, Tremor, RockLand, Quake, HammerQuake }
+public enum Sound
+{
+    CrateBreak, GlassBreak, CrystalPickup, MaterialsPickup, GoldPickup, Swing, Whoosh, Hit, Tremor, RockLand, Quake, HammerQuake,
+    HammerSmash, BombBreak, Flame, Zap,
+    HeroHurt, HeroDeath, Revive, SpitterShot, Explosion, BossArrive, BossDash, BossDeath, Freeze, Ricochet,
+    XpPickup, LevelUp, CardPick, RelicFound, Mining, ShrineDone, TeleporterOpen, TeleporterEnter,
+    Click, Descent, Build, TurnIn, LeaderSlide, Report, Evolution, Results, GameOver
+}
 
-// The scene's sound effects: Sfx.Play(sound) plays one of its clips (at random) at the settings' effects volume, with a
+// The sound effects: Sfx.Play(sound) plays one of its clips (at random) at the settings' effects volume, with a
 // slightly different pitch each time. A sound plays at most MaxCopies at once and not twice within MinGap seconds, so
 // many at once (30 pickups, a sweep hitting 20 enemies) don't pile up. A cut sound stops after its `length`, fading
-// out over its last `fade` seconds. One per scene (made by the scene builders); without one, Play does nothing.
+// out over its last `fade` seconds. Every button in every scene clicks (Sound.Click).
+// One per game like Music: every scene has one (made by the scene builders), the first stays, so sounds play on
+// through scene changes. Without one, Play does nothing.
 public class Sfx : MonoBehaviour
 {
     const int Voices = 16, MaxCopies = 3;
@@ -41,9 +53,21 @@ public class Sfx : MonoBehaviour
         if (instance != null) instance.Begin(sound);
     }
 
+    // Plays `sound` once no scene transition covers the screen (a popup that opens as its scene loads).
+    public static void PlayWhenShown(Sound sound)
+    {
+        if (instance != null) instance.StartCoroutine(instance.AfterTransition(sound));
+    }
+
     void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject); // the one from the first scene stays
+            return;
+        }
         instance = this;
+        DontDestroyOnLoad(gameObject);
         voices = new Voice[Voices];
         for (int i = 0; i < Voices; i++)
         {
@@ -53,11 +77,35 @@ public class Sfx : MonoBehaviour
         }
         lastStart = new float[System.Enum.GetValues(typeof(Sound)).Length];
         System.Array.Fill(lastStart, -1f);
+        HookButtons();
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void OnDestroy()
     {
-        if (instance == this) instance = null;
+        if (instance != this) return;
+        instance = null;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode) => HookButtons();
+
+    // Every button in the loaded scenes (hidden ones too) clicks; hooking one twice is harmless.
+    static void HookButtons()
+    {
+        foreach (Button button in FindObjectsByType<Button>(FindObjectsInactive.Include))
+        {
+            button.onClick.RemoveListener(Click);
+            button.onClick.AddListener(Click);
+        }
+    }
+
+    static void Click() => Play(Sound.Click);
+
+    IEnumerator AfterTransition(Sound sound)
+    {
+        while (SceneTransition.Busy) yield return null;
+        Begin(sound);
     }
 
     void Begin(Sound sound)

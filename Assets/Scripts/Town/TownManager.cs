@@ -116,6 +116,7 @@ public class TownManager : MonoBehaviour
     readonly List<int> shownBuildings = new List<int>(); // TownConfig.buildings index behind each building button
     readonly Dictionary<Sprite, Sprite> greyPortraits = new Dictionary<Sprite, Sprite>(); // made once each
     Sprite[] liveBanners; // the banners as built
+    bool endSounded;      // the town has fallen: its sound played (once)
 
     // Buttons beyond the NPCs in the config are hidden (e.g. a scene built before an NPC was removed).
     int NpcCount => Mathf.Min(npcButtons.Length, config.npcs.Length);
@@ -154,7 +155,12 @@ public class TownManager : MonoBehaviour
         for (int i = 0; i < buildingButtons.Length; i++)
         {
             int slot = i; // copy for the lambda
-            buildingButtons[i].onClick.AddListener(() => { if (campaign.Build(shownBuildings[slot])) Thank(); });
+            buildingButtons[i].onClick.AddListener(() =>
+            {
+                if (!campaign.Build(shownBuildings[slot])) return;
+                Sfx.Play(Sound.Build);
+                Thank();
+            });
         }
         diveButton.onClick.AddListener(() => Leave(arenaScene));
         newGameButton.onClick.AddListener(() =>
@@ -179,7 +185,11 @@ public class TownManager : MonoBehaviour
         // The run's result first (unless the run is over: the end screen covers everything), then the report.
         RunResult run = campaign.lastResult;
         campaign.lastResult = null;
-        if (run != null && !campaign.Ended) results.Show(ResultTitle(run), ResultLines(run), ShowReport);
+        if (run != null && !campaign.Ended)
+        {
+            results.Show(ResultTitle(run), ResultLines(run), ShowReport);
+            Sfx.PlayWhenShown(Sound.Results);
+        }
         else ShowReport();
     }
 
@@ -201,6 +211,7 @@ public class TownManager : MonoBehaviour
             reportHeading.text = campaign.reportTitle ?? $"DAY {campaign.day}";
             reportText.text = string.Join("\n", campaign.report);
             reportPanel.SetActive(true);
+            Sfx.PlayWhenShown(Sound.Report);
         }
         campaign.report.Clear();
         campaign.reportTitle = null;
@@ -232,6 +243,7 @@ public class TownManager : MonoBehaviour
         evolutionBurst.colors = new[] { color, Color.white };
         evolutionPanel.SetActive(true);
         evolutionBurst.Burst();
+        Sfx.PlayWhenShown(Sound.Evolution);
     }
 
     // Continue, Esc or a click: closed, and the next one shows if two leaders taught you at once.
@@ -267,6 +279,7 @@ public class TownManager : MonoBehaviour
         reward = null;
         leaderWindow.SetActive(true);
         ShowLeader(true);
+        Sfx.Play(Sound.LeaderSlide);
     }
 
     // Turns in the open leader's finished request: they thank you, and the dialogue shows what it paid.
@@ -275,6 +288,7 @@ public class TownManager : MonoBehaviour
         NpcDefinition definition = config.npcs[selected];
         bool teaches = definition.unlocksEvolution && !campaign.npcs[selected].everCompleted;
         if (!campaign.TurnIn(selected)) return;
+        Sfx.Play(Sound.TurnIn);
         Thank($"+{config.questGold} gold{(teaches ? $" · learned {Weapon.EvolutionNames[(int)definition.weapon]}" : "")}");
         ShowEvolution(); // their first request: the evolution popup over the window
     }
@@ -294,6 +308,7 @@ public class TownManager : MonoBehaviour
     void CloseLeader()
     {
         leaderSlide.Close(); // hides it once it's slid away
+        Sfx.Play(Sound.LeaderSlide);
     }
 
     // Remembers the counters (so they roll from here next time), then loads the scene.
@@ -336,6 +351,8 @@ public class TownManager : MonoBehaviour
     {
         epiloguePanel.SetActive(campaign.Ended);
         if (!campaign.Ended) return;
+        if (!endSounded) Sfx.PlayWhenShown(Sound.GameOver); // once (this runs on every Refresh)
+        endSounded = true;
 
         epilogueTitle.text = "THE TOWN HAS FALLEN";
         string body = campaign.endingReason;

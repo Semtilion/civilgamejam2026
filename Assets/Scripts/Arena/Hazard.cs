@@ -128,6 +128,7 @@ public class Hazard : MonoBehaviour
     void Explode()
     {
         if (HeroInside()) arena.player.TakeDamage(damage);
+        Sfx.Play(Sound.Explosion);
         arena.deathBursts.Burst(transform.position, color, radius * 0.6f, true);
         Destroy(gameObject);
     }

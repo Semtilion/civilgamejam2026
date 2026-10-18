@@ -210,6 +210,7 @@ public class LevelUp : MonoBehaviour
         celebrated = cards;
         celebrate = CelebrateTime;
         Time.timeScale = 0f;
+        Sfx.Play(Sound.LevelUp);
         ArenaManager arena = player.arena;
         player.Flash(new Color(0.85f, 1f, 1f, 0.8f), 0.25f);
         FadeEffect.Column(arena.fxGlow, player.Feet, 1.2f, 4.5f, LevelLight, CelebrateTime, unscaled: true);
@@ -221,6 +222,7 @@ public class LevelUp : MonoBehaviour
     // A relic pickup was collected (the relic already works): one Gold card with it; taking it just closes the panel.
     public void ShowRelic(string name, string description)
     {
+        Sfx.Play(Sound.RelicFound);
         Show("RELIC FOUND", new List<Card> { new Card { title = name, description = description, apply = () => { }, rarity = 2, relic = true } });
     }
 
@@ -256,6 +258,7 @@ public class LevelUp : MonoBehaviour
 
     void Pick(Card card)
     {
+        Sfx.Play(Sound.CardPick);
         card.apply();
         if (!card.relic) pendingPicks--;
         shownCards.Clear();

@@ -121,6 +121,7 @@ public class MineSpot : MonoBehaviour
             if (chipTimer <= 0f)
             {
                 chipTimer = ChipInterval;
+                Sfx.Play(Sound.Mining);
                 arena.deathBursts.Sparkle((Vector2)transform.position + Random.insideUnitCircle * 0.4f, chipColor);
             }
         }
